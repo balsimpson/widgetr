@@ -3,7 +3,7 @@
 ## Approved product and delivery plan
 
 Last updated: 28 August 2026  
-Status: Phase 0 complete; Phase 2 implemented locally; real Scriptable verification pending
+Status: Phase 0 complete; Phase 3 implemented locally; real Scriptable verification pending
 Working title: Scriptable Widget Builder  
 Challenge: [The WebMCP Challenge](https://webmcp.devpost.com/)
 
@@ -15,23 +15,24 @@ This section is the resume point for a new chat. The implementation lives in `/U
 
 | Area | Status | Evidence or remaining work |
 | --- | --- | --- |
-| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and `main` points to commit `90b178e`. |
+| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and the completed Phase 3 commit is `518e372` locally before push. |
 | Runtime | Ready locally | Use Node 22.23.1 at `/Users/balsimpson/.local/bin/node` with npm. The system Node 25 runtime is outside Nuxt's supported even-LTS range. |
 | Agent handoff | Added | [`AGENTS.md`](./AGENTS.md) contains the repository rules, file map, invariants, verification gates, and resume order. |
 | Phase 0 foundation | Complete | Nuxt, npm, Nuxt UI, Tailwind, README, deployment instructions, `.env.example`, `.nvmrc`, strict TypeScript setup, MIT license, public GitHub remote, and Vercel deployment are complete. |
 | Phase 1 kernel | Implemented | Canonical schema, constraints, separate layout trees, shared revision-checked operations, fixture, and exact-size browser renderer are implemented. |
 | Phase 1 checkpoint | Manually verified | Local browser checks passed for one-size, two-size, all-size, and stale-revision behavior. The 390px responsive check has no page-level horizontal overflow. The deployed URL also rendered all three previews and accepted scoped operations without console errors or horizontal overflow. |
-| Automated verification | Passed locally | `npm run typecheck` passes; `npm test` passes with 3 files and 16 tests. Do not run `npm run build` for this phase. |
+| Automated verification | Passed locally | `npm run typecheck` passes; `npm test` passes with 5 files and 28 tests. Do not run `npm run build` for this phase. |
 | Phase 2 export | Implemented locally | Deterministic generator, `config.widgetFamily` branches, preflight diagnostics, Scriptable API runtime harness, and shared viewer/copy/download source are implemented. Real iPhone execution remains. |
+| Phase 3 editor | Implemented locally | IndexedDB projects, CRUD and autosave, three previews, structure and inspector editing, session undo/redo, local reference-image persistence, and best-effort Scriptable import are implemented. The local browser checkpoint passed. |
 | Visual design | Deferred | The current page is a functional kernel harness. Do the intentional design pass later, after the state and export work is stable. |
 
 ### Resume order
 
 1. Verify the generated file in real Scriptable on an iPhone, including small, medium, and large widget families.
-2. Start Phase 3: the public local-first editor with IndexedDB persistence, structure view, selection, inspector, and session undo/redo.
-3. Keep later WebMCP, data, admin, and visual-polish work behind the phase checkpoints below.
+2. Start Phase 4: the WebMCP vertical slice over the shared operation path.
+3. Keep later data, admin, and visual-polish work behind the phase checkpoints below.
 
-The current Phase 1 implementation is concentrated in `app/types/widget.ts`, `app/domain/widget/`, `app/components/widget/`, `app/pages/index.vue`, and `tests/unit/`.
+The current implementation is concentrated in `app/types/widget.ts`, `app/domain/widget/`, `app/components/widget/`, `app/composables/`, `app/pages/index.vue`, and `tests/unit/`.
 
 ## 1. Product summary
 
@@ -644,22 +645,25 @@ Checkpoint:
 
 ### Phase 3: Public local-first editor
 
+Status: Implemented locally as of 28 August 2026. The local browser checkpoint passed for project persistence, shared selection, direct editing, undo/redo, local reference-image persistence, and import reporting.
+
 Deliverables:
 
-- Local project list
-- Create, rename, duplicate, delete, and autosave
-- IndexedDB persistence
-- Three-preview editor layout
-- Structure view, selection, and inspector
-- Session-only undo and redo
-- Local reference-image storage and display
-- Best-effort Scriptable import with an import report
+- [x] Local project list
+- [x] Create, rename, duplicate, delete, and autosave
+- [x] IndexedDB persistence
+- [x] Three-preview editor layout
+- [x] Structure view, selection, and inspector
+- [x] Session-only undo and redo
+- [x] Local reference-image storage and display
+- [x] Best-effort Scriptable import with an import report
 
 Checkpoint:
 
-- Refresh restores a project and its local reference image.
-- Selecting an element in the preview and structure view identifies the same element.
-- Direct edits persist and produce matching generated code.
+- [x] Refresh restores a project and its local reference image; the browser restored `sample-monsoon.svg` at `1200 × 900`.
+- [x] Selecting an element in the preview and structure view identifies the same element.
+- [x] Direct edits persist and produce matching generated code; the browser verified a font-size edit, undo, redo, and refresh persistence.
+- [x] Desktop and mobile browser checks pass without page-level horizontal overflow or console warnings/errors.
 
 ### Phase 4: WebMCP vertical slice
 

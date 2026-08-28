@@ -15,10 +15,11 @@ As of 28 August 2026:
 - Phase 0 is complete. The local Nuxt foundation, MIT license, public GitHub remote, and Vercel deployment are verified at `https://widgetrmcp.vercel.app/`.
 - Phase 1 is implemented and manually verified in the local browser.
 - Phase 1 includes the canonical schema, supported constraints, separate small/medium/large layout trees, revision-checked operations, shared rendering, and a fixed sample fixture.
-- Phase 1 automated checks and the Phase 2 generator checks pass: 3 test files, 16 tests, and strict typecheck.
+- Phase 1, Phase 2, and Phase 3 automated checks pass: 5 test files, 28 tests, and strict typecheck.
 - Phase 2 is implemented locally and browser-smoke-tested. Real Scriptable execution on an iPhone and public release setup are still pending.
+- Phase 3 is implemented locally and browser-smoke-tested: IndexedDB projects, autosave, selection and inspector editing, session undo/redo, local reference-image persistence, and best-effort import are covered.
 - Visual design refinement is intentionally deferred. Keep the current page as a functional kernel harness until the state and export work are stable.
-- The next order is: verify the generated file in real Scriptable, then begin Phase 3 local-first editor work.
+- The next order is: verify the generated file in real Scriptable, then begin Phase 4 WebMCP vertical-slice work.
 
 ## Resume checklist
 
@@ -152,7 +153,7 @@ For every rendered UI check, use this sequence:
 
 - Phase 0 complete: public remote `https://github.com/balsimpson/widgetr` and production URL `https://widgetrmcp.vercel.app/` are verified. Real iPhone Scriptable execution remains a Phase 2 checkpoint.
 - Phase 2 implemented locally: deterministic state-to-Scriptable generation, `config.widgetFamily` branching, preflight diagnostics, and one shared viewer/copy/download source string. Real iPhone execution remains to be verified.
-- Phase 3 later: IndexedDB projects, structure view, selection/inspector, autosave, undo/redo, local reference images, and best-effort import.
+- Phase 3 implemented locally: IndexedDB projects, structure view, selection/inspector, autosave, undo/redo, local reference images, and best-effort import. The local browser checkpoint passed.
 - Phase 4 later: contextual imperative WebMCP tools as a thin adapter over `applyWidgetOperation`.
 - Phase 5 later: data onboarding, CORS distinctions, iPhone diagnostics, and Keychain-only secret entry.
 - Phase 6 and 7 later: private design curation, approved-style provenance, and constrained adaptation.

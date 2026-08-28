@@ -71,4 +71,25 @@ describe('canonical widget schema', () => {
 
     expect(result.ok).toBe(false)
   })
+
+  it('normalizes the earlier compact import report shape', () => {
+    const project = createSampleWidgetProject()
+    const result = validateWidgetProject({
+      ...project,
+      importReport: {
+        reproduced: ['Read the source safely.'],
+        omitted: ['Interactive behavior was not imported.'],
+        nextSteps: ['Review the editable starting point.']
+      }
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok || !result.value.importReport) {
+      return
+    }
+    expect(result.value.importReport.unsupported).toEqual(['Interactive behavior was not imported.'])
+    expect(result.value.importReport.approximated).toEqual([])
+    expect(result.value.importReport.dataCalls).toEqual([])
+    expect(result.value.importReport.requiredUserInput).toEqual([])
+  })
 })

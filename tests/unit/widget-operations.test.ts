@@ -142,4 +142,94 @@ describe('shared widget operations', () => {
       expect(result.state).toBe(project)
     }
   })
+
+  it('updates element content through the shared scoped operation', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'update-element-content',
+      expectedRevision: 0,
+      scope: { kind: 'one', size: 'small' },
+      elementId: 'temperature',
+      patch: {
+        value: { kind: 'literal', value: '31°' },
+        visible: false
+      }
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+    const smallTemperature = findElement(result.state, 'small', 'temperature')
+    expect(smallTemperature.type).toBe('text')
+    if (smallTemperature.type !== 'text') {
+      return
+    }
+    expect(smallTemperature.value).toEqual({ kind: 'literal', value: '31°' })
+    expect(smallTemperature.visible).toBe(false)
+    expect(findElement(result.state, 'medium', 'temperature').visible).toBe(true)
+    expect(findElement(project, 'small', 'temperature').visible).toBe(true)
+  })
+
+  it('rejects content fields that do not belong to the selected element type', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'update-element-content',
+      expectedRevision: 0,
+      scope: { kind: 'one', size: 'medium' },
+      elementId: 'weather-image',
+      patch: { value: { kind: 'literal', value: 'not an image source' } }
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('TARGET_TYPE_MISMATCH')
+      expect(result.state).toBe(project)
+    }
+  })
+
+  it('updates project metadata without bypassing the operation path', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'update-project-metadata',
+      expectedRevision: 0,
+      patch: { name: 'Morning commute' }
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+    expect(result.state.name).toBe('Morning commute')
+    expect(result.changedSizes).toEqual([])
+    expect(result.revision).toBe(1)
+  })
+
+  it('restores a history snapshot with a new monotonic revision', () => {
+    const project = createSampleWidgetProject()
+    const edited = applyWidgetOperation(project, {
+      type: 'update-element-style',
+      expectedRevision: 0,
+      elementId: 'temperature',
+      patch: { opacity: 0.4 }
+    }, { now: fixedClock })
+
+    expect(edited.ok).toBe(true)
+    if (!edited.ok) {
+      return
+    }
+
+    const restored = applyWidgetOperation(edited.state, {
+      type: 'restore-snapshot',
+      expectedRevision: edited.state.revision,
+      snapshot: project
+    }, { now: fixedClock })
+
+    expect(restored.ok).toBe(true)
+    if (!restored.ok) {
+      return
+    }
+    expect(restored.state.revision).toBe(2)
+    expect(findElement(restored.state, 'small', 'temperature').style.opacity).toBe(1)
+  })
 })

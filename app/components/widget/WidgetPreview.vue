@@ -2,11 +2,15 @@
 import { computed } from 'vue'
 import { backgroundStyle } from '~/domain/widget/styles'
 import { WIDGET_DIMENSIONS } from '~/types/widget'
-import type { WidgetProject, WidgetSize } from '~/types/widget'
+import type { WidgetProject, WidgetSelection, WidgetSize } from '~/types/widget'
 
 const props = defineProps<{
   project: WidgetProject
   size: WidgetSize
+}>()
+
+const emit = defineEmits<{
+  select: [selection: WidgetSelection]
 }>()
 
 const layout = computed(() => props.project.layouts[props.size])
@@ -41,7 +45,9 @@ const previewStyle = computed(() => ({
         <WidgetNodeRenderer
           :element="layout.root"
           :project="project"
+          :size="size"
           :parent-direction="layout.root.direction"
+          @select="emit('select', $event)"
         />
       </div>
     </div>

@@ -1,0 +1,51 @@
+import type { WidgetElement } from '~/types/widget'
+
+export function findWidgetElement(
+  root: WidgetElement,
+  elementId: string
+): WidgetElement | null {
+  if (root.id === elementId) {
+    return root
+  }
+
+  if (root.type === 'group' || root.type === 'repeat') {
+    for (const child of root.children) {
+      const match = findWidgetElement(child, elementId)
+      if (match) {
+        return match
+      }
+    }
+  }
+
+  return null
+}
+
+export function widgetElementLabel(element: WidgetElement): string {
+  const words = element.id.split('-').filter(Boolean)
+  if (words.length === 0) {
+    return element.type
+  }
+
+  return words
+    .map(word => word[0]!.toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+export function widgetElementIcon(element: WidgetElement): string {
+  switch (element.type) {
+    case 'text':
+      return 'i-lucide-type'
+    case 'date':
+      return 'i-lucide-calendar-clock'
+    case 'image':
+      return 'i-lucide-image'
+    case 'symbol':
+      return 'i-lucide-sparkles'
+    case 'group':
+      return 'i-lucide-panels-top-left'
+    case 'spacer':
+      return 'i-lucide-move-horizontal'
+    case 'repeat':
+      return 'i-lucide-repeat-2'
+  }
+}

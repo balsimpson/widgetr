@@ -1,10 +1,12 @@
 import { resolveDesignScope, validateWidgetProject, widgetOperationSchema } from './schema'
+import { WIDGET_SIZES } from '~/types/widget'
 import type {
   DesignScope,
   OperationFailure,
   OperationFailureCode,
   OperationResult,
   OperationSuccess,
+  UpdateElementContentOperation,
   WidgetElement,
   WidgetOperation,
   WidgetProject,
@@ -68,6 +70,98 @@ function operationScope(state: WidgetProject, operation: WidgetOperation): Desig
     return operation.scope
   }
   return state.designScope
+}
+
+function applyElementContentPatch(
+  target: WidgetElement,
+  patch: UpdateElementContentOperation['patch']
+): boolean {
+  const specificKeys = Object.keys(patch).filter(key => key !== 'visible')
+
+  const supportedKeys = target.type === 'text'
+    ? ['value']
+    : target.type === 'date'
+      ? ['value', 'format']
+      : target.type === 'image'
+        ? ['source', 'alt', 'fit', 'crop']
+        : target.type === 'symbol'
+          ? ['name', 'color', 'size']
+          : target.type === 'group'
+            ? ['direction', 'spacing', 'horizontalAlignment', 'verticalAlignment', 'distribution']
+            : target.type === 'repeat'
+              ? ['limit', 'direction', 'spacing', 'horizontalAlignment', 'verticalAlignment', 'distribution']
+              : ['length']
+
+  if (specificKeys.some(key => !supportedKeys.includes(key))) {
+    return false
+  }
+
+  if (patch.visible !== undefined) {
+    target.visible = patch.visible
+  }
+
+  if (target.type === 'text' || target.type === 'date') {
+    if (patch.value !== undefined) {
+      target.value = patch.value
+    }
+    if (target.type === 'date' && patch.format !== undefined) {
+      target.format = patch.format
+    }
+  }
+
+  if (target.type === 'image') {
+    if (patch.source !== undefined) {
+      target.source = patch.source
+    }
+    if (patch.alt !== undefined) {
+      target.alt = patch.alt
+    }
+    if (patch.fit !== undefined) {
+      target.fit = patch.fit
+    }
+    if (patch.crop !== undefined) {
+      target.crop = patch.crop
+    }
+  }
+
+  if (target.type === 'symbol') {
+    if (patch.name !== undefined) {
+      target.name = patch.name
+    }
+    if (patch.color !== undefined) {
+      target.color = patch.color
+    }
+    if (patch.size !== undefined) {
+      target.size = patch.size
+    }
+  }
+
+  if (target.type === 'group' || target.type === 'repeat') {
+    if (patch.direction !== undefined) {
+      target.direction = patch.direction
+    }
+    if (patch.spacing !== undefined) {
+      target.spacing = patch.spacing
+    }
+    if (patch.horizontalAlignment !== undefined) {
+      target.horizontalAlignment = patch.horizontalAlignment
+    }
+    if (patch.verticalAlignment !== undefined) {
+      target.verticalAlignment = patch.verticalAlignment
+    }
+    if (patch.distribution !== undefined) {
+      target.distribution = patch.distribution
+    }
+    if (target.type === 'repeat' && patch.limit !== undefined) {
+      target.limit = patch.limit
+    }
+  }
+
+  if (target.type === 'spacer' && patch.length !== undefined) {
+    target.length = patch.length
+  }
+
+  return true
 }
 
 function finish(
@@ -168,11 +262,42 @@ export function applyWidgetOperation(
     )
   }
 
+  if (operation.type === 'update-project-metadata') {
+    if (operation.patch.name !== undefined) {
+      nextState.name = operation.patch.name
+    }
+    if (operation.patch.localReference !== undefined) {
+      nextState.localReference = operation.patch.localReference
+    }
+    if (operation.patch.importReport !== undefined) {
+      nextState.importReport = operation.patch.importReport
+    }
+    return finish(
+      state,
+      nextState,
+      [],
+      [],
+      'Updated project details.',
+      now
+    )
+  }
+
+  if (operation.type === 'restore-snapshot') {
+    return finish(
+      state,
+      structuredClone(operation.snapshot),
+      [...WIDGET_SIZES],
+      [],
+      'Restored a session history snapshot.',
+      now
+    )
+  }
+
   const sizes = resolveDesignScope(operationScope(state, operation))
 
   if (operation.type === 'set-layout-background') {
     for (const size of sizes) {
-      nextState.layouts[size].background = operation.background
+      nextState.layouts[size].background = structuredClone(operation.background)
     }
     return finish(
       state,
@@ -206,6 +331,16 @@ export function applyWidgetOperation(
       continue
     }
 
+    if (operation.type === 'update-element-content') {
+      if (!applyElementContentPatch(target, operation.patch)) {
+        foundWrongType = true
+        warnings.push(`${operation.elementId} does not support the requested content change in the ${size} layout.`)
+        continue
+      }
+      changedSizes.push(size)
+      continue
+    }
+
     if (target.type !== 'text' && target.type !== 'date') {
       foundWrongType = true
       warnings.push(`${operation.elementId} is not text or a date in the ${size} layout.`)
@@ -221,10 +356,15 @@ export function applyWidgetOperation(
 
   if (changedSizes.length === 0) {
     if (foundTarget && foundWrongType) {
+      const typeMessage = operation.type === 'update-text-style'
+        ? 'text style'
+        : operation.type === 'update-element-content'
+          ? 'content'
+          : 'element style'
       return failure(
         state,
         'TARGET_TYPE_MISMATCH',
-        `${operation.elementId} cannot accept the requested text style.`,
+        `${operation.elementId} cannot accept the requested ${typeMessage} change.`,
         warnings
       )
     }
@@ -236,7 +376,11 @@ export function applyWidgetOperation(
     )
   }
 
-  const operationLabel = operation.type === 'update-element-style' ? 'element style' : 'text style'
+  const operationLabel = operation.type === 'update-element-style'
+    ? 'element style'
+    : operation.type === 'update-element-content'
+      ? 'content'
+      : 'text style'
   return finish(
     state,
     nextState,

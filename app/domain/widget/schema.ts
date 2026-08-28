@@ -263,6 +263,33 @@ const widgetSelectionSchema = z.object({
   elementId: idSchema
 }).strict()
 
+const localReferenceMetadataSchema = z.object({
+  storageKey: z.string().trim().min(1).max(200),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(120),
+  width: z.number().int().positive().max(20000),
+  height: z.number().int().positive().max(20000),
+  addedAt: z.iso.datetime({ offset: true })
+}).strict()
+
+const importReportItemSchema = z.string().trim().min(1).max(240)
+
+const importReportSchema = z.object({
+  reproduced: z.array(importReportItemSchema).max(100),
+  approximated: z.array(importReportItemSchema).default([]),
+  unsupported: z.array(importReportItemSchema).default([]),
+  dataCalls: z.array(importReportItemSchema).default([]),
+  requiredUserInput: z.array(importReportItemSchema).default([]),
+  nextSteps: z.array(importReportItemSchema).max(100),
+  omitted: z.array(importReportItemSchema).optional()
+}).strict().transform(({ omitted, ...report }) => ({
+  ...report,
+  unsupported: [
+    ...report.unsupported,
+    ...(omitted ?? [])
+  ]
+}))
+
 const widgetProjectBaseSchema = z.object({
   schemaVersion: z.literal(WIDGET_SCHEMA_VERSION),
   id: idSchema,
@@ -316,19 +343,8 @@ const widgetProjectBaseSchema = z.object({
     approvedVersion: z.number().int().positive(),
     recipeSnapshot: jsonObjectSchema
   }).strict().nullable(),
-  localReference: z.object({
-    storageKey: z.string().trim().min(1).max(200),
-    fileName: z.string().trim().min(1).max(255),
-    mimeType: z.string().trim().min(1).max(120),
-    width: z.number().int().positive().max(20000),
-    height: z.number().int().positive().max(20000),
-    addedAt: z.iso.datetime({ offset: true })
-  }).strict().nullable(),
-  importReport: z.object({
-    reproduced: z.array(z.string().trim().min(1).max(240)).max(100),
-    omitted: z.array(z.string().trim().min(1).max(240)).max(100),
-    nextSteps: z.array(z.string().trim().min(1).max(240)).max(100)
-  }).strict().nullable(),
+  localReference: localReferenceMetadataSchema.nullable(),
+  importReport: importReportSchema.nullable(),
   diagnostics: z.array(z.object({
     id: idSchema,
     severity: z.enum(['warning', 'blocking']),
@@ -527,6 +543,38 @@ const elementStylePatchSchema = elementStyleSchema.partial().strict()
 const textStylePatchSchema = textStyleSchema.partial().strict()
   .refine(patch => Object.keys(patch).length > 0, 'Include at least one text-style property')
 
+const elementContentPatchSchema = z.object({
+  visible: z.boolean().optional(),
+  value: valueSourceSchema.optional(),
+  format: z.enum(['date', 'time', 'date-time', 'relative']).optional(),
+  source: valueSourceSchema.optional(),
+  alt: z.string().max(240).optional(),
+  fit: z.enum(['cover', 'contain', 'fill']).optional(),
+  crop: z.object({
+    x: z.number().min(0).max(100),
+    y: z.number().min(0).max(100)
+  }).strict().optional(),
+  name: valueSourceSchema.optional(),
+  color: colorSchema.optional(),
+  size: z.number().positive().max(200).optional(),
+  direction: z.enum(['horizontal', 'vertical']).optional(),
+  spacing: spacingSchema.optional(),
+  horizontalAlignment: z.enum(['leading', 'center', 'trailing']).optional(),
+  verticalAlignment: z.enum(['top', 'center', 'bottom']).optional(),
+  distribution: z.enum(['start', 'center', 'end', 'space-between']).optional(),
+  length: z.union([
+    z.number().min(0).max(400),
+    z.literal('flex')
+  ]).optional(),
+  limit: z.number().int().min(1).max(20).optional()
+}).strict().refine(patch => Object.keys(patch).length > 0, 'Include at least one element change')
+
+const projectMetadataPatchSchema = z.object({
+  name: labelSchema.optional(),
+  localReference: localReferenceMetadataSchema.nullable().optional(),
+  importReport: importReportSchema.nullable().optional()
+}).strict().refine(patch => Object.keys(patch).length > 0, 'Include at least one project change')
+
 export const widgetOperationSchema: z.ZodType<WidgetOperation> = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('set-design-scope'),
@@ -553,10 +601,27 @@ export const widgetOperationSchema: z.ZodType<WidgetOperation> = z.discriminated
     patch: textStylePatchSchema
   }).strict(),
   z.object({
+    type: z.literal('update-element-content'),
+    expectedRevision: z.number().int().nonnegative(),
+    elementId: idSchema,
+    scope: designScopeSchema.optional(),
+    patch: elementContentPatchSchema
+  }).strict(),
+  z.object({
+    type: z.literal('update-project-metadata'),
+    expectedRevision: z.number().int().nonnegative(),
+    patch: projectMetadataPatchSchema
+  }).strict(),
+  z.object({
     type: z.literal('set-layout-background'),
     expectedRevision: z.number().int().nonnegative(),
     scope: designScopeSchema.optional(),
     background: widgetBackgroundSchema
+  }).strict(),
+  z.object({
+    type: z.literal('restore-snapshot'),
+    expectedRevision: z.number().int().nonnegative(),
+    snapshot: widgetProjectSchema
   }).strict()
 ])
 

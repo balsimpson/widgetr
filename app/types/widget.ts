@@ -226,7 +226,10 @@ export interface LocalReferenceMetadata {
 
 export interface ImportReport {
   reproduced: string[]
-  omitted: string[]
+  approximated: string[]
+  unsupported: string[]
+  dataCalls: string[]
+  requiredUserInput: string[]
   nextSteps: string[]
 }
 
@@ -287,10 +290,49 @@ export interface UpdateTextStyleOperation extends OperationBase {
   patch: Partial<TextStyle>
 }
 
+export interface UpdateElementContentOperation extends OperationBase {
+  type: 'update-element-content'
+  elementId: string
+  scope?: DesignScope
+  patch: {
+    visible?: boolean
+    value?: ValueSource
+    format?: DateElement['format']
+    source?: ValueSource
+    alt?: string
+    fit?: ImageElement['fit']
+    crop?: ImageElement['crop']
+    name?: ValueSource
+    color?: string
+    size?: number
+    direction?: GroupDirection
+    spacing?: number
+    horizontalAlignment?: HorizontalAlignment
+    verticalAlignment?: VerticalAlignment
+    distribution?: GroupDistribution
+    length?: SpacerElement['length']
+    limit?: number
+  }
+}
+
+export interface UpdateProjectMetadataOperation extends OperationBase {
+  type: 'update-project-metadata'
+  patch: {
+    name?: string
+    localReference?: LocalReferenceMetadata | null
+    importReport?: ImportReport | null
+  }
+}
+
 export interface SetLayoutBackgroundOperation extends OperationBase {
   type: 'set-layout-background'
   scope?: DesignScope
   background: WidgetBackground
+}
+
+export interface RestoreSnapshotOperation extends OperationBase {
+  type: 'restore-snapshot'
+  snapshot: WidgetProject
 }
 
 export type WidgetOperation =
@@ -298,7 +340,10 @@ export type WidgetOperation =
   | SetSelectionOperation
   | UpdateElementStyleOperation
   | UpdateTextStyleOperation
+  | UpdateElementContentOperation
+  | UpdateProjectMetadataOperation
   | SetLayoutBackgroundOperation
+  | RestoreSnapshotOperation
 
 export type OperationFailureCode =
   | 'STALE_REVISION'
