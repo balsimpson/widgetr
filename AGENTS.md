@@ -12,13 +12,13 @@
 
 As of 28 August 2026:
 
-- Phase 0 is partial. The local Nuxt foundation, MIT license, and Vercel deployment instructions exist; a public remote and early deployment are still missing.
+- Phase 0 is complete. The local Nuxt foundation, MIT license, public GitHub remote, and Vercel deployment are verified at `https://widgetrmcp.vercel.app/`.
 - Phase 1 is implemented and manually verified in the local browser.
 - Phase 1 includes the canonical schema, supported constraints, separate small/medium/large layout trees, revision-checked operations, shared rendering, and a fixed sample fixture.
 - Phase 1 automated checks and the Phase 2 generator checks pass: 3 test files, 16 tests, and strict typecheck.
 - Phase 2 is implemented locally and browser-smoke-tested. Real Scriptable execution on an iPhone and public release setup are still pending.
 - Visual design refinement is intentionally deferred. Keep the current page as a functional kernel harness until the state and export work are stable.
-- The next order is: finish Phase 0 release setup, verify the generated file in real Scriptable, then begin Phase 3 local-first editor work.
+- The next order is: verify the generated file in real Scriptable, then begin Phase 3 local-first editor work.
 
 ## Resume checklist
 
@@ -149,7 +149,7 @@ For every rendered UI check, use this sequence:
 
 ## Phase boundaries
 
-- Phase 0 remaining: create the public remote and make the first deployment.
+- Phase 0 complete: public remote `https://github.com/balsimpson/widgetr` and production URL `https://widgetrmcp.vercel.app/` are verified. Real iPhone Scriptable execution remains a Phase 2 checkpoint.
 - Phase 2 implemented locally: deterministic state-to-Scriptable generation, `config.widgetFamily` branching, preflight diagnostics, and one shared viewer/copy/download source string. Real iPhone execution remains to be verified.
 - Phase 3 later: IndexedDB projects, structure view, selection/inspector, autosave, undo/redo, local reference images, and best-effort import.
 - Phase 4 later: contextual imperative WebMCP tools as a thin adapter over `applyWidgetOperation`.

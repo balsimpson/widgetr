@@ -3,7 +3,7 @@
 ## Approved product and delivery plan
 
 Last updated: 28 August 2026  
-Status: Phase 2 implemented locally; Phase 0 completion and real Scriptable verification pending  
+Status: Phase 0 complete; Phase 2 implemented locally; real Scriptable verification pending
 Working title: Scriptable Widget Builder  
 Challenge: [The WebMCP Challenge](https://webmcp.devpost.com/)
 
@@ -15,22 +15,21 @@ This section is the resume point for a new chat. The implementation lives in `/U
 
 | Area | Status | Evidence or remaining work |
 | --- | --- | --- |
-| Repository | In progress | Git is initialized on `main`; there is no commit or remote yet. |
+| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and `main` points to commit `90b178e`. |
 | Runtime | Ready locally | Use Node 22.23.1 at `/Users/balsimpson/.local/bin/node` with npm. The system Node 25 runtime is outside Nuxt's supported even-LTS range. |
 | Agent handoff | Added | [`AGENTS.md`](./AGENTS.md) contains the repository rules, file map, invariants, verification gates, and resume order. |
-| Phase 0 foundation | Partial | Nuxt, npm, Nuxt UI, Tailwind, README, deployment instructions, `.env.example`, `.nvmrc`, strict TypeScript setup, and the MIT license exist. A public remote and early deployment are still needed. |
+| Phase 0 foundation | Complete | Nuxt, npm, Nuxt UI, Tailwind, README, deployment instructions, `.env.example`, `.nvmrc`, strict TypeScript setup, MIT license, public GitHub remote, and Vercel deployment are complete. |
 | Phase 1 kernel | Implemented | Canonical schema, constraints, separate layout trees, shared revision-checked operations, fixture, and exact-size browser renderer are implemented. |
-| Phase 1 checkpoint | Manually verified | Local browser checks passed for one-size, two-size, all-size, and stale-revision behavior. The 390px responsive check has no page-level horizontal overflow. |
+| Phase 1 checkpoint | Manually verified | Local browser checks passed for one-size, two-size, all-size, and stale-revision behavior. The 390px responsive check has no page-level horizontal overflow. The deployed URL also rendered all three previews and accepted scoped operations without console errors or horizontal overflow. |
 | Automated verification | Passed locally | `npm run typecheck` passes; `npm test` passes with 3 files and 16 tests. Do not run `npm run build` for this phase. |
 | Phase 2 export | Implemented locally | Deterministic generator, `config.widgetFamily` branches, preflight diagnostics, Scriptable API runtime harness, and shared viewer/copy/download source are implemented. Real iPhone execution remains. |
 | Visual design | Deferred | The current page is a functional kernel harness. Do the intentional design pass later, after the state and export work is stable. |
 
 ### Resume order
 
-1. Finish Phase 0 by choosing and adding the public license, adding deployment instructions, creating the public remote, and making the first deployment.
-2. Verify the generated file in real Scriptable on an iPhone, including small, medium, and large widget families.
-3. Start Phase 3: the public local-first editor with IndexedDB persistence, structure view, selection, inspector, and session undo/redo.
-4. Keep later WebMCP, data, admin, and visual-polish work behind the phase checkpoints below.
+1. Verify the generated file in real Scriptable on an iPhone, including small, medium, and large widget families.
+2. Start Phase 3: the public local-first editor with IndexedDB persistence, structure view, selection, inspector, and session undo/redo.
+3. Keep later WebMCP, data, admin, and visual-polish work behind the phase checkpoints below.
 
 The current Phase 1 implementation is concentrated in `app/types/widget.ts`, `app/domain/widget/`, `app/components/widget/`, `app/pages/index.vue`, and `tests/unit/`.
 
@@ -585,7 +584,7 @@ Implementation should be incremental. Each phase ends with a working checkpoint 
 
 ### Phase 0: Create the standalone project
 
-Status: Partial as of 28 August 2026. The local application foundation, MIT license, and Vercel deployment instructions are complete. The public remote and early deployment remain.
+Status: Complete as of 28 August 2026. The local application foundation, MIT license, public remote, and Vercel deployment are complete. The production URL is [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/).
 
 Deliverables:
 
@@ -595,13 +594,13 @@ Deliverables:
 - [x] Public open-source license
 - [x] Basic README with local setup and deployment instructions
 - [x] Environment-variable contract with no committed keys
-- [ ] One early deployment that can be opened in the challenge test browser
+- [x] One early deployment that can be opened in the challenge test browser
 
 Checkpoint:
 
 - [x] The blank application runs locally.
-- [ ] The application runs from its deployed URL.
-- [ ] The repository is public and the license is visible from the public remote.
+- [x] The application runs from its deployed URL.
+- [x] The repository is public and the license is visible from the public remote.
 - [x] Only deliberately selected ideas or code are carried over, and the new application has no runtime dependency on the current repository.
 
 ### Phase 1: Canonical state and rendering kernel
