@@ -232,4 +232,52 @@ describe('shared widget operations', () => {
     expect(restored.state.revision).toBe(2)
     expect(findElement(restored.state, 'small', 'temperature').style.opacity).toBe(1)
   })
+
+  it('reorders children through the shared scoped operation', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'reorder-children',
+      expectedRevision: 0,
+      scope: { kind: 'one', size: 'large' },
+      elementId: 'header',
+      childId: 'location',
+      toIndex: 2
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+    const header = findElement(result.state, 'large', 'header')
+    expect(header.type).toBe('group')
+    if (header.type !== 'group') {
+      return
+    }
+    expect(header.children.map(child => child.id)).toEqual([
+      'header-spacer',
+      'updated',
+      'location'
+    ])
+    expect(result.changedSizes).toEqual(['large'])
+    expect(result.revision).toBe(1)
+  })
+
+  it('rejects child ordering when the target index is outside the group', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'reorder-children',
+      expectedRevision: 0,
+      scope: { kind: 'one', size: 'large' },
+      elementId: 'header',
+      childId: 'location',
+      toIndex: 8
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INVALID_OPERATION')
+      expect(result.revision).toBe(0)
+      expect(result.state).toBe(project)
+    }
+  })
 })

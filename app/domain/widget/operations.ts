@@ -309,6 +309,79 @@ export function applyWidgetOperation(
     )
   }
 
+  if (operation.type === 'reorder-children') {
+    const changedSizes: WidgetSize[] = []
+    const warnings: string[] = []
+    let foundParent = false
+    let foundWrongType = false
+    let invalidIndex = false
+
+    for (const size of sizes) {
+      const parent = findElement(nextState.layouts[size].root, operation.elementId)
+      if (!parent) {
+        warnings.push(`${operation.elementId} does not exist in the ${size} layout.`)
+        continue
+      }
+
+      foundParent = true
+      if (parent.type !== 'group' && parent.type !== 'repeat') {
+        foundWrongType = true
+        warnings.push(`${operation.elementId} is not a group or repeat in the ${size} layout.`)
+        continue
+      }
+
+      const childIndex = parent.children.findIndex(child => child.id === operation.childId)
+      if (childIndex < 0) {
+        warnings.push(`${operation.childId} does not exist inside ${operation.elementId} in the ${size} layout.`)
+        continue
+      }
+
+      if (operation.toIndex >= parent.children.length) {
+        invalidIndex = true
+        warnings.push(`The target child position ${operation.toIndex} is outside the ${size} layout group.`)
+        continue
+      }
+
+      const [child] = parent.children.splice(childIndex, 1)
+      parent.children.splice(operation.toIndex, 0, child!)
+      changedSizes.push(size)
+    }
+
+    if (changedSizes.length === 0) {
+      if (invalidIndex) {
+        return failure(
+          state,
+          'INVALID_OPERATION',
+          `The child position ${operation.toIndex} is outside the requested group.`,
+          warnings
+        )
+      }
+      if (foundParent && foundWrongType) {
+        return failure(
+          state,
+          'TARGET_TYPE_MISMATCH',
+          `${operation.elementId} cannot accept child ordering changes.`,
+          warnings
+        )
+      }
+      return failure(
+        state,
+        'TARGET_NOT_FOUND',
+        `${operation.childId} was not found in the requested group layouts.`,
+        warnings
+      )
+    }
+
+    return finish(
+      state,
+      nextState,
+      changedSizes,
+      warnings,
+      `Moved ${operation.childId} in ${operation.elementId} for ${formatSizes(changedSizes)}.`,
+      now
+    )
+  }
+
   const changedSizes: WidgetSize[] = []
   const warnings: string[] = []
   let foundTarget = false

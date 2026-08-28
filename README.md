@@ -1,8 +1,8 @@
 # Widgetr
 
-Widgetr is a standalone Nuxt application for building Scriptable widgets through one shared visual state. Phase 3 adds local-first projects, IndexedDB persistence, structure and inspector editing, local reference images, and best-effort Scriptable import on top of the deterministic Scriptable generator from Phase 2.
+Widgetr is a standalone Nuxt application for building Scriptable widgets through one shared visual state. Phase 4 adds contextual imperative WebMCP tools over the same revision-checked operation path as the UI, on top of the Phase 3 local-first projects, IndexedDB persistence, structure and inspector editing, local reference images, best-effort Scriptable import, and deterministic Scriptable generator.
 
-The current public-facing editor is intentionally functional rather than visually polished: it demonstrates three independent widget-size layouts, shared data, revision-checked operations, local project history, and deterministic Scriptable export. WebMCP tools, data onboarding, and design curation are later phases in the approved product plan.
+The current public-facing editor is intentionally functional rather than visually polished: it demonstrates three independent widget-size layouts, shared data, revision-checked operations, local project history, deterministic Scriptable export, and a live WebMCP tool catalog that changes with the selected element. Data onboarding and design curation remain later phases in the approved product plan.
 
 Live deployment: [widgetrmcp.vercel.app](https://widgetrmcp.vercel.app/)
 
@@ -31,7 +31,7 @@ Widgetr is configured for a normal Nuxt server deployment. Vercel detects Nuxt a
 3. Use `npm run build` as the build command if Vercel asks for an explicit command. Leave the output directory at its automatic setting.
 4. Deploy, open the resulting URL, and verify the three previews, scoped operations, export preflight, Copy action, and `.js` download. The current deployment is [widgetrmcp.vercel.app](https://widgetrmcp.vercel.app/).
 
-Phase 3 has no required environment variables. Do not add secrets to the repository or to the generated Scriptable file.
+Phase 4 has no required environment variables. Do not add secrets to the repository or to the generated Scriptable file.
 
 ### Local production check
 
@@ -53,11 +53,11 @@ The repository also defines `npm run build` and `npm run generate` for the delib
 
 ## Environment variables
 
-Phase 3 does not use environment variables. Later phases must document variable names in `.env.example` without committing values or secrets.
+Phase 4 does not use environment variables. Later phases must document variable names in `.env.example` without committing values or secrets.
 
 ## Project boundary
 
-This application has no runtime dependency on `ScriptableEditor`. Local projects, reference images, and Scriptable import now belong to the Widgetr runtime; WebMCP tools, authenticated data diagnostics, and the private design library belong to later phases in the approved plan. The exported file is generated from the Widgetr canonical state and runs independently of the website.
+This application has no runtime dependency on `ScriptableEditor`. Local projects, reference images, Scriptable import, and WebMCP tools now belong to the Widgetr runtime; authenticated data diagnostics and the private design library belong to later phases in the approved plan. The exported file is generated from the Widgetr canonical state and runs independently of the website.
 
 ## License
 

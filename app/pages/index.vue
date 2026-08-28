@@ -5,6 +5,7 @@ import { cloneWidgetProject } from '~/domain/widget/clone'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { resolveDesignScope } from '~/domain/widget/schema'
 import { useWidgetProjects } from '~/composables/useWidgetProjects'
+import { useWidgetWebMcp } from '~/composables/useWidgetWebMcp'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
 import { WIDGET_SIZES } from '~/types/widget'
 import type {
@@ -14,6 +15,7 @@ import type {
   WidgetSelection,
   WidgetSize
 } from '~/types/widget'
+import type { WebMcpConfirmationRequest } from '~/types/webmcp'
 
 useHead({
   title: 'Widgetr local editor',
@@ -62,6 +64,11 @@ const importError = ref<string | null>(null)
 const referenceUpload = ref<File | null | undefined>()
 const referenceUrl = ref<string | null>(null)
 const referenceError = ref<string | null>(null)
+const agentConfirmation = ref<WebMcpConfirmationRequest | null>(null)
+let pendingAgentConfirmation: {
+  resolve: (confirmed: boolean) => void
+  cleanup: () => void
+} | null = null
 
 const activeSizes = computed(() => resolveDesignScope(project.value.designScope))
 const exportResult = computed(() => generateScriptableCode(project.value))
@@ -140,6 +147,28 @@ const structureSizeOptions = WIDGET_SIZES.map(size => ({
 
 const activeProject = computed(() => projects.value.find(item => item.id === project.value.id) ?? project.value)
 
+const agentConfirmationOpen = computed({
+  get: () => agentConfirmation.value !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      finishAgentConfirmation(false)
+    }
+  }
+})
+
+const {
+  status: webmcpStatus,
+  context: webmcpContext,
+  registeredToolNames: webmcpRegisteredToolNames,
+  error: webmcpError
+} = useWidgetWebMcp({
+  project,
+  commitOperation,
+  createProject: createAgentProject,
+  getExport: () => exportResult.value,
+  requestConfirmation: requestAgentConfirmation
+})
+
 function commitOperation(
   operation: WidgetOperation,
   options: { recordHistory?: boolean } = {}
@@ -176,6 +205,47 @@ function selectElement(selection: WidgetSelection): void {
     expectedRevision: project.value.revision,
     selection
   }, { recordHistory: false })
+}
+
+function clearSelection(): void {
+  if (!project.value.selection) {
+    return
+  }
+
+  commitOperation({
+    type: 'set-selection',
+    expectedRevision: project.value.revision,
+    selection: null
+  }, { recordHistory: false })
+}
+
+function finishAgentConfirmation(confirmed: boolean): void {
+  const pending = pendingAgentConfirmation
+  pendingAgentConfirmation = null
+  agentConfirmation.value = null
+  pending?.cleanup()
+  pending?.resolve(confirmed)
+}
+
+function requestAgentConfirmation(
+  request: WebMcpConfirmationRequest,
+  signal: AbortSignal
+): Promise<boolean> {
+  if (signal.aborted) {
+    return Promise.resolve(false)
+  }
+
+  if (pendingAgentConfirmation) {
+    finishAgentConfirmation(false)
+  }
+
+  return new Promise(resolve => {
+    const abort = () => finishAgentConfirmation(false)
+    const cleanup = () => signal.removeEventListener('abort', abort)
+    pendingAgentConfirmation = { resolve, cleanup }
+    agentConfirmation.value = request
+    signal.addEventListener('abort', abort, { once: true })
+  })
 }
 
 function undo(): void {
@@ -237,12 +307,18 @@ async function submitNewProject(): Promise<void> {
   if (!name) {
     return
   }
-  await createProject(name)
+  await createAgentProject(name)
+  newProjectOpen.value = false
+}
+
+async function createAgentProject(name: string): Promise<WidgetProject> {
+  const created = await createProject(name)
   historyPast.value = []
   historyFuture.value = []
   lastResult.value = null
-  newProjectOpen.value = false
+  referenceError.value = null
   await loadReferenceImage()
+  return created
 }
 
 function openRenameProject(target: WidgetProject): void {
@@ -487,7 +563,7 @@ onBeforeUnmount(() => {
   <main class="editor-shell">
     <header class="editor-header">
       <div class="editor-title-block">
-        <p class="phase-label">Widgetr / phase 3</p>
+        <p class="phase-label">Widgetr / phase 4</p>
         <h1>{{ project.name }}</h1>
         <p class="editor-summary">
           A local visual editor for one widget, three Scriptable sizes, and one export path.
@@ -549,6 +625,15 @@ onBeforeUnmount(() => {
           @rename="openRenameProject"
           @duplicate="duplicateSelectedProject"
           @delete="openDeleteProject"
+        />
+
+        <WidgetAgentToolsPanel
+          :status="webmcpStatus"
+          :context="webmcpContext"
+          :revision="project.revision"
+          :tool-names="webmcpRegisteredToolNames"
+          :error="webmcpError"
+          @clear-selection="clearSelection"
         />
 
         <section class="reference-panel" aria-labelledby="reference-heading">
@@ -913,6 +998,37 @@ onBeforeUnmount(() => {
           wrap="off"
           spellcheck="false"
         />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="agentConfirmationOpen"
+      :title="agentConfirmation?.title"
+      description="Widgetr will not apply this agent-requested change until you confirm it."
+    >
+      <template #body>
+        <UAlert
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-shield-alert"
+          title="A destructive change needs your approval"
+          :description="agentConfirmation?.description"
+        />
+      </template>
+      <template #footer>
+        <div class="modal-actions">
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="outline"
+            @click="finishAgentConfirmation(false)"
+          />
+          <UButton
+            :label="agentConfirmation?.actionLabel ?? 'Confirm change'"
+            color="error"
+            @click="finishAgentConfirmation(true)"
+          />
+        </div>
       </template>
     </UModal>
   </main>

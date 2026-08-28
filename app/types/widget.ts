@@ -330,6 +330,14 @@ export interface SetLayoutBackgroundOperation extends OperationBase {
   background: WidgetBackground
 }
 
+export interface ReorderChildrenOperation extends OperationBase {
+  type: 'reorder-children'
+  elementId: string
+  childId: string
+  toIndex: number
+  scope?: DesignScope
+}
+
 export interface RestoreSnapshotOperation extends OperationBase {
   type: 'restore-snapshot'
   snapshot: WidgetProject
@@ -343,6 +351,7 @@ export type WidgetOperation =
   | UpdateElementContentOperation
   | UpdateProjectMetadataOperation
   | SetLayoutBackgroundOperation
+  | ReorderChildrenOperation
   | RestoreSnapshotOperation
 
 export type OperationFailureCode =

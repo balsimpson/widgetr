@@ -1,0 +1,342 @@
+import { describe, expect, it } from 'vitest'
+import { shallowRef } from 'vue'
+import { createNewWidgetProject } from '~/domain/widget/projects'
+import { createSampleWidgetProject } from '~/domain/widget/fixture'
+import { applyWidgetOperation } from '~/domain/widget/operations'
+import { generateScriptableCode } from '~/domain/widget/scriptable'
+import { registerWebMcpToolSet } from '~/composables/useWidgetWebMcp'
+import {
+  createWebMcpToolCatalog,
+  getWebMcpContext,
+  getWebMcpToolNames,
+  serializeWebMcpResult
+} from '~/domain/widget/webmcp'
+import type { WebMcpModelContext, WebMcpRuntime, WebMcpTool } from '~/types/webmcp'
+import type { WidgetOperation, WidgetProject } from '~/types/widget'
+
+const fixedClock = () => '2026-08-28T06:00:00.000Z'
+
+function selectedProject(size: 'small' | 'medium' | 'large', elementId: string): WidgetProject {
+  const project = createSampleWidgetProject()
+  const result = applyWidgetOperation(project, {
+    type: 'set-selection',
+    expectedRevision: 0,
+    selection: { size, elementId }
+  }, { now: fixedClock })
+
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+  return result.state
+}
+
+function createRuntime(initialProject: WidgetProject, confirmation = true) {
+  const state = { project: initialProject }
+  const operations: WidgetOperation[] = []
+  const confirmations: string[] = []
+
+  const runtime: WebMcpRuntime = {
+    getProject: () => state.project,
+    commitOperation: operation => {
+      operations.push(operation)
+      const result = applyWidgetOperation(state.project, operation, { now: fixedClock })
+      if (result.ok) {
+        state.project = result.state
+      }
+      return result
+    },
+    createProject: async name => {
+      state.project = createNewWidgetProject(fixedClock(), name)
+      return state.project
+    },
+    getExport: () => generateScriptableCode(state.project),
+    requestConfirmation: async request => {
+      confirmations.push(request.title)
+      return confirmation
+    }
+  }
+
+  return { runtime, state, operations, confirmations }
+}
+
+function toolFor(project: WidgetProject, name: string) {
+  const tool = createWebMcpToolCatalog(project).find(candidate => candidate.name === name)
+  if (!tool) {
+    throw new Error(`${name} is not registered for ${getWebMcpContext(project)} context`)
+  }
+  return tool
+}
+
+function signal(): AbortSignal {
+  return new AbortController().signal
+}
+
+describe('Widgetr WebMCP catalog', () => {
+  it('exposes only the no-selection tools when nothing is selected', () => {
+    const project = createSampleWidgetProject()
+    project.selection = null
+
+    expect(getWebMcpContext(project)).toBe('none')
+    expect(getWebMcpToolNames(project)).toEqual([
+      'widgetr_get_context',
+      'widgetr_export',
+      'widgetr_select_element',
+      'widgetr_clear_selection',
+      'widgetr_create_widget',
+      'widgetr_set_design_scope',
+      'widgetr_change_overall_style'
+    ])
+  })
+
+  it('changes the catalog for text, image, and group selections', () => {
+    const textProject = selectedProject('small', 'temperature')
+    const imageProject = selectedProject('medium', 'weather-image')
+    const groupProject = selectedProject('large', 'header')
+
+    expect(getWebMcpContext(textProject)).toBe('text')
+    expect(getWebMcpToolNames(textProject)).toContain('widgetr_change_typography')
+    expect(getWebMcpToolNames(textProject)).not.toContain('widgetr_replace_image')
+
+    expect(getWebMcpContext(imageProject)).toBe('image')
+    expect(getWebMcpToolNames(imageProject)).toContain('widgetr_replace_image')
+    expect(getWebMcpToolNames(imageProject)).not.toContain('widgetr_change_typography')
+
+    expect(getWebMcpContext(groupProject)).toBe('group')
+    expect(getWebMcpToolNames(groupProject)).toContain('widgetr_reorder_group')
+    expect(getWebMcpToolNames(groupProject)).not.toContain('widgetr_replace_image')
+  })
+
+  it('clears selection through the canonical selection operation', async () => {
+    const project = selectedProject('small', 'temperature')
+    const { runtime, state, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_clear_selection').execute({
+      expectedRevision: project.revision
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({ ok: true, revision: 2, selection: null })
+    expect(state.project.selection).toBeNull()
+    expect(operations[0]).toMatchObject({ type: 'set-selection', selection: null })
+  })
+
+  it('returns a bounded context summary without widget data', async () => {
+    const project = selectedProject('small', 'temperature')
+    const { runtime } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_get_context').execute({}, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      revision: 1,
+      context: 'text',
+      selectedElement: {
+        id: 'temperature',
+        type: 'text'
+      }
+    })
+    expect(JSON.stringify(result)).not.toContain('Kochi')
+    expect(JSON.stringify(result)).not.toContain('forecast')
+  })
+
+  it('routes text typography through the current operation path', async () => {
+    const project = selectedProject('small', 'temperature')
+    const { runtime, state, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_change_typography').execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'small' },
+      fontSize: 30,
+      color: '#F6C453'
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      revision: 2,
+      changedSizes: ['small']
+    })
+    expect(operations[0]).toMatchObject({
+      type: 'update-text-style',
+      elementId: 'temperature'
+    })
+    const temperature = state.project.layouts.small.root.children.find(element => element.id === 'temperature')
+    expect(temperature?.type).toBe('text')
+    if (temperature?.type === 'text') {
+      expect(temperature.textStyle.fontSize).toBe(30)
+      expect(temperature.textStyle.color).toBe('#F6C453')
+    }
+  })
+
+  it('rejects an agent operation after a manual revision change', async () => {
+    const project = selectedProject('small', 'temperature')
+    const { runtime, state } = createRuntime(project)
+    const typographyTool = toolFor(project, 'widgetr_change_typography')
+
+    const manual = applyWidgetOperation(state.project, {
+      type: 'update-text-style',
+      expectedRevision: 1,
+      elementId: 'temperature',
+      scope: { kind: 'one', size: 'small' },
+      patch: { color: '#12A36E' }
+    }, { now: fixedClock })
+    if (!manual.ok) {
+      throw new Error(manual.message)
+    }
+    state.project = manual.state
+
+    const result = await typographyTool.execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'small' },
+      fontSize: 20
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'STALE_REVISION',
+      revision: 2
+    })
+    const temperature = state.project.layouts.small.root.children.find(element => element.id === 'temperature')
+    expect(temperature?.type).toBe('text')
+    if (temperature?.type === 'text') {
+      expect(temperature.textStyle.color).toBe('#12A36E')
+      expect(temperature.textStyle.fontSize).not.toBe(20)
+    }
+  })
+
+  it('waits for user confirmation before replacing an image', async () => {
+    const project = selectedProject('medium', 'weather-image')
+    const { runtime, state, operations, confirmations } = createRuntime(project, false)
+    const result = await toolFor(project, 'widgetr_replace_image').execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'medium' },
+      source: { kind: 'literal', value: '/new-reference.png' },
+      alt: 'A new reference image'
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'CONFIRMATION_REQUIRED',
+      confirmed: false,
+      revision: 1
+    })
+    expect(confirmations).toEqual(['Confirm image replacement'])
+    expect(operations).toHaveLength(0)
+    const image = state.project.layouts.medium.root.children.find(element => element.id === 'weather-image')
+    expect(image?.type).toBe('image')
+    if (image?.type === 'image') {
+      expect(image.source).toEqual({
+        kind: 'binding',
+        bindingId: 'hero-image',
+        fallback: '/sample-monsoon.svg'
+      })
+    }
+  })
+
+  it('routes group ordering through the canonical reorder operation', async () => {
+    const project = selectedProject('large', 'header')
+    const { runtime, state, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_reorder_group').execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'large' },
+      childId: 'location',
+      toIndex: 2
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      revision: 2,
+      changedSizes: ['large']
+    })
+    expect(operations[0]).toMatchObject({
+      type: 'reorder-children',
+      elementId: 'header',
+      childId: 'location',
+      toIndex: 2
+    })
+    const header = state.project.layouts.large.root.children.find(element => element.id === 'header')
+    expect(header?.type).toBe('group')
+    if (header?.type === 'group') {
+      expect(header.children.map(child => child.id)).toEqual([
+        'header-spacer',
+        'updated',
+        'location'
+      ])
+    }
+  })
+
+  it('uses the same export generator and exposes bounded source output', async () => {
+    const project = createSampleWidgetProject()
+    const { runtime } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_export').execute({}, { signal: signal() }, runtime)
+    const expected = generateScriptableCode(project)
+
+    expect(result).toMatchObject({
+      ok: true,
+      revision: 0,
+      ready: true,
+      sourceIncluded: false,
+      sourceLength: expected.code?.length
+    })
+    if (expected.code) {
+      expect((result as { sourcePreview?: string }).sourcePreview).toBe(expected.code.slice(0, 800))
+    }
+  })
+
+  it('registers the current descriptor set through a model context', async () => {
+    const project = selectedProject('small', 'temperature')
+    const { runtime } = createRuntime(project)
+    const registered: WebMcpTool[] = []
+    const modelContext: WebMcpModelContext = {
+      registerTool: async tool => {
+        registered.push(tool)
+        return undefined
+      }
+    }
+    const controller = new AbortController()
+
+    const names = await registerWebMcpToolSet(
+      modelContext,
+      createWebMcpToolCatalog(project),
+      runtime,
+      shallowRef(project),
+      controller.signal
+    )
+
+    expect(names).toEqual(getWebMcpToolNames(project))
+    expect(registered.map(tool => tool.name)).toEqual(names)
+    expect(registered.every(tool => tool.inputSchema.type === 'object')).toBe(true)
+  })
+
+  it('stops publishing a descriptor set when its registration signal aborts', async () => {
+    const project = createSampleWidgetProject()
+    const { runtime } = createRuntime(project)
+    const controller = new AbortController()
+    let registeredCount = 0
+    const modelContext: WebMcpModelContext = {
+      registerTool: async () => {
+        registeredCount += 1
+        controller.abort()
+        return undefined
+      }
+    }
+
+    const names = await registerWebMcpToolSet(
+      modelContext,
+      createWebMcpToolCatalog(project),
+      runtime,
+      shallowRef(project),
+      controller.signal
+    )
+
+    expect(registeredCount).toBe(1)
+    expect(names).toEqual([])
+  })
+
+  it('returns an explicit output-limit result for oversized payloads', () => {
+    const result = JSON.parse(serializeWebMcpResult({
+      ok: true,
+      source: 'x'.repeat(30000)
+    })) as { ok: boolean, code: string }
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      code: 'OUTPUT_LIMIT'
+    }))
+  })
+})

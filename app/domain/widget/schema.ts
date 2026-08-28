@@ -619,6 +619,14 @@ export const widgetOperationSchema: z.ZodType<WidgetOperation> = z.discriminated
     background: widgetBackgroundSchema
   }).strict(),
   z.object({
+    type: z.literal('reorder-children'),
+    expectedRevision: z.number().int().nonnegative(),
+    elementId: idSchema,
+    childId: idSchema,
+    toIndex: z.number().int().nonnegative().max(WIDGET_CONSTRAINTS.tree.maxElementsPerLayout - 1),
+    scope: designScopeSchema.optional()
+  }).strict(),
+  z.object({
     type: z.literal('restore-snapshot'),
     expectedRevision: z.number().int().nonnegative(),
     snapshot: widgetProjectSchema

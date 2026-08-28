@@ -122,7 +122,7 @@ The schema will constrain the two-size tuple to distinct sizes. The handler will
 
 `widgetr_export` is read-only and is always registered. It calls `generateScriptableCode(project.value)`, reports readiness and bounded diagnostics, and returns the generated source only when it fits the output limit. If the source exceeds the limit, the result reports `sourceIncluded: false`, the source length, and a short preview. The UI continues to provide the complete source through its existing viewer, copy, and download actions.
 
-`widgetr_select_element` is always registered. It validates the requested size and element ID against the live trees before sending the existing `set-selection` operation. This lets an external agent move into a text, image, or group context without bypassing the selection path.
+`widgetr_select_element` and `widgetr_clear_selection` are always registered. They validate the live tree or current revision before sending the existing `set-selection` operation. This lets an external agent move into a text, image, or group context, or return to project-level tools, without bypassing the selection path.
 
 ### No-selection tools
 
