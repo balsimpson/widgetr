@@ -15,7 +15,7 @@ This section is the resume point for a new chat. The implementation lives in `/U
 
 | Area | Status | Evidence or remaining work |
 | --- | --- | --- |
-| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and the completed Phase 3 commit is `518e372` locally before push. |
+| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and the completed Phase 3 commit is `0100b5a`. |
 | Runtime | Ready locally | Use Node 22.23.1 at `/Users/balsimpson/.local/bin/node` with npm. The system Node 25 runtime is outside Nuxt's supported even-LTS range. |
 | Agent handoff | Added | [`AGENTS.md`](./AGENTS.md) contains the repository rules, file map, invariants, verification gates, and resume order. |
 | Phase 0 foundation | Complete | Nuxt, npm, Nuxt UI, Tailwind, README, deployment instructions, `.env.example`, `.nvmrc`, strict TypeScript setup, MIT license, public GitHub remote, and Vercel deployment are complete. |
