@@ -1,0 +1,55 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+:root {
+  --widgetr-workbench: #f3f6fa;
+  --widgetr-ink: #172033;
+  --widgetr-cobalt: #355dff;
+  --widgetr-mist: #dce4ef;
+  --widgetr-proof: #13795b;
+  --widgetr-signal: #a65308;
+  --font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --ui-primary: var(--widgetr-cobalt);
+  --ui-radius: 0.625rem;
+}
+
+.dark {
+  --widgetr-workbench: #0d1627;
+  --widgetr-ink: #edf3ff;
+  --widgetr-cobalt: #6f8cff;
+  --widgetr-mist: #34425a;
+  --widgetr-proof: #4fc9a2;
+  --widgetr-signal: #f0ad4e;
+}
+
+html {
+  background: var(--widgetr-workbench);
+}
+
+body {
+  min-width: 320px;
+  color: var(--widgetr-ink);
+  font-family: var(--font-sans);
+}
+
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--widgetr-cobalt);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
