@@ -142,6 +142,7 @@ For every rendered UI check, use this sequence:
 - Use focused edits with `apply_patch`.
 - Prefer named exports in application modules. Keep framework-required default exports only in Nuxt/Vitest configuration entrypoints.
 - Use Nuxt UI components where they fit and Tailwind for layout. Use semantic Nuxt UI colors rather than hard-coded palette classes.
+- Default every input field and textarea to full width with Tailwind (`w-full`) unless a narrower control is explicitly requested. Check the rendered root component as well as its inner input so shrink-wrapped Nuxt UI controls do not leave a narrow field.
 - Keep one clear surface. Avoid nested card stacks.
 - Do not add fake or generic placeholder copy. Fixture fallbacks are allowed only when they represent a real recovery state in the product contract.
 - Keep browser-local public references local. Never add API secrets, user secrets, or committed `.env` values.

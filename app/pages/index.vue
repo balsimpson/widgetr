@@ -379,7 +379,7 @@ function downloadExport(): void {
       <template #body>
         <UTextarea
           :model-value="generatedSource"
-          class="export-code"
+          class="export-code w-full"
           aria-label="Generated Scriptable source"
           readonly
           :rows="24"
