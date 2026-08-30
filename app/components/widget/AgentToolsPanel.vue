@@ -5,13 +5,8 @@ import type { WebMcpContext, WebMcpStatus } from '~/types/webmcp'
 const props = defineProps<{
   status: WebMcpStatus
   context: WebMcpContext
-  revision: number
   toolNames: string[]
   error: string | null
-}>()
-
-const emit = defineEmits<{
-  clearSelection: []
 }>()
 
 const statusLabel = computed(() => {
@@ -59,28 +54,14 @@ const contextLabel = computed(() => {
 <template>
   <section class="agent-tools-panel" aria-labelledby="agent-tools-heading">
     <div class="panel-heading">
-      <div>
-        <p class="panel-kicker">WebMCP</p>
-        <h2 id="agent-tools-heading">Agent tools</h2>
-      </div>
+      <h2 id="agent-tools-heading">Agent tools</h2>
       <UIcon name="i-lucide-bot" aria-hidden="true" />
     </div>
 
     <div class="agent-tools-meta">
       <UBadge :color="statusColor" variant="soft" :label="statusLabel" />
       <span>{{ contextLabel }}</span>
-      <span>rev {{ revision }}</span>
     </div>
-
-    <UButton
-      v-if="context !== 'none'"
-      class="w-full"
-      color="neutral"
-      icon="i-lucide-x"
-      label="Clear selection"
-      variant="outline"
-      @click="emit('clearSelection')"
-    />
 
     <UAlert
       v-if="status === 'unsupported'"
@@ -123,7 +104,24 @@ const contextLabel = computed(() => {
   align-content: start;
   gap: 0.8rem;
   padding: 1.25rem;
-  border-top: 1px solid var(--ui-border-muted);
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.panel-heading h2 {
+  color: var(--ui-text-highlighted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.panel-heading > .i-lucide-bot {
+  color: var(--widgetr-cobalt);
 }
 
 .agent-tools-meta {

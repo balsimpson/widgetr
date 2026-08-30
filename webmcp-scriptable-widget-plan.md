@@ -3,7 +3,7 @@
 ## Approved product and delivery plan
 
 Last updated: 28 August 2026  
-Status: Phase 0 complete; Phase 4 implemented locally; real Scriptable and deployed WebMCP verification pending
+Status: Phase 0 complete; Phase 4 deployed; real Scriptable and external-agent WebMCP verification pending
 Working title: Scriptable Widget Builder  
 Challenge: [The WebMCP Challenge](https://webmcp.devpost.com/)
 
@@ -15,7 +15,7 @@ This section is the resume point for a new chat. The implementation lives in `/U
 
 | Area | Status | Evidence or remaining work |
 | --- | --- | --- |
-| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and the completed Phase 3 commit is `0100b5a`; the Phase 4 implementation is now in the working tree. |
+| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and `origin/main` now points to the Phase 4 commit `6ea44f0`. |
 | Runtime | Ready locally | Use Node 22.23.1 at `/Users/balsimpson/.local/bin/node` with npm. The system Node 25 runtime is outside Nuxt's supported even-LTS range. |
 | Agent handoff | Added | [`AGENTS.md`](./AGENTS.md) contains the repository rules, file map, invariants, verification gates, and resume order. |
 | Phase 0 foundation | Complete | Nuxt, npm, Nuxt UI, Tailwind, README, deployment instructions, `.env.example`, `.nvmrc`, strict TypeScript setup, MIT license, public GitHub remote, and Vercel deployment are complete. |
@@ -24,13 +24,13 @@ This section is the resume point for a new chat. The implementation lives in `/U
 | Automated verification | Passed locally | `npm run typecheck` passes; `npm test` passes with 6 files and 42 tests. Do not run `npm run build` for this phase. |
 | Phase 2 export | Implemented locally | Deterministic generator, `config.widgetFamily` branches, preflight diagnostics, Scriptable API runtime harness, and shared viewer/copy/download source are implemented. Real iPhone execution remains. |
 | Phase 3 editor | Implemented locally | IndexedDB projects, CRUD and autosave, three previews, structure and inspector editing, session undo/redo, local reference-image persistence, and best-effort Scriptable import are implemented. The local browser checkpoint passed. |
-| Phase 4 WebMCP | Implemented locally | Contextual imperative tools for widget, text, image, and group contexts are registered over the shared operation path with revision checks, scope handling, bounded results, confirmation, and an editor status panel. The local 1280×900 and 390×844 browser checkpoint passed; a deployed external-agent run remains. |
+| Phase 4 WebMCP | Deployed | Contextual imperative tools for widget, text, image, and group contexts are registered over the shared operation path with revision checks, scope handling, bounded results, confirmation, and an editor status panel. Production now serves Phase 4; the WebMCP-capable in-app browser shows `Registered` and the expected contextual names with no browser warnings or errors. Actual external-agent tool execution remains unverified because the active browser backend rejected `webmcp_list_tools`. |
 | Visual design | Deferred | The current page is a functional kernel harness. Do the intentional design pass later, after the state and export work is stable. |
 
 ### Resume order
 
 1. Verify the generated file in real Scriptable on an iPhone, including small, medium, and large widget families.
-2. Run the deployed external-agent WebMCP checkpoint: create, select, change context, edit, and export through the production URL.
+2. Run the deployed external-agent WebMCP checkpoint: create, select, change context, edit, and export through the production URL when the WebMCP browser backend supports tool discovery and calls.
 3. Keep later data, admin, and visual-polish work behind the phase checkpoints below.
 
 The current implementation is concentrated in `app/types/widget.ts`, `app/domain/widget/`, `app/components/widget/`, `app/composables/`, `app/pages/index.vue`, and `tests/unit/`.
@@ -668,7 +668,7 @@ Checkpoint:
 
 ### Phase 4: WebMCP vertical slice
 
-Status: Implemented locally as of 28 August 2026. The local browser checkpoint passed. Deployed external-agent verification remains.
+Status: Implemented and deployed as of 28 August 2026. The local browser checkpoint and production page-side registration check passed. Deployed external-agent execution remains.
 
 Deliverables:
 
@@ -681,9 +681,10 @@ Deliverables:
 
 Checkpoint:
 
-- A deployed external agent can create a widget, select an element, observe the tool set change, alter it, and see the same state update in the interface.
-- A manual change made between agent calls is preserved.
-- The agent can export through the same preflight and generator used by the UI.
+- [x] Production serves the Phase 4 page, and the WebMCP-capable in-app browser reports `Registered` with the expected contextual tool names.
+- [ ] A deployed external agent can create a widget, select an element, observe the tool set change, alter it, and see the same state update in the interface.
+- [ ] A manual change made between agent calls is preserved.
+- [ ] The agent can export through the same preflight and generator used by the UI.
 
 ### Phase 5: Data onboarding and iPhone diagnostics
 

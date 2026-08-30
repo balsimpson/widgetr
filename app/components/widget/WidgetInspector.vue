@@ -19,6 +19,8 @@ import type {
 const props = defineProps<{
   project: WidgetProject
   selection: WidgetSelection | null
+  mode?: 'element' | 'widget'
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -48,6 +50,55 @@ const selectedImage = computed(() => (
 const selectedLabel = computed(() => selectedElement.value
   ? widgetElementLabel(selectedElement.value)
   : 'No element selected')
+
+const inspectorMode = computed(() => props.mode ?? 'element')
+const isWidgetMode = computed(() => inspectorMode.value === 'widget')
+const isEmbedded = computed(() => props.embedded ?? false)
+const inspectorTitle = computed(() => isWidgetMode.value ? 'Widget settings' : selectedLabel.value)
+
+const inspectorSections = computed(() => {
+  const element = selectedElement.value
+  if (isWidgetMode.value || !element) {
+    return []
+  }
+
+  const sections = [
+    {
+      label: 'Properties',
+      value: 'properties',
+      slot: 'properties',
+      icon: 'i-lucide-sliders-horizontal'
+    }
+  ]
+
+  if (['text', 'date', 'symbol', 'image'].includes(element.type)) {
+    sections.push({
+      label: 'Content',
+      value: 'content',
+      slot: 'content',
+      icon: 'i-lucide-type'
+    })
+  }
+
+  if (['group', 'repeat', 'spacer'].includes(element.type)) {
+    sections.push({
+      label: 'Layout',
+      value: 'layout',
+      slot: 'layout',
+      icon: 'i-lucide-panels-top-left'
+    })
+  }
+
+  return sections
+})
+
+const defaultInspectorSection = computed(() => {
+  const element = selectedElement.value
+  if (element && ['group', 'repeat', 'spacer'].includes(element.type)) {
+    return 'layout'
+  }
+  return 'content'
+})
 
 const selectedSource = computed<ValueSource | null>(() => {
   const element = selectedElement.value
@@ -378,13 +429,18 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 </script>
 
 <template>
-  <aside class="inspector-panel" aria-labelledby="inspector-heading">
-    <div class="inspector-heading">
+  <aside
+    class="inspector-panel"
+    :class="{ 'inspector-panel-embedded': isEmbedded }"
+    :aria-label="isEmbedded ? inspectorTitle : undefined"
+    :aria-labelledby="isEmbedded ? undefined : 'inspector-heading'"
+  >
+    <div v-if="!isEmbedded" class="inspector-heading">
       <div>
-        <p class="panel-kicker">Inspector</p>
-        <h2 id="inspector-heading">{{ selectedLabel }}</h2>
+        <h2 id="inspector-heading">{{ inspectorTitle }}</h2>
       </div>
       <UBadge
+        v-if="!isWidgetMode"
         color="neutral"
         variant="soft"
         :label="scopeLabel"
@@ -392,8 +448,8 @@ function updateOverlayOpacity(value: string | number | undefined): void {
     </div>
 
     <UFormField
-      label="Change scope"
-      description="Inspector edits apply through this scope."
+      label="Applies to"
+      description="Choose which widget sizes this change affects."
     >
       <USelect
         class="w-full"
@@ -404,10 +460,13 @@ function updateOverlayOpacity(value: string | number | undefined): void {
       />
     </UFormField>
 
-    <section class="inspector-section" aria-labelledby="background-heading">
+    <section
+      v-if="isWidgetMode"
+      class="inspector-section"
+      aria-labelledby="background-heading"
+    >
       <div class="section-heading">
         <div>
-          <p class="panel-kicker">Widget surface</p>
           <h3 id="background-heading">{{ selectedSize }} background</h3>
         </div>
         <span class="section-meta">{{ selectedSize }}</span>
@@ -482,20 +541,28 @@ function updateOverlayOpacity(value: string | number | undefined): void {
       </template>
     </section>
 
-    <UAlert
-      v-if="!selectedElement"
-      color="info"
-      variant="subtle"
-      icon="i-lucide-mouse-pointer-2"
-      title="Select an element to edit it"
-      description="Click a node in a preview or in the structure tree."
-    />
+    <template v-if="!isWidgetMode">
+      <UAlert
+        v-if="!selectedElement"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-mouse-pointer-2"
+        title="Select an element to edit it"
+        description="Click a node in a preview or in the structure tree."
+      />
 
-    <template v-else>
+      <template v-else>
+      <UAccordion
+        :key="selectedElement?.id"
+        :items="inspectorSections"
+        type="multiple"
+        :default-value="[defaultInspectorSection]"
+        class="inspector-accordion"
+      >
+        <template #properties-body>
       <section class="inspector-section" aria-labelledby="visibility-heading">
         <div class="section-heading">
           <div>
-            <p class="panel-kicker">Element</p>
             <h3 id="visibility-heading">Visibility and box</h3>
           </div>
           <span class="section-meta">{{ selectedElement.type }}</span>
@@ -567,6 +634,9 @@ function updateOverlayOpacity(value: string | number | undefined): void {
         </div>
       </section>
 
+        </template>
+
+        <template #content-body>
       <section
         v-if="selectedElement.type === 'text' || selectedElement.type === 'date' || selectedElement.type === 'symbol' || selectedElement.type === 'image'"
         class="inspector-section"
@@ -574,10 +644,8 @@ function updateOverlayOpacity(value: string | number | undefined): void {
       >
         <div class="section-heading">
           <div>
-            <p class="panel-kicker">Content</p>
             <h3 id="content-heading">{{ selectedElement.type === 'image' ? 'Image source' : 'Displayed value' }}</h3>
           </div>
-          <span class="section-meta">{{ sourceDescription }}</span>
         </div>
 
         <UFormField
@@ -746,6 +814,9 @@ function updateOverlayOpacity(value: string | number | undefined): void {
         </template>
       </section>
 
+        </template>
+
+        <template #layout-body>
       <section
         v-if="selectedElement.type === 'group' || selectedElement.type === 'repeat'"
         class="inspector-section"
@@ -753,7 +824,6 @@ function updateOverlayOpacity(value: string | number | undefined): void {
       >
         <div class="section-heading">
           <div>
-            <p class="panel-kicker">Layout</p>
             <h3 id="layout-heading">Group arrangement</h3>
           </div>
           <span class="section-meta">{{ selectedElement.children.length }} children</span>
@@ -836,7 +906,6 @@ function updateOverlayOpacity(value: string | number | undefined): void {
       >
         <div class="section-heading">
           <div>
-            <p class="panel-kicker">Layout</p>
             <h3 id="spacer-heading">Spacer length</h3>
           </div>
           <span class="section-meta">{{ selectedElement.length === 'flex' ? 'flexible' : `${selectedElement.length}px` }}</span>
@@ -862,6 +931,10 @@ function updateOverlayOpacity(value: string | number | undefined): void {
           @click="updateContent({ length: 'flex' })"
         />
       </section>
+
+        </template>
+      </UAccordion>
+      </template>
     </template>
   </aside>
 </template>
@@ -870,11 +943,16 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 .inspector-panel {
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: 0.9rem;
   min-width: 0;
   padding: 1.25rem;
   overflow-y: auto;
   background: var(--ui-bg);
+}
+
+.inspector-panel-embedded {
+  padding: 1.25rem;
+  background: transparent;
 }
 
 .inspector-heading,
@@ -887,7 +965,7 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 
 .inspector-heading h2,
 .section-heading h3 {
-  margin-top: 0.2rem;
+  margin: 0;
   color: var(--ui-text-highlighted);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -903,18 +981,14 @@ function updateOverlayOpacity(value: string | number | undefined): void {
   font-size: 0.9rem;
 }
 
-.panel-kicker,
 .section-meta {
+  flex: 0 0 auto;
+  padding-top: 0.2rem;
   color: var(--ui-text-muted);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.section-meta {
-  flex: 0 0 auto;
-  padding-top: 0.2rem;
 }
 
 .inspector-section {
@@ -924,16 +998,15 @@ function updateOverlayOpacity(value: string | number | undefined): void {
   border-top: 1px solid var(--ui-border-muted);
 }
 
+.inspector-accordion .inspector-section {
+  padding-top: 0.2rem;
+  border-top: 0;
+}
+
 .inspector-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem;
-}
-
-@media (max-width: 72rem) {
-  .inspector-panel {
-    border-top: 1px solid var(--ui-border-muted);
-  }
 }
 
 @media (max-width: 25rem) {

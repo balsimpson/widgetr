@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { importScriptableProject } from '~/domain/widget/importer'
 import { cloneWidgetProject } from '~/domain/widget/clone'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { resolveDesignScope } from '~/domain/widget/schema'
+import { findWidgetElement, widgetElementLabel } from '~/domain/widget/tree'
 import { useWidgetProjects } from '~/composables/useWidgetProjects'
 import { useWidgetWebMcp } from '~/composables/useWidgetWebMcp'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
@@ -48,8 +49,17 @@ const lastResult = ref<OperationResult | null>(null)
 const historyPast = ref<WidgetProject[]>([])
 const historyFuture = ref<WidgetProject[]>([])
 const structureSize = ref<WidgetSize>('small')
+const previewView = ref<WidgetSize | 'all'>('all')
 const sourceOpen = ref(false)
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
+
+const projectsOpen = ref(false)
+const layersOpen = ref(false)
+const settingsOpen = ref(false)
+const referenceOpen = ref(false)
+const importReportOpen = ref(false)
+const exportOpen = ref(false)
+const agentOpen = ref(false)
 
 const newProjectOpen = ref(false)
 const newProjectName = ref('')
@@ -122,12 +132,12 @@ const exportStatusLabel = computed(() => {
   return 'Ready to export'
 })
 
-const blockingDescription = computed(() => blockingIssues.value
-  .map(issue => `${issue.message} ${issue.recovery}`)
+const blockingDescription = computed(() => [...new Set(blockingIssues.value
+  .map(issue => `${issue.message} ${issue.recovery}`))]
   .join(' '))
 
-const warningDescription = computed(() => warningIssues.value
-  .map(issue => `${issue.message} ${issue.recovery}`)
+const warningDescription = computed(() => [...new Set(warningIssues.value
+  .map(issue => `${issue.message} ${issue.recovery}`))]
   .join(' '))
 
 const copyButtonLabel = computed(() => {
@@ -141,11 +151,45 @@ const copyButtonLabel = computed(() => {
 })
 
 const structureSizeOptions = WIDGET_SIZES.map(size => ({
-  label: `${size[0]!.toUpperCase()}${size.slice(1)} structure`,
+  label: size[0]!.toUpperCase() + size.slice(1),
   value: size
 }))
 
+const previewViewOptions = [
+  { label: 'All sizes', value: 'all' },
+  ...WIDGET_SIZES.map(size => ({
+    label: size[0]!.toUpperCase() + size.slice(1),
+    value: size
+  }))
+]
+
+const visiblePreviewSizes = computed(() => (
+  previewView.value === 'all' ? WIDGET_SIZES : [previewView.value]
+))
+
 const activeProject = computed(() => projects.value.find(item => item.id === project.value.id) ?? project.value)
+
+const selectedElementTitle = computed(() => {
+  const selection = project.value.selection
+  if (!selection) {
+    return 'Edit selection'
+  }
+
+  const element = findWidgetElement(
+    project.value.layouts[selection.size].root,
+    selection.elementId
+  )
+  return element ? widgetElementLabel(element) : 'Edit selection'
+})
+
+const inspectorOpen = computed({
+  get: () => project.value.selection !== null,
+  set: (open: boolean) => {
+    if (!open) {
+      clearSelection()
+    }
+  }
+})
 
 const agentConfirmationOpen = computed({
   get: () => agentConfirmation.value !== null,
@@ -167,6 +211,32 @@ const {
   createProject: createAgentProject,
   getExport: () => exportResult.value,
   requestConfirmation: requestAgentConfirmation
+})
+
+const agentStatusLabel = computed(() => {
+  switch (webmcpStatus.value) {
+    case 'registered':
+      return 'Agent ready'
+    case 'registering':
+      return 'Connecting'
+    case 'error':
+      return 'Agent issue'
+    default:
+      return 'Agent unavailable'
+  }
+})
+
+const agentStatusColor = computed(() => {
+  switch (webmcpStatus.value) {
+    case 'registered':
+      return 'success'
+    case 'registering':
+      return 'warning'
+    case 'error':
+      return 'error'
+    default:
+      return 'neutral'
+  }
 })
 
 function commitOperation(
@@ -193,6 +263,9 @@ function commitOperation(
 }
 
 function selectElement(selection: WidgetSelection): void {
+  closeContextualSurfaces()
+  structureSize.value = selection.size
+
   if (
     project.value.selection?.size === selection.size
     && project.value.selection.elementId === selection.elementId
@@ -217,6 +290,46 @@ function clearSelection(): void {
     expectedRevision: project.value.revision,
     selection: null
   }, { recordHistory: false })
+}
+
+function closeContextualSurfaces(): void {
+  projectsOpen.value = false
+  layersOpen.value = false
+  settingsOpen.value = false
+  referenceOpen.value = false
+  importReportOpen.value = false
+  exportOpen.value = false
+  agentOpen.value = false
+}
+
+function openProjects(): void {
+  closeContextualSurfaces()
+  projectsOpen.value = true
+}
+
+function openLayers(): void {
+  closeContextualSurfaces()
+  layersOpen.value = true
+}
+
+function openWidgetSettings(): void {
+  closeContextualSurfaces()
+  settingsOpen.value = true
+}
+
+function openReference(): void {
+  closeContextualSurfaces()
+  referenceOpen.value = true
+}
+
+function openImportReport(): void {
+  closeContextualSurfaces()
+  importReportOpen.value = true
+}
+
+function openExport(): void {
+  closeContextualSurfaces()
+  exportOpen.value = true
 }
 
 function finishAgentConfirmation(confirmed: boolean): void {
@@ -289,6 +402,7 @@ function redo(): void {
 }
 
 async function selectProject(projectId: string): Promise<void> {
+  closeContextualSurfaces()
   await openProject(projectId)
   historyPast.value = []
   historyFuture.value = []
@@ -298,6 +412,7 @@ async function selectProject(projectId: string): Promise<void> {
 }
 
 function openNewProject(): void {
+  closeContextualSurfaces()
   newProjectName.value = ''
   newProjectOpen.value = true
 }
@@ -322,6 +437,7 @@ async function createAgentProject(name: string): Promise<WidgetProject> {
 }
 
 function openRenameProject(target: WidgetProject): void {
+  closeContextualSurfaces()
   renameTarget.value = target
   renameProjectName.value = target.name
   renameProjectOpen.value = true
@@ -353,6 +469,7 @@ async function duplicateSelectedProject(target: WidgetProject): Promise<void> {
 }
 
 function openDeleteProject(target: WidgetProject): void {
+  closeContextualSurfaces()
   deleteTarget.value = target
   deleteProjectOpen.value = true
 }
@@ -371,6 +488,7 @@ async function confirmDeleteProject(): Promise<void> {
 }
 
 function openImport(): void {
+  closeContextualSurfaces()
   importSource.value = ''
   importError.value = null
   importOpen.value = true
@@ -541,8 +659,23 @@ function downloadExport(): void {
   URL.revokeObjectURL(href)
 }
 
-function isActiveSize(size: WidgetSize): boolean {
-  return activeSizes.value.includes(size)
+function openSourceViewer(): void {
+  exportOpen.value = false
+  sourceOpen.value = true
+}
+
+function downloadAndClose(): void {
+  downloadExport()
+  if (exportReady.value) {
+    exportOpen.value = false
+  }
+}
+
+let previewMediaQuery: MediaQueryList | null = null
+
+function syncPreviewView(event?: MediaQueryList | MediaQueryListEvent): void {
+  const isNarrow = event ? event.matches : previewMediaQuery?.matches ?? false
+  previewView.value = isNarrow ? 'medium' : 'all'
 }
 
 watch(
@@ -552,7 +685,14 @@ watch(
   }
 )
 
+onMounted(() => {
+  previewMediaQuery = window.matchMedia('(max-width: 58rem)')
+  syncPreviewView()
+  previewMediaQuery.addEventListener('change', syncPreviewView)
+})
+
 onBeforeUnmount(() => {
+  previewMediaQuery?.removeEventListener('change', syncPreviewView)
   if (referenceUrl.value) {
     URL.revokeObjectURL(referenceUrl.value)
   }
@@ -563,15 +703,31 @@ onBeforeUnmount(() => {
   <main class="editor-shell">
     <header class="editor-header">
       <div class="editor-title-block">
-        <p class="phase-label">Widgetr / phase 4</p>
+        <div class="editor-context">
+          <UButton
+            label="Projects"
+            icon="i-lucide-panels-top-left"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            @click="openProjects"
+          />
+          <span class="editor-context-divider" aria-hidden="true">/</span>
+          <UBadge
+            :color="persistenceState === 'error' ? 'error' : persistenceState === 'saving' ? 'warning' : 'success'"
+            variant="soft"
+            :label="persistenceState === 'saving' ? 'Saving' : persistenceState === 'error' ? 'Storage issue' : 'Saved locally'"
+          />
+        </div>
         <h1>{{ project.name }}</h1>
-        <p class="editor-summary">
-          A local visual editor for one widget, three Scriptable sizes, and one export path.
-        </p>
       </div>
 
       <div class="editor-header-actions">
-        <div class="history-actions" aria-label="Session history">
+        <div
+          v-if="historyPast.length || historyFuture.length"
+          class="history-actions"
+          aria-label="Session history"
+        >
           <UButton
             icon="i-lucide-undo-2"
             color="neutral"
@@ -589,15 +745,33 @@ onBeforeUnmount(() => {
             @click="redo"
           />
         </div>
-        <UBadge
-          color="neutral"
-          variant="soft"
-          :label="`Revision ${project.revision}`"
-        />
-        <UBadge
-          :color="persistenceState === 'error' ? 'error' : persistenceState === 'saving' ? 'warning' : 'success'"
-          variant="soft"
-          :label="persistenceState === 'saving' ? 'Saving' : persistenceState === 'error' ? 'Storage issue' : 'Saved locally'"
+        <UPopover
+          v-model:open="agentOpen"
+          :content="{ align: 'end', sideOffset: 8 }"
+          :ui="{ content: 'w-96 max-w-[calc(100vw-2rem)] p-0' }"
+        >
+          <UButton
+            :label="agentStatusLabel"
+            icon="i-lucide-bot"
+            :color="agentStatusColor"
+            variant="soft"
+            size="sm"
+          />
+          <template #content>
+            <WidgetAgentToolsPanel
+              :status="webmcpStatus"
+              :context="webmcpContext"
+              :tool-names="webmcpRegisteredToolNames"
+              :error="webmcpError"
+            />
+          </template>
+        </UPopover>
+        <UButton
+          label="Export"
+          icon="i-lucide-download"
+          color="primary"
+          size="sm"
+          @click="openExport"
         />
       </div>
     </header>
@@ -612,9 +786,103 @@ onBeforeUnmount(() => {
       :description="`${persistenceError} The current session remains available, but it may not survive a refresh.`"
     />
 
-    <section class="workspace-grid" aria-label="Widget editor">
-      <div class="workspace-left">
+    <section class="workspace" aria-label="Widget editor">
+      <section class="canvas-panel" aria-labelledby="canvas-heading">
+        <div class="canvas-toolbar">
+          <div>
+            <h2 id="canvas-heading">Preview</h2>
+            <p class="canvas-subtitle">Shape the widget visually across every size.</p>
+          </div>
+          <div class="canvas-actions">
+            <UButton
+              label="Widget settings"
+              icon="i-lucide-settings-2"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="openWidgetSettings"
+            />
+            <UButton
+              label="Layers"
+              icon="i-lucide-layers-2"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="openLayers"
+            />
+            <UButton
+              label="Reference"
+              icon="i-lucide-image-plus"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="openReference"
+            />
+            <UButton
+              v-if="project.importReport"
+              label="Import review"
+              icon="i-lucide-file-check-2"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              @click="openImportReport"
+            />
+          </div>
+        </div>
+
+        <div class="preview-controls">
+          <UFormField label="Show" class="preview-view-field">
+            <USelect
+              :model-value="previewView"
+              :items="previewViewOptions"
+              value-key="value"
+              aria-label="Preview sizes"
+              @update:model-value="value => previewView = value as WidgetSize | 'all'"
+            />
+          </UFormField>
+          <div class="scope-readout">
+            <span>Edits affect</span>
+            <UBadge color="primary" variant="soft" :label="scopeLabel" />
+          </div>
+        </div>
+
+        <UAlert
+          v-if="lastResult && !lastResult.ok"
+          class="operation-result"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="lastResult.code"
+          :description="lastResult.message"
+        />
+
+        <div class="preview-scroll">
+          <div
+            class="preview-grid"
+            :class="{ 'preview-grid-single': visiblePreviewSizes.length === 1 }"
+          >
+            <WidgetPreview
+              v-for="size in visiblePreviewSizes"
+              :key="size"
+              :project="project"
+              :size="size"
+              @select="selectElement"
+            />
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <USlideover
+      v-model:open="projectsOpen"
+      side="left"
+      title="Projects"
+      description="Switch between widgets saved in this browser."
+      :ui="{ content: 'sm:max-w-sm', body: 'p-0 sm:p-0' }"
+    >
+      <template #body>
         <WidgetProjectList
+          class="slideover-projects"
           :projects="projects"
           :active-project-id="project.id"
           :is-loading="isLoading"
@@ -626,29 +894,74 @@ onBeforeUnmount(() => {
           @duplicate="duplicateSelectedProject"
           @delete="openDeleteProject"
         />
+      </template>
+    </USlideover>
 
-        <WidgetAgentToolsPanel
-          :status="webmcpStatus"
-          :context="webmcpContext"
-          :revision="project.revision"
-          :tool-names="webmcpRegisteredToolNames"
-          :error="webmcpError"
-          @clear-selection="clearSelection"
+    <USlideover
+      v-model:open="layersOpen"
+      side="left"
+      title="Layers"
+      description="Select an element to edit it."
+      :ui="{ content: 'sm:max-w-sm' }"
+    >
+      <template #body>
+        <div class="layers-drawer">
+          <UFormField label="Preview size">
+            <USelect
+              class="w-full"
+              :model-value="structureSize"
+              :items="structureSizeOptions"
+              value-key="value"
+              aria-label="Layer preview size"
+              @update:model-value="value => structureSize = value as WidgetSize"
+            />
+          </UFormField>
+
+          <ul class="structure-tree">
+            <WidgetStructureTree
+              :element="project.layouts[structureSize].root"
+              :size="structureSize"
+              :selection="project.selection"
+              @select="selectElement"
+            />
+          </ul>
+        </div>
+      </template>
+    </USlideover>
+
+    <USlideover
+      v-model:open="settingsOpen"
+      title="Widget settings"
+      description="Set the surface and size scope for this widget."
+      :ui="{ content: 'sm:max-w-md', body: 'p-0 sm:p-0' }"
+    >
+      <template #body>
+        <WidgetInspector
+          class="slideover-inspector"
+          mode="widget"
+          embedded
+          :project="project"
+          :selection="null"
+          @operation="commitOperation"
         />
+      </template>
+    </USlideover>
 
-        <section class="reference-panel" aria-labelledby="reference-heading">
-          <div class="panel-heading">
-            <div>
-              <p class="panel-kicker">Local reference</p>
-              <h2 id="reference-heading">Visual direction</h2>
-            </div>
+    <USlideover
+      v-model:open="referenceOpen"
+      title="Reference"
+      description="Keep a local visual direction nearby while you design."
+      :ui="{ content: 'sm:max-w-md' }"
+    >
+      <template #body>
+        <section class="drawer-section reference-panel" aria-labelledby="reference-heading">
+          <div class="drawer-intro">
             <UIcon name="i-lucide-image-plus" aria-hidden="true" />
+            <h2 id="reference-heading">Reference image</h2>
+            <p>Optional. The file stays in this browser.</p>
           </div>
 
-          <UFormField
-            label="Add a local image"
-            description="The file stays in this browser and is never uploaded by Widgetr."
-          >
+          <UFormField label="Add an image">
             <UFileUpload
               v-model="referenceUpload"
               class="w-full"
@@ -684,22 +997,22 @@ onBeforeUnmount(() => {
               @click="removeReference"
             />
           </div>
-          <p v-else class="reference-empty">
-            Add a screenshot or visual reference when you want the editor to keep a style nearby.
-          </p>
         </section>
+      </template>
+    </USlideover>
 
-        <section
-          v-if="project.importReport"
-          class="import-report-panel"
-          aria-labelledby="import-report-heading"
-        >
-          <div class="panel-heading">
-            <div>
-              <p class="panel-kicker">Import report</p>
-              <h2 id="import-report-heading">What Widgetr kept</h2>
-            </div>
+    <USlideover
+      v-if="project.importReport"
+      v-model:open="importReportOpen"
+      title="Import review"
+      description="See what Widgetr could recreate from the source."
+      :ui="{ content: 'sm:max-w-md' }"
+    >
+      <template #body>
+        <section class="drawer-section import-report-panel" aria-labelledby="import-report-heading">
+          <div class="drawer-intro">
             <UIcon name="i-lucide-file-check-2" aria-hidden="true" />
+            <h2 id="import-report-heading">What Widgetr kept</h2>
           </div>
 
           <div v-for="section in importReportSections" :key="section.key" class="report-group">
@@ -709,76 +1022,19 @@ onBeforeUnmount(() => {
             </ul>
           </div>
         </section>
-      </div>
+      </template>
+    </USlideover>
 
-      <section class="canvas-panel" aria-labelledby="canvas-heading">
-        <div class="canvas-toolbar">
-          <div>
-            <p class="panel-kicker">Preview</p>
-            <h2 id="canvas-heading">Three layout trees, one project</h2>
-          </div>
-          <div class="scope-readout">
-            <span>Editing scope</span>
-            <UBadge color="primary" variant="soft" :label="scopeLabel" />
-          </div>
-        </div>
-
-        <UAlert
-          v-if="lastResult"
-          class="operation-result"
-          :color="lastResult.ok ? 'success' : 'error'"
-          variant="subtle"
-          :icon="lastResult.ok ? 'i-lucide-check-circle-2' : 'i-lucide-circle-alert'"
-          :title="lastResult.ok ? `Revision ${lastResult.revision}` : lastResult.code"
-          :description="lastResult.message"
-        />
-
-        <div class="preview-scroll">
-          <div class="preview-grid">
-            <WidgetPreview
-              v-for="size in WIDGET_SIZES"
-              :key="size"
-              :project="project"
-              :size="size"
-              @select="selectElement"
-            />
-          </div>
-        </div>
-
-        <div class="structure-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="panel-kicker">Structure</p>
-              <h2>Choose an element to inspect</h2>
-            </div>
-            <USelect
-              class="structure-size-select"
-              :model-value="structureSize"
-              :items="structureSizeOptions"
-              value-key="value"
-              aria-label="Structure widget size"
-              @update:model-value="value => structureSize = value as WidgetSize"
-            />
-          </div>
-
-          <div class="structure-scroll">
-            <ul class="structure-tree">
-              <WidgetStructureTree
-                :element="project.layouts[structureSize].root"
-                :size="structureSize"
-                :selection="project.selection"
-                @select="selectElement"
-              />
-            </ul>
-          </div>
-        </div>
-
-        <section class="export-panel" aria-labelledby="export-heading">
-          <div class="panel-heading">
-            <div>
-              <p class="panel-kicker">Scriptable export</p>
-              <h2 id="export-heading">One file for small, medium, and large</h2>
-            </div>
+    <USlideover
+      v-model:open="exportOpen"
+      title="Export widget"
+      description="One standalone Scriptable file for all three sizes."
+      :ui="{ content: 'sm:max-w-md' }"
+    >
+      <template #body>
+        <section class="drawer-section export-panel" aria-labelledby="export-heading">
+          <div class="export-status-row">
+            <span>Export status</span>
             <UBadge
               :color="exportStatusColor"
               variant="soft"
@@ -799,47 +1055,71 @@ onBeforeUnmount(() => {
             color="warning"
             variant="subtle"
             icon="i-lucide-triangle-alert"
-            title="Export is ready with review notes"
+            title="Ready with review notes"
             :description="warningDescription"
           />
 
-          <div class="export-actions">
-            <UButton
-              label="View source"
-              icon="i-lucide-code-2"
-              color="primary"
-              :disabled="!exportReady"
-              @click="sourceOpen = true"
-            />
-            <UButton
-              :label="copyButtonLabel"
-              icon="i-lucide-copy"
-              color="neutral"
-              variant="outline"
-              :disabled="!exportReady"
-              @click="copyExport"
-            />
-            <UButton
-              label="Download .js"
-              icon="i-lucide-download"
-              color="neutral"
-              variant="outline"
-              :disabled="!exportReady"
-              @click="downloadExport"
-            />
-          </div>
           <p class="export-note">
-            {{ generatedSource.length.toLocaleString() }} characters · source, Copy, and download use the same generated string.
+            {{ generatedSource.length.toLocaleString() }} characters. The preview, copy, and download use the same generated source.
           </p>
         </section>
-      </section>
+      </template>
+      <template #footer>
+        <div class="export-actions">
+          <UButton
+            label="Download .js"
+            icon="i-lucide-download"
+            color="primary"
+            :disabled="!exportReady"
+            @click="downloadAndClose"
+          />
+          <UButton
+            :label="copyButtonLabel"
+            icon="i-lucide-copy"
+            color="neutral"
+            variant="outline"
+            :disabled="!exportReady"
+            @click="copyExport"
+          />
+          <UButton
+            label="View source"
+            icon="i-lucide-code-2"
+            color="neutral"
+            variant="outline"
+            :disabled="!exportReady"
+            @click="openSourceViewer"
+          />
+        </div>
+      </template>
+    </USlideover>
 
-      <WidgetInspector
-        :project="project"
-        :selection="project.selection"
-        @operation="commitOperation"
-      />
-    </section>
+    <USlideover
+      v-if="project.selection"
+      v-model:open="inspectorOpen"
+      :title="selectedElementTitle"
+      description="Edit the selected element and choose where changes apply."
+      :ui="{ content: 'sm:max-w-md', body: 'p-0 sm:p-0' }"
+    >
+      <template #body>
+        <WidgetInspector
+          class="slideover-inspector"
+          embedded
+          :project="project"
+          :selection="project.selection"
+          @operation="commitOperation"
+        />
+      </template>
+      <template #footer>
+        <UButton
+          label="Clear selection"
+          icon="i-lucide-x"
+          color="neutral"
+          variant="outline"
+          block
+          @click="clearSelection"
+        />
+      </template>
+    </USlideover>
 
     <UModal
       v-model:open="newProjectOpen"
@@ -1047,42 +1327,35 @@ onBeforeUnmount(() => {
   align-items: flex-end;
   justify-content: space-between;
   gap: 1.5rem;
-  padding: 0.5rem 0 1.25rem;
+  padding: 0.25rem 0 1.25rem;
 }
 
-.phase-label,
-.panel-kicker,
-.scope-readout,
-.reference-meta,
-.export-note {
+.editor-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
   color: var(--ui-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+}
+
+.editor-context-divider {
+  color: var(--ui-text-dimmed);
 }
 
 .editor-title-block h1 {
-  max-width: 25ch;
-  margin-top: 0.35rem;
+  max-width: 32ch;
+  margin-top: 0.45rem;
   color: var(--ui-text-highlighted);
-  font-size: clamp(1.8rem, 3.5vw, 3.5rem);
+  font-size: clamp(1.55rem, 3vw, 2.35rem);
   font-weight: 750;
-  letter-spacing: -0.06em;
-  line-height: 0.98;
+  letter-spacing: -0.055em;
+  line-height: 1;
   overflow-wrap: anywhere;
-}
-
-.editor-summary {
-  max-width: 40rem;
-  margin-top: 0.65rem;
-  color: var(--ui-text-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
 }
 
 .editor-header-actions,
 .history-actions,
+.canvas-actions,
 .export-actions,
 .modal-actions {
   display: flex;
@@ -1099,10 +1372,8 @@ onBeforeUnmount(() => {
   margin-bottom: 1rem;
 }
 
-.workspace-grid {
-  display: grid;
-  grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr) minmax(19rem, 24rem);
-  min-height: calc(100vh - 9rem);
+.workspace {
+  min-height: calc(100vh - 8rem);
   overflow: hidden;
   border: 1px solid var(--ui-border-muted);
   border-radius: 1rem;
@@ -1110,37 +1381,131 @@ onBeforeUnmount(() => {
   box-shadow: 0 20px 70px rgb(23 32 51 / 8%);
 }
 
-.workspace-left {
+.canvas-panel {
   display: grid;
   align-content: start;
   min-width: 0;
-  border-right: 1px solid var(--ui-border-muted);
 }
 
-.reference-panel {
-  display: grid;
-  align-content: start;
-  gap: 0.8rem;
-  padding: 1.25rem;
-  border-top: 1px solid var(--ui-border-muted);
-}
-
-.panel-heading,
 .canvas-toolbar,
-.scope-readout {
+.preview-controls {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.8rem;
+  gap: 1rem;
 }
 
-.panel-heading h2,
+.canvas-toolbar {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--ui-border-muted);
+}
+
 .canvas-toolbar h2 {
-  margin-top: 0.2rem;
+  color: var(--ui-text-highlighted);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.canvas-subtitle {
+  margin-top: 0.35rem;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.canvas-actions {
+  justify-content: flex-end;
+}
+
+.preview-controls {
+  align-items: flex-end;
+  padding: 1.25rem 1.5rem 0;
+}
+
+.preview-view-field {
+  width: 11rem;
+}
+
+.scope-readout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  color: var(--ui-text-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.operation-result {
+  margin: 1rem 1.5rem 0;
+}
+
+.preview-scroll {
+  min-width: 0;
+  margin: 0;
+  padding: 1.5rem;
+  overflow-x: auto;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: 158px 338px 338px;
+  gap: 1.25rem;
+  width: max-content;
+  align-items: start;
+}
+
+.preview-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  justify-items: center;
+}
+
+.layers-drawer {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.structure-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drawer-section {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.drawer-intro {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.drawer-intro > .i-lucide-image-plus,
+.drawer-intro > .i-lucide-file-check-2 {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--widgetr-cobalt);
+}
+
+.drawer-intro h2 {
   color: var(--ui-text-highlighted);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.drawer-intro p {
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 
 .reference-preview {
@@ -1162,21 +1527,13 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 0.5rem;
   overflow-wrap: anywhere;
-  font-size: 0.56rem;
-}
-
-.reference-empty {
   color: var(--ui-text-muted);
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
 }
 
 .import-report-panel {
-  display: grid;
-  align-content: start;
-  gap: 0.9rem;
-  padding: 1.25rem;
-  border-top: 1px solid var(--ui-border-muted);
+  gap: 1.1rem;
 }
 
 .report-group {
@@ -1203,90 +1560,28 @@ onBeforeUnmount(() => {
   line-height: 1.45;
 }
 
-.canvas-panel {
-  display: grid;
-  align-content: start;
-  min-width: 0;
-  background:
-    linear-gradient(var(--ui-border-muted) 1px, transparent 1px),
-    linear-gradient(90deg, var(--ui-border-muted) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-.canvas-toolbar,
-.structure-panel,
 .export-panel {
-  background: color-mix(in srgb, var(--ui-bg) 94%, transparent);
+  gap: 1rem;
 }
 
-.canvas-toolbar {
-  padding: 1.25rem 1.5rem 0;
-}
-
-.operation-result {
-  margin: 1rem 1.5rem 0;
-}
-
-.scope-readout {
+.export-status-row {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   color: var(--ui-text-muted);
-  font-size: 0.58rem;
-  white-space: nowrap;
-}
-
-.preview-scroll {
-  min-width: 0;
-  margin-top: 1.25rem;
-  padding: 0.75rem 1.5rem 1.5rem;
-  overflow-x: auto;
-}
-
-.preview-grid {
-  display: grid;
-  grid-template-columns: 158px 338px 338px;
-  gap: 1.5rem;
-  width: max-content;
-  align-items: start;
-}
-
-.structure-panel,
-.export-panel {
-  padding: 1.25rem 1.5rem;
-  border-top: 1px solid var(--ui-border-muted);
-}
-
-.structure-size-select {
-  width: 10rem;
-}
-
-.structure-scroll {
-  max-height: 22rem;
-  margin-top: 0.8rem;
-  padding-right: 0.25rem;
-  overflow: auto;
-}
-
-.structure-tree {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.export-panel {
-  display: grid;
-  align-content: start;
-  gap: 0.9rem;
-}
-
-.export-actions {
-  align-items: flex-start;
+  font-size: 0.75rem;
 }
 
 .export-note {
   margin: 0;
-  font-size: 0.58rem;
+  color: var(--ui-text-muted);
+  font-size: 0.72rem;
   line-height: 1.5;
-  text-transform: none;
+}
+
+.export-actions {
+  align-items: stretch;
 }
 
 .export-code :deep(textarea) {
@@ -1315,28 +1610,6 @@ onBeforeUnmount(() => {
   line-height: 1.55;
 }
 
-@media (max-width: 88rem) {
-  .workspace-grid {
-    grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
-    grid-template-areas:
-      "left canvas"
-      "left inspector";
-  }
-
-  .workspace-left {
-    grid-area: left;
-  }
-
-  .canvas-panel {
-    grid-area: canvas;
-  }
-
-  .inspector-panel {
-    grid-area: inspector;
-    border-top: 1px solid var(--ui-border-muted);
-  }
-}
-
 @media (max-width: 58rem) {
   .editor-shell {
     padding: 1rem;
@@ -1348,50 +1621,73 @@ onBeforeUnmount(() => {
   }
 
   .editor-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .canvas-toolbar {
+    flex-direction: column;
+  }
+
+  .canvas-actions {
     justify-content: flex-start;
   }
 
-  .workspace-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "left"
-      "canvas"
-      "inspector";
-  }
-
-  .workspace-left {
-    border-right: 0;
-  }
-
-  .project-panel {
-    border-right: 0;
-  }
-
-  .canvas-toolbar,
-  .structure-panel,
-  .export-panel {
-    padding-right: 1rem;
-    padding-left: 1rem;
-  }
-
-  .preview-scroll {
-    padding-right: 1rem;
-    padding-left: 1rem;
-  }
-}
-
-@media (max-width: 30rem) {
-  .canvas-toolbar,
-  .panel-heading {
+  .preview-controls {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .scope-readout {
-    align-items: flex-start;
+  .preview-view-field {
+    width: min(100%, 18rem);
   }
 
-  .structure-size-select {
+  .scope-readout {
+    justify-content: flex-start;
+  }
+
+  .preview-scroll {
+    padding: 1rem;
+  }
+
+  .operation-result {
+    margin-right: 1rem;
+    margin-left: 1rem;
+  }
+}
+
+@media (max-width: 30rem) {
+  .editor-shell {
+    padding: 0.75rem;
+  }
+
+  .editor-header-actions {
+    align-items: stretch;
+  }
+
+  .history-actions {
+    order: 2;
+  }
+
+  .editor-header-actions > :last-child {
+    order: 1;
+  }
+
+  .canvas-toolbar,
+  .preview-controls {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .canvas-actions {
+    width: 100%;
+  }
+
+  .canvas-actions > :deep(button) {
+    flex: 1 1 auto;
+  }
+
+  .preview-view-field {
     width: 100%;
   }
 }

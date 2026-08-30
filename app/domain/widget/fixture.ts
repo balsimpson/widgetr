@@ -467,10 +467,7 @@ const fixture: WidgetProject = {
       root: largeLayoutRoot
     }
   },
-  selection: {
-    size: 'small',
-    elementId: 'temperature'
-  },
+  selection: null,
   designScope: {
     kind: 'all'
   },

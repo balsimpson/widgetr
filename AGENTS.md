@@ -18,9 +18,9 @@ As of 28 August 2026:
 - Phase 1 through Phase 4 automated checks pass: 6 test files, 42 tests, and strict typecheck.
 - Phase 2 is implemented locally and browser-smoke-tested. Real Scriptable execution on an iPhone and public release setup are still pending.
 - Phase 3 is implemented locally and browser-smoke-tested: IndexedDB projects, autosave, selection and inspector editing, session undo/redo, local reference-image persistence, and best-effort import are covered.
-- Phase 4 is implemented locally and browser-smoke-tested: contextual imperative WebMCP registration, revision-aware operations, scope handling, bounded results, destructive confirmation, and shared manual/agent state are covered. The local 1280×900 and 390×844 checks passed without page-level horizontal overflow or post-fix console warnings/errors.
+- Phase 4 is implemented and deployed: contextual imperative WebMCP registration, revision-aware operations, scope handling, bounded results, destructive confirmation, and shared manual/agent state are covered locally. Production now shows Phase 4 and the WebMCP-capable in-app browser reports `Registered` with the expected contextual tools and no browser warnings/errors. Actual external-agent execution remains unverified because the active backend rejected `webmcp_list_tools`.
 - Visual design refinement is intentionally deferred. Keep the current page as a functional kernel harness until the state and export work are stable.
-- The next order is: verify the generated file in real Scriptable, then run the deployed external-agent WebMCP checkpoint. Keep both separate from the local implementation evidence.
+- The next order is: verify the generated file in real Scriptable, then rerun the deployed external-agent WebMCP checkpoint when the browser backend supports tool discovery and calls. Keep both separate from the local implementation and page-side registration evidence.
 
 ## Resume checklist
 

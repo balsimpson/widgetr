@@ -33,7 +33,6 @@ const previewStyle = computed(() => ({
   >
     <figcaption class="preview-caption">
       <span>{{ label }}</span>
-      <span>{{ dimensions.width }} × {{ dimensions.height }} reference grid</span>
     </figcaption>
 
     <div class="calibration-frame">
@@ -82,48 +81,12 @@ const previewStyle = computed(() => ({
 }
 
 .calibration-frame {
-  position: relative;
-}
-
-.calibration-frame::before,
-.calibration-frame::after {
-  position: absolute;
-  z-index: 0;
-  content: "";
-  pointer-events: none;
-}
-
-.calibration-frame::before {
-  top: -6px;
-  right: 8px;
-  left: 8px;
-  height: 3px;
-  background: repeating-linear-gradient(
-    to right,
-    var(--widgetr-mist) 0,
-    var(--widgetr-mist) 1px,
-    transparent 1px,
-    transparent 12px
-  );
-}
-
-.calibration-frame::after {
-  top: 8px;
-  bottom: 8px;
-  left: -6px;
-  width: 3px;
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--widgetr-mist) 0,
-    var(--widgetr-mist) 1px,
-    transparent 1px,
-    transparent 12px
-  );
+  display: flex;
+  justify-content: center;
 }
 
 .widget-preview {
   position: relative;
-  z-index: 1;
   box-sizing: border-box;
   overflow: hidden;
   box-shadow:

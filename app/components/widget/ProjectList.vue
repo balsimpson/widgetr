@@ -39,24 +39,12 @@ const persistenceColor = computed(() => (
       : 'neutral'
 ))
 
-function projectDate(project: WidgetProject): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric'
-  }).format(new Date(project.updatedAt))
-}
 </script>
 
 <template>
-  <aside class="project-panel" aria-labelledby="projects-heading">
-    <div class="project-brand">
-      <div class="brand-mark" aria-hidden="true">
-        <UIcon name="i-lucide-box" />
-      </div>
-      <div>
-        <p class="panel-kicker">Widgetr</p>
-        <h1 id="projects-heading">Local projects</h1>
-      </div>
+  <aside class="project-panel" aria-label="Saved widgets">
+    <div class="project-heading">
+      <h2>Saved widgets</h2>
     </div>
 
     <div class="project-actions">
@@ -83,7 +71,6 @@ function projectDate(project: WidgetProject): string {
         variant="soft"
         :label="persistenceLabel"
       />
-      <span>IndexedDB</span>
     </div>
 
     <div v-if="isLoading" class="project-loading" aria-live="polite">
@@ -112,7 +99,6 @@ function projectDate(project: WidgetProject): string {
             />
             <span class="project-row-copy">
               <strong>{{ project.name }}</strong>
-              <small>{{ projectDate(project) }} · rev {{ project.revision }}</small>
             </span>
           </span>
           <UIcon
@@ -160,9 +146,6 @@ function projectDate(project: WidgetProject): string {
       description="Create a widget to start a local project."
     />
 
-    <p class="project-footnote">
-      Projects and reference images stay in this browser. There is no cloud backup.
-    </p>
   </aside>
 </template>
 
@@ -170,44 +153,16 @@ function projectDate(project: WidgetProject): string {
 .project-panel {
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: 1.25rem;
   min-width: 0;
   padding: 1.25rem;
-  border-right: 1px solid var(--ui-border-muted);
-  background: var(--ui-bg-elevated);
 }
 
-.project-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
-
-.brand-mark {
-  display: grid;
-  width: 2.1rem;
-  height: 2.1rem;
-  place-items: center;
-  border-radius: 0.65rem;
-  background: var(--widgetr-cobalt);
-  color: var(--ui-text-inverted);
-}
-
-.project-brand h1 {
-  margin-top: 0.15rem;
+.project-heading h2 {
   color: var(--ui-text-highlighted);
-  font-size: 1.05rem;
-  font-weight: 750;
-  letter-spacing: -0.03em;
-}
-
-.panel-kicker {
-  color: var(--ui-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 
 .project-actions {
@@ -289,7 +244,6 @@ function projectDate(project: WidgetProject): string {
 .project-row-copy {
   display: grid;
   min-width: 0;
-  gap: 0.18rem;
 }
 
 .project-row-copy strong {
@@ -298,12 +252,6 @@ function projectDate(project: WidgetProject): string {
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.25;
-}
-
-.project-row-copy small {
-  color: var(--ui-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
 }
 
 .project-row-arrow {
@@ -326,10 +274,4 @@ function projectDate(project: WidgetProject): string {
   opacity: 1;
 }
 
-.project-footnote {
-  margin-top: 0.5rem;
-  color: var(--ui-text-muted);
-  font-size: 0.7rem;
-  line-height: 1.5;
-}
 </style>
