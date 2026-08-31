@@ -73,7 +73,7 @@ Add a domain module that accepts the latest `WidgetProject` and returns a `WebMc
 - `group` when the selected element is a group or repeat;
 - `unsupported` when a stale selection points to an element that no longer exists.
 
-The catalog will contain static descriptions and JSON Schema input definitions. It may include a short sanitized element label in the status panel, but imported code, API data, project data, and user-provided text will not be copied into tool descriptions.
+The catalog will contain static descriptions and JSON Schema input definitions. It may include a short sanitized element label in the status panel, but API data, project data, and user-provided text will not be copied into tool descriptions.
 
 The catalog will not call browser APIs or mutate state. It will provide tool metadata and an operation factory or handler descriptor for the runtime adapter.
 
@@ -234,12 +234,12 @@ The page will own a pending confirmation ref and a resolver. A destructive tool 
 5. commit only after confirmation;
 6. resolve with the normalized operation result.
 
-The modal will not display arbitrary imported code or unbounded agent text. The confirmation request will show the action, target, and affected sizes using fixed UI copy and bounded values.
+The modal will not display arbitrary user-provided code or unbounded agent text. The confirmation request will show the action, target, and affected sizes using fixed UI copy and bounded values.
 
 ## Security and privacy
 
 - Do not expose `data.value`, secrets, headers, query parameters, raw bindings, or IndexedDB records through tools.
-- Do not put imported Scriptable code or API responses into tool descriptions.
+- Do not put user-provided Scriptable code or API responses into tool descriptions.
 - Treat every tool argument as untrusted data. Operation schemas remain the final validator.
 - Keep `exposedTo` unset so tools remain same-origin unless a later phase explicitly defines cross-origin exposure.
 - Mark tools that handle user-provided content with the appropriate untrusted-content annotation when the browser type supports it.
@@ -263,7 +263,7 @@ The repository’s existing `npm test` and `npm run typecheck` commands remain t
 
 ## Browser checkpoint
 
-After implementation, run one local Nuxt server on port 3100 and use the in-app Browser. Verify at 1280 × 900 and 390 × 844:
+After implementation, run one local Nuxt server on port 3100 and use the in-app Browser. Verify at the desktop viewport 1280 × 900. Keep the responsive layout rules intact and inspect their narrow-width behavior in source unless a mobile viewport is explicitly requested:
 
 - the Agent tools panel reports the browser WebMCP status;
 - the tool list changes after selecting text, image, and group elements;

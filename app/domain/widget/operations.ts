@@ -269,9 +269,6 @@ export function applyWidgetOperation(
     if (operation.patch.localReference !== undefined) {
       nextState.localReference = operation.patch.localReference
     }
-    if (operation.patch.importReport !== undefined) {
-      nextState.importReport = operation.patch.importReport
-    }
     return finish(
       state,
       nextState,

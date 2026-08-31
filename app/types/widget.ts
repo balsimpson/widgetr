@@ -4,6 +4,17 @@ export const WIDGET_SIZES = ['small', 'medium', 'large'] as const
 
 export type WidgetSize = (typeof WIDGET_SIZES)[number]
 
+export const WIDGET_STARTER_IDS = [
+  'weather',
+  'cryptocurrency',
+  'daily-agenda',
+  'reference-image',
+  'own-idea',
+  'example'
+] as const
+
+export type WidgetStarterId = (typeof WIDGET_STARTER_IDS)[number]
+
 export const WIDGET_DIMENSIONS: Record<WidgetSize, { width: number, height: number }> = {
   small: { width: 158, height: 158 },
   medium: { width: 338, height: 158 },
@@ -224,15 +235,6 @@ export interface LocalReferenceMetadata {
   addedAt: string
 }
 
-export interface ImportReport {
-  reproduced: string[]
-  approximated: string[]
-  unsupported: string[]
-  dataCalls: string[]
-  requiredUserInput: string[]
-  nextSteps: string[]
-}
-
 export interface WidgetDiagnostic {
   id: string
   severity: 'warning' | 'blocking'
@@ -250,6 +252,7 @@ export interface WidgetProject {
   createdAt: string
   updatedAt: string
   revision: number
+  startingIntent?: WidgetStarterId | null
   dataSource: DataSourceConfig
   data: NormalizedDataState
   bindings: DataBinding[]
@@ -258,7 +261,6 @@ export interface WidgetProject {
   designScope: DesignScope
   styleProvenance: StyleProvenance | null
   localReference: LocalReferenceMetadata | null
-  importReport: ImportReport | null
   diagnostics: WidgetDiagnostic[]
 }
 
@@ -320,7 +322,6 @@ export interface UpdateProjectMetadataOperation extends OperationBase {
   patch: {
     name?: string
     localReference?: LocalReferenceMetadata | null
-    importReport?: ImportReport | null
   }
 }
 

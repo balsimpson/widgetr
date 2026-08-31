@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { HEX_COLOR_PATTERN, WIDGET_CONSTRAINTS } from './constraints'
 import {
   WIDGET_SCHEMA_VERSION,
+  WIDGET_STARTER_IDS,
   WIDGET_SIZES
 } from '~/types/widget'
 import type {
@@ -272,31 +273,34 @@ const localReferenceMetadataSchema = z.object({
   addedAt: z.iso.datetime({ offset: true })
 }).strict()
 
-const importReportItemSchema = z.string().trim().min(1).max(240)
+function stripRemovedProjectFields(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return input
+  }
 
-const importReportSchema = z.object({
-  reproduced: z.array(importReportItemSchema).max(100),
-  approximated: z.array(importReportItemSchema).default([]),
-  unsupported: z.array(importReportItemSchema).default([]),
-  dataCalls: z.array(importReportItemSchema).default([]),
-  requiredUserInput: z.array(importReportItemSchema).default([]),
-  nextSteps: z.array(importReportItemSchema).max(100),
-  omitted: z.array(importReportItemSchema).optional()
-}).strict().transform(({ omitted, ...report }) => ({
-  ...report,
-  unsupported: [
-    ...report.unsupported,
-    ...(omitted ?? [])
-  ]
-}))
+  const record = input as Record<string, unknown>
+  const hasRemovedImportMetadata = Object.prototype.hasOwnProperty.call(record, 'importReport')
+  const hasRemovedImportIntent = record.startingIntent === 'scriptable-import'
+  if (!hasRemovedImportMetadata && !hasRemovedImportIntent) {
+    return input
+  }
 
-const widgetProjectBaseSchema = z.object({
+  const project = { ...record }
+  delete project.importReport
+  if (hasRemovedImportIntent) {
+    delete project.startingIntent
+  }
+  return project
+}
+
+const widgetProjectBaseSchema = z.preprocess(stripRemovedProjectFields, z.object({
   schemaVersion: z.literal(WIDGET_SCHEMA_VERSION),
   id: idSchema,
   name: labelSchema,
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
   revision: z.number().int().nonnegative(),
+  startingIntent: z.enum(WIDGET_STARTER_IDS).nullable().optional(),
   dataSource: z.object({
     kind: z.enum(['none', 'sample', 'pasted', 'public-api']),
     url: z.url().nullable(),
@@ -344,7 +348,6 @@ const widgetProjectBaseSchema = z.object({
     recipeSnapshot: jsonObjectSchema
   }).strict().nullable(),
   localReference: localReferenceMetadataSchema.nullable(),
-  importReport: importReportSchema.nullable(),
   diagnostics: z.array(z.object({
     id: idSchema,
     severity: z.enum(['warning', 'blocking']),
@@ -354,7 +357,7 @@ const widgetProjectBaseSchema = z.object({
     size: widgetSizeSchema.optional(),
     elementId: idSchema.optional()
   }).strict()).max(100)
-}).strict()
+}).strict())
 
 function collectElementFacts(element: WidgetElement, depth = 1, insideRepeat = false): {
   ids: string[]
@@ -571,8 +574,7 @@ const elementContentPatchSchema = z.object({
 
 const projectMetadataPatchSchema = z.object({
   name: labelSchema.optional(),
-  localReference: localReferenceMetadataSchema.nullable().optional(),
-  importReport: importReportSchema.nullable().optional()
+  localReference: localReferenceMetadataSchema.nullable().optional()
 }).strict().refine(patch => Object.keys(patch).length > 0, 'Include at least one project change')
 
 export const widgetOperationSchema: z.ZodType<WidgetOperation> = z.discriminatedUnion('type', [

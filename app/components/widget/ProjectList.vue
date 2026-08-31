@@ -11,7 +11,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   create: []
-  import: []
   open: [projectId: string]
   rename: [project: WidgetProject]
   duplicate: [project: WidgetProject]
@@ -42,26 +41,18 @@ const persistenceColor = computed(() => (
 </script>
 
 <template>
-  <aside class="project-panel" aria-label="Saved widgets">
+  <aside class="project-panel" aria-label="Saved projects">
     <div class="project-heading">
-      <h2>Saved widgets</h2>
+      <h2>Saved projects</h2>
     </div>
 
     <div class="project-actions">
       <UButton
-        label="New widget"
+        label="New project"
         icon="i-lucide-plus"
         color="primary"
         block
         @click="emit('create')"
-      />
-      <UButton
-        label="Import Scriptable"
-        icon="i-lucide-file-input"
-        color="neutral"
-        variant="outline"
-        block
-        @click="emit('import')"
       />
     </div>
 

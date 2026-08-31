@@ -1,12 +1,17 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { createNewWidgetProject, duplicateWidgetProject } from '~/domain/widget/projects'
+import {
+  createExampleWidgetProject,
+  createNewWidgetProject,
+  duplicateWidgetProject
+} from '~/domain/widget/projects'
 import { cloneWidgetProject } from '~/domain/widget/clone'
+import { createNeutralWidgetProject } from '~/domain/widget/fixture'
 import {
   createMemoryProjectRepository,
   createWidgetProjectRepository
 } from '~/domain/widget/storage'
-import { createSampleWidgetProject } from '~/domain/widget/fixture'
 import type { WidgetProject } from '~/types/widget'
+import type { WidgetStarterId } from '~/types/widget'
 import type { WidgetProjectRepository } from '~/domain/widget/storage'
 
 export type PersistenceState = 'idle' | 'saving' | 'saved' | 'error'
@@ -16,7 +21,7 @@ function sortProjects(projects: WidgetProject[]): WidgetProject[] {
 }
 
 export function useWidgetProjects() {
-  const project = ref(createSampleWidgetProject())
+  const project = ref(createNeutralWidgetProject())
   const projects = ref<WidgetProject[]>([])
   const isLoading = ref(true)
   const isHydrated = ref(false)
@@ -50,11 +55,9 @@ export function useWidgetProjects() {
     try {
       const storedProjects = await repository.listProjects()
       if (storedProjects.length === 0) {
-        const sample = createSampleWidgetProject()
-        projects.value = [sample]
-        project.value = cloneWidgetProject(sample)
-        await repository.saveProject(sample)
-        await repository.setActiveProjectId(sample.id)
+        projects.value = []
+        project.value = createNeutralWidgetProject()
+        await repository.setActiveProjectId(null)
       } else {
         projects.value = storedProjects
         const activeProjectId = await repository.getActiveProjectId()
@@ -66,12 +69,10 @@ export function useWidgetProjects() {
       persistenceError.value = null
     } catch (error) {
       useMemoryFallback(error)
-      const sample = createSampleWidgetProject()
-      projects.value = [sample]
-      project.value = cloneWidgetProject(sample)
+      projects.value = []
+      project.value = createNeutralWidgetProject()
       try {
-        await repository.saveProject(sample)
-        await repository.setActiveProjectId(sample.id)
+        await repository.setActiveProjectId(null)
       } catch (fallbackError) {
         setPersistenceError(fallbackError)
       }
@@ -118,8 +119,18 @@ export function useWidgetProjects() {
     }
   }
 
-  async function createProject(name: string): Promise<WidgetProject> {
-    const nextProject = createNewWidgetProject(undefined, name)
+  async function createProject(
+    name: string,
+    startingIntent?: WidgetStarterId
+  ): Promise<WidgetProject> {
+    const nextProject = createNewWidgetProject(undefined, name, startingIntent)
+    replaceProject(nextProject)
+    await persistProject(nextProject)
+    return nextProject
+  }
+
+  async function createExampleProject(): Promise<WidgetProject> {
+    const nextProject = createExampleWidgetProject()
     replaceProject(nextProject)
     await persistProject(nextProject)
     return nextProject
@@ -146,7 +157,7 @@ export function useWidgetProjects() {
           project.value = cloneWidgetProject(nextProject)
           await repository.setActiveProjectId(nextProject.id)
         } else {
-          project.value = createNewWidgetProject()
+          project.value = createNeutralWidgetProject()
           await repository.setActiveProjectId(null)
         }
       }
@@ -188,6 +199,7 @@ export function useWidgetProjects() {
     persistProject,
     openProject,
     createProject,
+    createExampleProject,
     duplicateProject,
     deleteProject,
     saveReference,

@@ -17,6 +17,7 @@ import type {
 } from '~/types/webmcp'
 
 export interface UseWidgetWebMcpOptions {
+  enabled: Ref<boolean>
   project: Ref<WidgetProject>
   commitOperation: (operation: WidgetOperation) => OperationResult
   createProject: (name: string) => Promise<WidgetProject>
@@ -106,10 +107,13 @@ export function useWidgetWebMcp(options: UseWidgetWebMcpOptions) {
   const error = ref<string | null>(null)
   const registeredToolNames = ref<string[]>([])
   const apiAvailable = ref(false)
-  const context = computed(() => getWebMcpContext(options.project.value))
+  const context = computed(() => (
+    options.enabled.value ? getWebMcpContext(options.project.value) : 'unsupported'
+  ))
   const contextKey = computed(() => {
     const selection = options.project.value.selection
     return [
+      options.enabled.value ? 'enabled' : 'disabled',
       options.project.value.id,
       selection?.size ?? 'none',
       selection?.elementId ?? 'none',
@@ -145,7 +149,7 @@ export function useWidgetWebMcp(options: UseWidgetWebMcpOptions) {
     registeredToolNames.value = []
     error.value = null
 
-    if (!modelContext) {
+    if (!modelContext || !options.enabled.value) {
       status.value = 'unsupported'
       return
     }

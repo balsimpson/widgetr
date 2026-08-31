@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { importScriptableProject } from '~/domain/widget/importer'
 import { cloneWidgetProject } from '~/domain/widget/clone'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { resolveDesignScope } from '~/domain/widget/schema'
+import { getWidgetStarter } from '~/domain/widget/starters'
 import { findWidgetElement, widgetElementLabel } from '~/domain/widget/tree'
 import { useWidgetProjects } from '~/composables/useWidgetProjects'
 import { useWidgetWebMcp } from '~/composables/useWidgetWebMcp'
@@ -14,6 +14,7 @@ import type {
   WidgetOperation,
   WidgetProject,
   WidgetSelection,
+  WidgetStarterId,
   WidgetSize
 } from '~/types/widget'
 import type { WebMcpConfirmationRequest } from '~/types/webmcp'
@@ -38,6 +39,7 @@ const {
   persistProject,
   openProject,
   createProject,
+  createExampleProject,
   duplicateProject,
   deleteProject,
   saveReference,
@@ -57,7 +59,6 @@ const projectsOpen = ref(false)
 const layersOpen = ref(false)
 const settingsOpen = ref(false)
 const referenceOpen = ref(false)
-const importReportOpen = ref(false)
 const exportOpen = ref(false)
 const agentOpen = ref(false)
 
@@ -68,19 +69,18 @@ const renameProjectName = ref('')
 const renameTarget = ref<WidgetProject | null>(null)
 const deleteProjectOpen = ref(false)
 const deleteTarget = ref<WidgetProject | null>(null)
-const importOpen = ref(false)
-const importSource = ref('')
-const importError = ref<string | null>(null)
 const referenceUpload = ref<File | null | undefined>()
 const referenceUrl = ref<string | null>(null)
 const referenceError = ref<string | null>(null)
 const agentConfirmation = ref<WebMcpConfirmationRequest | null>(null)
+const starterBusy = ref(false)
 let pendingAgentConfirmation: {
   resolve: (confirmed: boolean) => void
   cleanup: () => void
 } | null = null
 
 const activeSizes = computed(() => resolveDesignScope(project.value.designScope))
+const showStarter = computed(() => isLoading.value || projects.value.length === 0)
 const exportResult = computed(() => generateScriptableCode(project.value))
 const generatedSource = computed(() => exportResult.value.code ?? '')
 const blockingIssues = computed(() => exportResult.value.issues.filter(issue => issue.severity === 'blocking'))
@@ -94,22 +94,6 @@ const scopeLabel = computed(() => {
   return activeSizes.value
     .map(size => size[0]!.toUpperCase() + size.slice(1))
     .join(' + ')
-})
-
-const importReportSections = computed(() => {
-  const report = project.value.importReport
-  if (!report) {
-    return []
-  }
-
-  return [
-    { key: 'reproduced', label: 'Recreated or detected', items: report.reproduced },
-    { key: 'approximated', label: 'Approximated', items: report.approximated },
-    { key: 'unsupported', label: 'Unsupported behavior', items: report.unsupported },
-    { key: 'data-calls', label: 'Data calls detected', items: report.dataCalls },
-    { key: 'required-input', label: 'Input still needed', items: report.requiredUserInput },
-    { key: 'next-steps', label: 'Next corrections', items: report.nextSteps }
-  ].filter(section => section.items.length > 0)
 })
 
 const exportStatusColor = computed(() => {
@@ -206,6 +190,7 @@ const {
   registeredToolNames: webmcpRegisteredToolNames,
   error: webmcpError
 } = useWidgetWebMcp({
+  enabled: computed(() => !showStarter.value),
   project,
   commitOperation,
   createProject: createAgentProject,
@@ -297,7 +282,6 @@ function closeContextualSurfaces(): void {
   layersOpen.value = false
   settingsOpen.value = false
   referenceOpen.value = false
-  importReportOpen.value = false
   exportOpen.value = false
   agentOpen.value = false
 }
@@ -320,11 +304,6 @@ function openWidgetSettings(): void {
 function openReference(): void {
   closeContextualSurfaces()
   referenceOpen.value = true
-}
-
-function openImportReport(): void {
-  closeContextualSurfaces()
-  importReportOpen.value = true
 }
 
 function openExport(): void {
@@ -436,6 +415,37 @@ async function createAgentProject(name: string): Promise<WidgetProject> {
   return created
 }
 
+async function startFromStarter(starterId: WidgetStarterId): Promise<void> {
+  if (starterBusy.value) {
+    return
+  }
+
+  starterBusy.value = true
+
+  try {
+    const starter = getWidgetStarter(starterId)
+    closeContextualSurfaces()
+
+    if (starter.action === 'example') {
+      await createExampleProject()
+    } else {
+      await createProject(starter.projectName ?? 'New widget', starter.id)
+    }
+
+    historyPast.value = []
+    historyFuture.value = []
+    lastResult.value = null
+    referenceError.value = null
+    await loadReferenceImage()
+
+    if (starter.action === 'reference') {
+      referenceOpen.value = true
+    }
+  } finally {
+    starterBusy.value = false
+  }
+}
+
 function openRenameProject(target: WidgetProject): void {
   closeContextualSurfaces()
   renameTarget.value = target
@@ -485,34 +495,6 @@ async function confirmDeleteProject(): Promise<void> {
   deleteProjectOpen.value = false
   deleteTarget.value = null
   await loadReferenceImage()
-}
-
-function openImport(): void {
-  closeContextualSurfaces()
-  importSource.value = ''
-  importError.value = null
-  importOpen.value = true
-}
-
-async function submitImport(): Promise<void> {
-  if (!importSource.value.trim()) {
-    importError.value = 'Paste a Scriptable file before importing it.'
-    return
-  }
-
-  try {
-    const imported = importScriptableProject(importSource.value)
-    replaceProject(imported.project)
-    await persistProject(imported.project)
-    historyPast.value = []
-    historyFuture.value = []
-    lastResult.value = null
-    importOpen.value = false
-    importError.value = null
-    await loadReferenceImage()
-  } catch (error) {
-    importError.value = error instanceof Error ? error.message : 'The Scriptable source could not be imported.'
-  }
 }
 
 function readImageDimensions(file: Blob): Promise<{ width: number, height: number }> {
@@ -701,7 +683,16 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="editor-shell">
-    <header class="editor-header">
+    <WidgetProjectStarter
+      v-if="showStarter"
+      :is-loading="isLoading"
+      :persistence-error="persistenceError"
+      :disabled="starterBusy"
+      @start="startFromStarter"
+    />
+
+    <template v-else>
+      <header class="editor-header">
       <div class="editor-title-block">
         <div class="editor-context">
           <UButton
@@ -745,6 +736,14 @@ onBeforeUnmount(() => {
             @click="redo"
           />
         </div>
+        <UButton
+          label="New project"
+          icon="i-lucide-plus"
+          color="neutral"
+          variant="outline"
+          size="sm"
+          @click="openNewProject"
+        />
         <UPopover
           v-model:open="agentOpen"
           :content="{ align: 'end', sideOffset: 8 }"
@@ -818,15 +817,6 @@ onBeforeUnmount(() => {
               size="sm"
               @click="openReference"
             />
-            <UButton
-              v-if="project.importReport"
-              label="Import review"
-              icon="i-lucide-file-check-2"
-              color="neutral"
-              variant="soft"
-              size="sm"
-              @click="openImportReport"
-            />
           </div>
         </div>
 
@@ -877,7 +867,7 @@ onBeforeUnmount(() => {
       v-model:open="projectsOpen"
       side="left"
       title="Projects"
-      description="Switch between widgets saved in this browser."
+      description="Switch between projects saved in this browser."
       :ui="{ content: 'sm:max-w-sm', body: 'p-0 sm:p-0' }"
     >
       <template #body>
@@ -888,7 +878,6 @@ onBeforeUnmount(() => {
           :is-loading="isLoading"
           :persistence-state="persistenceState"
           @create="openNewProject"
-          @import="openImport"
           @open="selectProject"
           @rename="openRenameProject"
           @duplicate="duplicateSelectedProject"
@@ -1002,30 +991,6 @@ onBeforeUnmount(() => {
     </USlideover>
 
     <USlideover
-      v-if="project.importReport"
-      v-model:open="importReportOpen"
-      title="Import review"
-      description="See what Widgetr could recreate from the source."
-      :ui="{ content: 'sm:max-w-md' }"
-    >
-      <template #body>
-        <section class="drawer-section import-report-panel" aria-labelledby="import-report-heading">
-          <div class="drawer-intro">
-            <UIcon name="i-lucide-file-check-2" aria-hidden="true" />
-            <h2 id="import-report-heading">What Widgetr kept</h2>
-          </div>
-
-          <div v-for="section in importReportSections" :key="section.key" class="report-group">
-            <p class="report-label">{{ section.label }}</p>
-            <ul>
-              <li v-for="item in section.items" :key="`${section.key}-${item}`">{{ item }}</li>
-            </ul>
-          </div>
-        </section>
-      </template>
-    </USlideover>
-
-    <USlideover
       v-model:open="exportOpen"
       title="Export widget"
       description="One standalone Scriptable file for all three sizes."
@@ -1123,11 +1088,11 @@ onBeforeUnmount(() => {
 
     <UModal
       v-model:open="newProjectOpen"
-      title="Create a local widget"
-      description="Start from Widgetr's editable three-size sample and make it yours."
+      title="Create a local project"
+      description="Start with a neutral widget, then shape it in the editor."
     >
       <template #body>
-        <UFormField label="Widget name">
+        <UFormField label="Project name">
           <UInput
             v-model="newProjectName"
             class="w-full"
@@ -1146,7 +1111,7 @@ onBeforeUnmount(() => {
             @click="newProjectOpen = false"
           />
           <UButton
-            label="Create widget"
+            label="Create project"
             color="primary"
             :disabled="!newProjectName.trim()"
             @click="submitNewProject"
@@ -1217,53 +1182,6 @@ onBeforeUnmount(() => {
     </UModal>
 
     <UModal
-      v-model:open="importOpen"
-      title="Import a Scriptable widget"
-      description="Widgetr reads the source as text. It never executes pasted JavaScript in the app."
-    >
-      <template #body>
-        <UFormField
-          label="Scriptable source"
-          description="Widgetr exports can be reconstructed exactly. Other scripts become a clearly labelled visual starting point."
-        >
-          <UTextarea
-            v-model="importSource"
-            class="w-full import-textarea"
-            :rows="14"
-            placeholder="Paste the Scriptable file here"
-            spellcheck="false"
-          />
-        </UFormField>
-        <UAlert
-          v-if="importError"
-          class="modal-alert"
-          color="error"
-          variant="subtle"
-          icon="i-lucide-file-warning"
-          title="Import needs another try"
-          :description="importError"
-        />
-      </template>
-      <template #footer>
-        <div class="modal-actions">
-          <UButton
-            label="Cancel"
-            color="neutral"
-            variant="outline"
-            @click="importOpen = false"
-          />
-          <UButton
-            label="Import safely"
-            icon="i-lucide-file-input"
-            color="primary"
-            :disabled="!importSource.trim()"
-            @click="submitImport"
-          />
-        </div>
-      </template>
-    </UModal>
-
-    <UModal
       v-model:open="sourceOpen"
       title="Generated Scriptable source"
       description="Read-only output from the current canonical widget state."
@@ -1311,6 +1229,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </UModal>
+    </template>
   </main>
 </template>
 
@@ -1488,8 +1407,7 @@ onBeforeUnmount(() => {
   gap: 0.35rem;
 }
 
-.drawer-intro > .i-lucide-image-plus,
-.drawer-intro > .i-lucide-file-check-2 {
+.drawer-intro > .i-lucide-image-plus {
   width: 1.1rem;
   height: 1.1rem;
   color: var(--widgetr-cobalt);
@@ -1532,34 +1450,6 @@ onBeforeUnmount(() => {
   font-size: 0.58rem;
 }
 
-.import-report-panel {
-  gap: 1.1rem;
-}
-
-.report-group {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.report-label {
-  color: var(--ui-text-highlighted);
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.report-group ul {
-  display: grid;
-  gap: 0.3rem;
-  margin: 0;
-  padding-left: 1rem;
-  color: var(--ui-text-muted);
-  font-size: 0.7rem;
-  line-height: 1.45;
-}
-
 .export-panel {
   gap: 1rem;
 }
@@ -1590,18 +1480,6 @@ onBeforeUnmount(() => {
   font-size: 0.68rem;
   line-height: 1.5;
   white-space: pre;
-}
-
-.import-textarea :deep(textarea) {
-  min-height: 20rem;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  white-space: pre;
-}
-
-.modal-alert {
-  margin-top: 1rem;
 }
 
 .modal-copy {

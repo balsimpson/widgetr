@@ -1,6 +1,6 @@
 # Widgetr
 
-Widgetr is a standalone Nuxt application for building Scriptable widgets through one shared visual state. Phase 4 adds contextual imperative WebMCP tools over the same revision-checked operation path as the UI, on top of the Phase 3 local-first projects, IndexedDB persistence, structure and inspector editing, local reference images, best-effort Scriptable import, and deterministic Scriptable generator.
+Widgetr is a standalone Nuxt application for building Scriptable widgets through one shared visual state. Phase 4 adds contextual imperative WebMCP tools over the same revision-checked operation path as the UI, on top of the Phase 3 local-first projects, IndexedDB persistence, structure and inspector editing, local reference images, and deterministic Scriptable generation.
 
 The current public-facing editor is intentionally functional rather than visually polished: it demonstrates three independent widget-size layouts, shared data, revision-checked operations, local project history, deterministic Scriptable export, and a live WebMCP tool catalog that changes with the selected element. Data onboarding and design curation remain later phases in the approved product plan.
 
@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL shown by Nuxt. The editor starts with a browser-local project list, three widget-size previews, structure and inspector controls, and the generated Scriptable source. Projects, edits, undo/redo history, and reference images stay in the browser's local IndexedDB storage.
+Open the local URL shown by Nuxt. With no saved projects, the editor starts with intentional project choices; returning users resume their last project. Once a project exists, the workspace provides three widget-size previews, structure and inspector controls, and generated Scriptable source. Projects, edits, undo/redo history, and reference images stay in the browser's local IndexedDB storage.
 
 ## Production deployment
 
@@ -57,7 +57,7 @@ Phase 4 does not use environment variables. Later phases must document variable 
 
 ## Project boundary
 
-This application has no runtime dependency on `ScriptableEditor`. Local projects, reference images, Scriptable import, and WebMCP tools now belong to the Widgetr runtime; authenticated data diagnostics and the private design library belong to later phases in the approved plan. The exported file is generated from the Widgetr canonical state and runs independently of the website.
+This application has no runtime dependency on `ScriptableEditor`. Local projects, reference images, intentional starter paths, and WebMCP tools belong to the Widgetr runtime; authenticated data diagnostics and the private design library belong to later phases in the approved plan. The exported file is generated from the Widgetr canonical state and runs independently of the website.
 
 ## License
 

@@ -1,7 +1,7 @@
-import { createSampleWidgetProject } from './fixture'
+import { createNeutralWidgetProject, createSampleWidgetProject } from './fixture'
 import { cloneWidgetProject } from './clone'
 import { parseWidgetProject } from './schema'
-import type { WidgetProject } from '~/types/widget'
+import type { WidgetProject, WidgetStarterId } from '~/types/widget'
 
 function createProjectId(): string {
   const uuid = globalThis.crypto?.randomUUID?.()
@@ -16,6 +16,7 @@ export interface ProjectIdentityOptions {
   id?: string
   name?: string
   now?: string
+  startingIntent?: WidgetStarterId | null
 }
 
 export function createProjectFromTemplate(
@@ -30,17 +31,33 @@ export function createProjectFromTemplate(
   project.createdAt = now
   project.updatedAt = now
   project.revision = 0
+  project.startingIntent = options.startingIntent ?? null
   project.selection = null
   project.styleProvenance = null
   project.localReference = null
-  project.importReport = null
   project.diagnostics = []
 
   return parseWidgetProject(project)
 }
 
-export function createNewWidgetProject(now?: string, name = 'New widget'): WidgetProject {
-  return createProjectFromTemplate(createSampleWidgetProject(), { now, name })
+export function createNewWidgetProject(
+  now?: string,
+  name = 'New widget',
+  startingIntent?: WidgetStarterId
+): WidgetProject {
+  return createProjectFromTemplate(createNeutralWidgetProject(), {
+    now,
+    name,
+    startingIntent
+  })
+}
+
+export function createExampleWidgetProject(now?: string): WidgetProject {
+  return createProjectFromTemplate(createSampleWidgetProject(), {
+    now,
+    name: 'Kochi monsoon example',
+    startingIntent: 'example'
+  })
 }
 
 export function duplicateWidgetProject(
@@ -49,20 +66,7 @@ export function duplicateWidgetProject(
 ): WidgetProject {
   return createProjectFromTemplate(project, {
     name: `Copy of ${project.name}`,
-    now
+    now,
+    startingIntent: project.startingIntent ?? null
   })
-}
-
-export function createImportedProject(
-  project: WidgetProject,
-  report: WidgetProject['importReport'],
-  now?: string
-): WidgetProject {
-  const imported = createProjectFromTemplate(project, {
-    name: `${project.name} import`,
-    now
-  })
-
-  imported.importReport = report
-  return parseWidgetProject(imported)
 }

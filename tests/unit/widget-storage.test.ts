@@ -8,7 +8,7 @@ const secondTimestamp = '2026-08-28T07:00:00.000Z'
 describe('local widget project storage', () => {
   it('stores defensive project snapshots and tracks the active project', async () => {
     const repository = createMemoryProjectRepository()
-    const project = createNewWidgetProject(firstTimestamp, 'Morning commute')
+    const project = createNewWidgetProject(firstTimestamp, 'Morning commute', 'daily-agenda')
 
     await repository.saveProject(project)
     await repository.setActiveProjectId(project.id)
@@ -18,6 +18,8 @@ describe('local widget project storage', () => {
 
     expect(stored).toHaveLength(1)
     expect(stored[0]?.name).toBe('Morning commute')
+    expect(stored[0]?.startingIntent).toBe('daily-agenda')
+    expect(stored[0]?.dataSource.kind).toBe('none')
     expect(await repository.getActiveProjectId()).toBe(project.id)
   })
 
@@ -54,6 +56,5 @@ describe('local widget project storage', () => {
     expect(duplicate.revision).toBe(0)
     expect(duplicate.selection).toBeNull()
     expect(duplicate.localReference).toBeNull()
-    expect(duplicate.importReport).toBeNull()
   })
 })

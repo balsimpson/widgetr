@@ -18,6 +18,15 @@ describe('canonical widget schema', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('accepts projects created before starting intents were stored', () => {
+    const project = createSampleWidgetProject()
+    delete project.startingIntent
+
+    const result = validateWidgetProject(project)
+
+    expect(result.ok).toBe(true)
+  })
+
   it('uses separate trees while keeping one shared data model', () => {
     const project = createSampleWidgetProject()
 
@@ -72,24 +81,23 @@ describe('canonical widget schema', () => {
     expect(result.ok).toBe(false)
   })
 
-  it('normalizes the earlier compact import report shape', () => {
+  it('drops removed import metadata while loading older projects', () => {
     const project = createSampleWidgetProject()
     const result = validateWidgetProject({
       ...project,
+      startingIntent: 'scriptable-import',
       importReport: {
-        reproduced: ['Read the source safely.'],
-        omitted: ['Interactive behavior was not imported.'],
-        nextSteps: ['Review the editable starting point.']
+        reproduced: ['Legacy metadata'],
+        omitted: ['No longer used'],
+        nextSteps: ['Start a new project']
       }
     })
 
     expect(result.ok).toBe(true)
-    if (!result.ok || !result.value.importReport) {
+    if (!result.ok) {
       return
     }
-    expect(result.value.importReport.unsupported).toEqual(['Interactive behavior was not imported.'])
-    expect(result.value.importReport.approximated).toEqual([])
-    expect(result.value.importReport.dataCalls).toEqual([])
-    expect(result.value.importReport.requiredUserInput).toEqual([])
+    expect(result.value).not.toHaveProperty('importReport')
+    expect(result.value.startingIntent).toBeUndefined()
   })
 })

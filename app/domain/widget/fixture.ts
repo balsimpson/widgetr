@@ -93,6 +93,41 @@ function text(
   }
 }
 
+function literalText(
+  id: string,
+  value: string,
+  fontSize: number,
+  options: {
+    color?: string
+    weight?: 'regular' | 'medium' | 'semibold' | 'bold'
+    design?: 'default' | 'rounded' | 'monospaced' | 'serif'
+    alignment?: 'leading' | 'center' | 'trailing'
+    width?: number | 'fill' | 'fit'
+    lineLimit?: number
+  } = {}
+): WidgetElement {
+  return {
+    id,
+    type: 'text',
+    visible: true,
+    style: createElementStyle({
+      width: options.width ?? 'fit'
+    }),
+    value: {
+      kind: 'literal',
+      value
+    },
+    textStyle: createTextStyle({
+      fontSize,
+      color: options.color ?? '#172033',
+      fontWeight: options.weight ?? 'regular',
+      fontDesign: options.design ?? 'default',
+      alignment: options.alignment ?? 'leading',
+      lineLimit: options.lineLimit ?? 2
+    })
+  }
+}
+
 function itemText(
   id: string,
   path: string,
@@ -473,7 +508,6 @@ const fixture: WidgetProject = {
   },
   styleProvenance: null,
   localReference: null,
-  importReport: null,
   diagnostics: []
 }
 
@@ -481,4 +515,199 @@ export const SAMPLE_WIDGET_PROJECT = parseWidgetProject(fixture)
 
 export function createSampleWidgetProject(): WidgetProject {
   return structuredClone(SAMPLE_WIDGET_PROJECT)
+}
+
+const neutralSmallRoot = group('root', 'vertical', [
+  literalText('welcome', 'Start building', 18, {
+    weight: 'bold',
+    width: 'fill'
+  }),
+  literalText('prompt', 'Choose an idea to begin.', 11, {
+    color: '#64748B',
+    width: 'fill'
+  }),
+  spacer('content-spacer', 'flex'),
+  literalText('assistant-hint', 'Continue in your assistant\'s chat.', 9, {
+    color: '#64748B',
+    width: 'fill'
+  })
+], {
+  style: createElementStyle({
+    width: 'fill',
+    height: 'fill',
+    padding: createEdgeInsets(12)
+  }),
+  spacing: 6
+})
+
+const neutralMediumRoot = group('root', 'horizontal', [
+  group('welcome-copy', 'vertical', [
+    literalText('welcome', 'Start building', 22, {
+      weight: 'bold',
+      width: 'fill'
+    }),
+    literalText('prompt', 'Choose an idea to begin.', 13, {
+      color: '#64748B',
+      width: 'fill'
+    })
+  ], {
+    style: createElementStyle({
+      width: 'fill',
+      height: 'fill'
+    }),
+    spacing: 6
+  }),
+  spacer('content-spacer', 14),
+  group('assistant-note', 'vertical', [
+    literalText('assistant-label', 'Next step', 10, {
+      color: '#355DFF',
+      weight: 'semibold',
+      width: 'fill'
+    }),
+    literalText('assistant-hint', 'Continue in your assistant\'s chat.', 11, {
+      color: '#64748B',
+      width: 118
+    })
+  ], {
+    style: createElementStyle({
+      width: 132,
+      padding: createEdgeInsets(10),
+      cornerRadius: 14,
+      background: {
+        kind: 'solid',
+        color: '#EEF2FF',
+        opacity: 1
+      }
+    }),
+    spacing: 4,
+    verticalAlignment: 'center'
+  })
+], {
+  style: createElementStyle({
+    width: 'fill',
+    height: 'fill',
+    padding: createEdgeInsets(14)
+  }),
+  spacing: 10,
+  verticalAlignment: 'center'
+})
+
+const neutralLargeRoot = group('root', 'vertical', [
+  literalText('welcome', 'Start building', 30, {
+    weight: 'bold',
+    width: 'fill'
+  }),
+  literalText('prompt', 'Choose an idea or add a reference.', 16, {
+    color: '#64748B',
+    width: 'fill'
+  }),
+  spacer('hero-spacer', 'flex'),
+  group('assistant-note', 'vertical', [
+    literalText('assistant-label', 'Your next step', 11, {
+      color: '#355DFF',
+      weight: 'semibold',
+      width: 'fill'
+    }),
+    literalText('assistant-hint', 'Continue in your assistant\'s chat.', 14, {
+      color: '#334155',
+      width: 'fill'
+    })
+  ], {
+    style: createElementStyle({
+      width: 'fill',
+      padding: {
+        top: 14,
+        right: 16,
+        bottom: 14,
+        left: 16
+      },
+      cornerRadius: 16,
+      background: {
+        kind: 'solid',
+        color: '#EEF2FF',
+        opacity: 1
+      }
+    }),
+    spacing: 5
+  })
+], {
+  style: createElementStyle({
+    width: 'fill',
+    height: 'fill',
+    padding: createEdgeInsets(20)
+  }),
+  spacing: 8
+})
+
+const neutralFixture: WidgetProject = {
+  schemaVersion: 1,
+  id: 'neutral-widget-template',
+  name: 'New widget',
+  createdAt: '2026-08-31T00:00:00.000Z',
+  updatedAt: '2026-08-31T00:00:00.000Z',
+  revision: 0,
+  dataSource: {
+    kind: 'none',
+    url: null,
+    method: 'GET',
+    parameters: [],
+    headers: [],
+    refreshMinutes: 30,
+    secretPlaceholders: []
+  },
+  data: {
+    kind: 'sample',
+    label: 'No data configured',
+    capturedAt: '2026-08-31T00:00:00.000Z',
+    value: {}
+  },
+  bindings: [],
+  layouts: {
+    small: {
+      size: 'small',
+      padding: createEdgeInsets(0),
+      cornerRadius: 24,
+      background: {
+        kind: 'solid',
+        color: '#F8FAFC',
+        opacity: 1
+      },
+      root: neutralSmallRoot
+    },
+    medium: {
+      size: 'medium',
+      padding: createEdgeInsets(0),
+      cornerRadius: 24,
+      background: {
+        kind: 'solid',
+        color: '#F8FAFC',
+        opacity: 1
+      },
+      root: neutralMediumRoot
+    },
+    large: {
+      size: 'large',
+      padding: createEdgeInsets(0),
+      cornerRadius: 28,
+      background: {
+        kind: 'solid',
+        color: '#F8FAFC',
+        opacity: 1
+      },
+      root: neutralLargeRoot
+    }
+  },
+  selection: null,
+  designScope: {
+    kind: 'all'
+  },
+  styleProvenance: null,
+  localReference: null,
+  diagnostics: []
+}
+
+export const NEUTRAL_WIDGET_PROJECT = parseWidgetProject(neutralFixture)
+
+export function createNeutralWidgetProject(): WidgetProject {
+  return structuredClone(NEUTRAL_WIDGET_PROJECT)
 }
