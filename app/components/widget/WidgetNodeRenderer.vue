@@ -6,6 +6,7 @@ import {
   spacerStyle,
   textStyle
 } from '~/domain/widget/styles'
+import { widgetElementLabel } from '~/domain/widget/tree'
 import {
   formatDateValue,
   resolveRepeatItems,
@@ -49,6 +50,15 @@ function selectElement(): void {
     size: props.size,
     elementId: props.element.id
   })
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Enter' && event.key !== ' ') {
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  selectElement()
 }
 
 const boxStyle = computed(() => elementStyle(
@@ -165,7 +175,12 @@ const repeatItemStyle = computed(() => {
       :class="{ 'element-selected': isSelected }"
       :style="containerStyle"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} group`"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     >
       <WidgetNodeRenderer
         v-for="child in element.children"
@@ -185,7 +200,12 @@ const repeatItemStyle = computed(() => {
       :class="{ 'element-selected': isSelected }"
       :style="{ ...boxStyle, ...textStyle(element.textStyle) }"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} text`"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     >{{ renderedText }}</span>
 
     <time
@@ -195,7 +215,12 @@ const repeatItemStyle = computed(() => {
       :datetime="renderedText"
       :style="{ ...boxStyle, ...textStyle(element.textStyle) }"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} date`"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     >{{ renderedDate }}</time>
 
     <img
@@ -206,7 +231,12 @@ const repeatItemStyle = computed(() => {
       :alt="element.alt"
       :style="imageStyle"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} image`"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     >
 
     <UIcon
@@ -217,17 +247,25 @@ const repeatItemStyle = computed(() => {
       :style="symbolStyle"
       :aria-label="renderedText"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     />
 
     <div
       v-else-if="element.type === 'spacer'"
       class="widget-node"
       :class="{ 'element-selected': isSelected }"
-      aria-hidden="true"
       :style="spacerStyle(element.length, parentDirection)"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} spacer`"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     />
 
     <div
@@ -236,7 +274,12 @@ const repeatItemStyle = computed(() => {
       :class="{ 'element-selected': isSelected }"
       :style="containerStyle"
       :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} repeat`"
+      :aria-pressed="isSelected"
       @click.stop="selectElement"
+      @keydown="handleKeydown"
     >
       <div
         v-for="(repeatItem, index) in repeatItems"
@@ -266,12 +309,17 @@ const repeatItemStyle = computed(() => {
   transition: outline-color 120ms ease, box-shadow 120ms ease;
 }
 
+.widget-node:focus-visible {
+  outline: 2px solid var(--widgetr-accent);
+  outline-offset: 3px;
+}
+
 .widget-node:hover {
-  outline-color: var(--widgetr-cobalt);
+  outline-color: var(--widgetr-accent);
 }
 
 .widget-node.element-selected {
-  outline: 2px solid var(--widgetr-cobalt);
-  box-shadow: 0 0 0 4px rgb(53 93 255 / 22%);
+  outline: 2px solid var(--widgetr-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--widgetr-accent) 22%, transparent);
 }
 </style>

@@ -144,15 +144,15 @@ const persistenceColor = computed(() => (
 .project-panel {
   display: grid;
   align-content: start;
-  gap: 1.25rem;
+  gap: 0.85rem;
   min-width: 0;
-  padding: 1.25rem;
+  padding: 1rem 0.85rem;
 }
 
 .project-heading h2 {
-  color: var(--ui-text-highlighted);
+  color: var(--widgetr-ink);
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 650;
   letter-spacing: -0.025em;
 }
 
@@ -166,7 +166,7 @@ const persistenceColor = computed(() => (
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   text-transform: uppercase;
@@ -187,18 +187,19 @@ const persistenceColor = computed(() => (
 .project-list-item {
   position: relative;
   border: 1px solid transparent;
-  border-radius: 0.65rem;
+  border-radius: var(--widgetr-radius-control);
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 .project-list-item:hover,
 .project-list-item.active {
-  border-color: var(--ui-border-muted);
-  background: var(--ui-bg);
+  border-color: var(--widgetr-border);
+  background: color-mix(in srgb, var(--widgetr-ink) 4%, transparent);
 }
 
 .project-list-item.active {
-  border-color: var(--widgetr-cobalt);
+  border-color: color-mix(in srgb, var(--widgetr-accent) 36%, var(--widgetr-border));
+  background: color-mix(in srgb, var(--widgetr-accent) 9%, transparent);
 }
 
 .project-row {
@@ -208,8 +209,9 @@ const persistenceColor = computed(() => (
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.7rem 0.7rem 0.35rem;
-  color: var(--ui-text-toned);
+  min-height: var(--widgetr-touch-target);
+  padding: 0.5rem 0.6rem;
+  color: var(--widgetr-ink);
   text-align: left;
 }
 
@@ -225,11 +227,11 @@ const persistenceColor = computed(() => (
   width: 1rem;
   height: 1rem;
   margin-top: 0.1rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
 }
 
 .project-list-item.active .project-row-icon {
-  color: var(--widgetr-cobalt);
+  color: var(--widgetr-accent);
 }
 
 .project-row-copy {
@@ -239,7 +241,7 @@ const persistenceColor = computed(() => (
 
 .project-row-copy strong {
   overflow-wrap: anywhere;
-  color: var(--ui-text-highlighted);
+  color: var(--widgetr-ink);
   font-size: 0.78rem;
   font-weight: 650;
   line-height: 1.25;
@@ -249,14 +251,14 @@ const persistenceColor = computed(() => (
   flex: 0 0 auto;
   width: 0.9rem;
   height: 0.9rem;
-  color: var(--ui-text-dimmed);
+  color: var(--widgetr-muted);
 }
 
 .project-row-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.1rem;
-  padding: 0 0.35rem 0.35rem;
+  padding: 0 0.35rem 0.25rem;
   opacity: 0.65;
 }
 

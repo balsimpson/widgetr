@@ -84,31 +84,32 @@ function selectElement(): void {
   gap: 0.5rem;
   padding: 0.45rem 0.55rem;
   border-left: 2px solid transparent;
-  color: var(--ui-text-toned);
+  min-height: var(--widgetr-touch-target);
+  color: var(--widgetr-ink);
   text-align: left;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .structure-row:hover {
-  background: var(--ui-bg-muted);
-  color: var(--ui-text-highlighted);
+  background: color-mix(in srgb, var(--widgetr-ink) 5%, transparent);
+  color: var(--widgetr-ink);
 }
 
 .structure-row.selected {
-  border-left-color: var(--widgetr-cobalt);
-  background: var(--ui-bg-accented);
-  color: var(--ui-text-highlighted);
+  border-left-color: var(--widgetr-accent);
+  background: color-mix(in srgb, var(--widgetr-accent) 12%, transparent);
+  color: var(--widgetr-ink);
 }
 
 .structure-icon {
   flex: 0 0 auto;
   width: 1rem;
   height: 1rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
 }
 
 .structure-row.selected .structure-icon {
-  color: var(--widgetr-cobalt);
+  color: var(--widgetr-accent);
 }
 
 .structure-label {
@@ -120,7 +121,7 @@ function selectElement(): void {
 
 .structure-type {
   margin-left: auto;
-  color: var(--ui-text-dimmed);
+  color: var(--widgetr-muted);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   text-transform: uppercase;
@@ -131,6 +132,6 @@ function selectElement(): void {
   gap: 0.12rem;
   margin: 0 0 0 0.65rem;
   padding: 0 0 0 0.55rem;
-  border-left: 1px solid var(--ui-border-muted);
+  border-left: 1px solid var(--widgetr-border);
 }
 </style>

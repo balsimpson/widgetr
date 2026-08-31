@@ -64,8 +64,8 @@ const previewStyle = computed(() => ({
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.625rem;
-  color: var(--ui-text-muted);
+  margin-bottom: 0.55rem;
+  color: var(--widgetr-muted);
   font-family: var(--font-mono);
   font-size: 0.625rem;
   letter-spacing: 0.035em;
@@ -76,7 +76,7 @@ const previewStyle = computed(() => ({
   color: var(--widgetr-ink);
   font-family: var(--font-sans);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 650;
   letter-spacing: 0;
 }
 
@@ -89,8 +89,9 @@ const previewStyle = computed(() => ({
   position: relative;
   box-sizing: border-box;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 18%, transparent);
   box-shadow:
-    0 1px 0 rgb(255 255 255 / 70%) inset,
-    0 18px 42px rgb(23 32 51 / 14%);
+    0 1px 0 rgb(255 255 255 / 65%) inset,
+    0 18px 42px rgb(29 29 31 / 16%);
 }
 </style>

@@ -158,19 +158,16 @@ function choose(starterId: WidgetStarterId): void {
 <style scoped>
 .starter-page {
   display: flex;
-  min-height: calc(100vh - 3rem);
+  min-height: 100vh;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem 0;
+  padding: max(1.5rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+  background: var(--widgetr-app);
 }
 
 .starter-surface {
   width: min(100%, 68rem);
-  border: 1px solid var(--ui-border-muted);
-  border-radius: 1rem;
-  background: var(--ui-bg);
-  box-shadow: 0 20px 70px rgb(23 32 51 / 8%);
-  padding: clamp(1.25rem, 4vw, 3.5rem);
+  padding: clamp(1.25rem, 4vw, 3.5rem) 0;
 }
 
 .starter-loading {
@@ -194,10 +191,10 @@ function choose(starterId: WidgetStarterId): void {
   height: 2.6rem;
   place-items: center;
   margin-bottom: 1.5rem;
-  border-radius: 0.8rem;
-  background: var(--widgetr-cobalt);
-  color: white;
-  box-shadow: 0 10px 24px rgb(53 93 255 / 24%);
+  border: 1px solid color-mix(in srgb, var(--widgetr-accent) 32%, var(--widgetr-border));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--widgetr-accent) 12%, transparent);
+  color: var(--widgetr-accent);
 }
 
 .starter-mark .i-lucide-panels-top-left {
@@ -207,17 +204,17 @@ function choose(starterId: WidgetStarterId): void {
 
 .starter-header h1 {
   max-width: 12ch;
-  color: var(--ui-text-highlighted);
-  font-size: clamp(2rem, 5vw, 3.6rem);
-  font-weight: 760;
+  color: var(--widgetr-ink);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 650;
   letter-spacing: -0.045em;
-  line-height: 0.98;
+  line-height: 1;
 }
 
 .starter-header p {
   max-width: 60ch;
   margin-top: 1.25rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-size: 0.95rem;
   line-height: 1.65;
 }
@@ -244,14 +241,14 @@ function choose(starterId: WidgetStarterId): void {
 }
 
 .starter-section-heading h2 {
-  color: var(--ui-text-highlighted);
+  color: var(--widgetr-ink);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.025em;
 }
 
 .starter-section-heading p {
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-size: 0.76rem;
   line-height: 1.5;
 }
@@ -270,18 +267,18 @@ function choose(starterId: WidgetStarterId): void {
   min-width: 0;
   align-items: center;
   gap: 0.85rem;
-  border: 1px solid var(--ui-border-muted);
+  border: 1px solid var(--widgetr-border);
   border-radius: 0.8rem;
   background: transparent;
   padding: 0.9rem 0.95rem;
-  color: var(--ui-text-toned);
+  color: var(--widgetr-ink);
   text-align: left;
-  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+  transition: border-color 140ms ease-out, background-color 140ms ease-out, transform 140ms ease-out;
 }
 
 .starter-option:hover {
-  border-color: var(--widgetr-cobalt);
-  background: var(--ui-bg-elevated);
+  border-color: color-mix(in srgb, var(--widgetr-accent) 48%, var(--widgetr-border));
+  background: color-mix(in srgb, var(--widgetr-accent) 6%, transparent);
   transform: translateY(-1px);
 }
 
@@ -289,14 +286,14 @@ function choose(starterId: WidgetStarterId): void {
 .starter-option:disabled:hover {
   cursor: not-allowed;
   opacity: 0.6;
-  border-color: var(--ui-border-muted);
+  border-color: var(--widgetr-border);
   background: transparent;
   transform: none;
 }
 
 .starter-option:focus-visible,
 .starter-option:focus {
-  outline: 2px solid var(--widgetr-cobalt);
+  outline: 2px solid var(--widgetr-accent);
   outline-offset: 3px;
 }
 
@@ -307,8 +304,8 @@ function choose(starterId: WidgetStarterId): void {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 0.6rem;
-  background: var(--ui-bg-elevated);
-  color: var(--widgetr-cobalt);
+  background: color-mix(in srgb, var(--widgetr-ink) 5%, transparent);
+  color: var(--widgetr-accent);
 }
 
 .starter-option-copy {
@@ -318,7 +315,7 @@ function choose(starterId: WidgetStarterId): void {
 }
 
 .starter-option-copy strong {
-  color: var(--ui-text-highlighted);
+  color: var(--widgetr-ink);
   font-size: 0.84rem;
   font-weight: 700;
 }
@@ -327,20 +324,20 @@ function choose(starterId: WidgetStarterId): void {
 .starter-option-copy small,
 .starter-example-copy p,
 .starter-example-copy small {
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-size: 0.7rem;
   line-height: 1.45;
 }
 
 .starter-option-copy small,
 .starter-example-copy small {
-  color: var(--ui-text-toned);
+  color: var(--widgetr-ink);
 }
 
 .starter-option-arrow {
   width: 1rem;
   height: 1rem;
-  color: var(--ui-text-dimmed);
+  color: var(--widgetr-muted);
 }
 
 .starter-side {
@@ -353,7 +350,7 @@ function choose(starterId: WidgetStarterId): void {
 
 .starter-example-section {
   margin-top: 1.5rem;
-  border-top: 1px solid var(--ui-border-muted);
+  border-top: 1px solid var(--widgetr-border);
   padding-top: 1rem;
 }
 
@@ -363,7 +360,7 @@ function choose(starterId: WidgetStarterId): void {
   align-items: center;
   gap: 1rem;
   margin-top: 0.75rem;
-  border-top: 1px solid var(--ui-border-muted);
+  border-top: 1px solid var(--widgetr-border);
   padding-top: 1rem;
 }
 
@@ -374,7 +371,7 @@ function choose(starterId: WidgetStarterId): void {
 }
 
 .starter-example-copy h3 {
-  color: var(--ui-text-highlighted);
+  color: var(--widgetr-ink);
   font-size: 0.8rem;
   font-weight: 700;
 }

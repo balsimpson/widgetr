@@ -12,13 +12,13 @@ const props = defineProps<{
 const statusLabel = computed(() => {
   switch (props.status) {
     case 'registered':
-      return 'Registered'
+      return 'Ready for your assistant'
     case 'registering':
-      return 'Registering'
+      return 'Preparing assistant tools'
     case 'error':
-      return 'Registration issue'
+      return 'Assistant tools unavailable'
     default:
-      return 'Unavailable'
+      return 'Assistant unavailable'
   }
 })
 
@@ -54,7 +54,7 @@ const contextLabel = computed(() => {
 <template>
   <section class="agent-tools-panel" aria-labelledby="agent-tools-heading">
     <div class="panel-heading">
-      <h2 id="agent-tools-heading">Agent tools</h2>
+      <h2 id="agent-tools-heading">Assistant handoff</h2>
       <UIcon name="i-lucide-bot" aria-hidden="true" />
     </div>
 
@@ -68,15 +68,15 @@ const contextLabel = computed(() => {
       color="neutral"
       variant="subtle"
       icon="i-lucide-plug-zap"
-      title="WebMCP is not available in this browser"
-      description="The editor remains usable. Use a WebMCP-enabled browser to let an external agent work with this page."
+      title="Assistant unavailable"
+      description="Continue building locally, or open this page in a WebMCP-enabled browser so your AI assistant can work with it."
     />
     <UAlert
       v-else-if="error"
       color="error"
       variant="subtle"
       icon="i-lucide-circle-alert"
-      title="Agent tools could not be registered"
+      title="Assistant tools could not be prepared"
       :description="error"
     />
 
@@ -114,14 +114,14 @@ const contextLabel = computed(() => {
 }
 
 .panel-heading h2 {
-  color: var(--ui-text-highlighted);
+  color: var(--widgetr-ink);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .panel-heading > .i-lucide-bot {
-  color: var(--widgetr-cobalt);
+  color: var(--widgetr-accent);
 }
 
 .agent-tools-meta {
@@ -130,7 +130,7 @@ const contextLabel = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.45rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   text-transform: uppercase;
@@ -142,7 +142,7 @@ const contextLabel = computed(() => {
 }
 
 .agent-tools-label {
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.06em;
@@ -162,25 +162,25 @@ const contextLabel = computed(() => {
   min-width: 0;
   align-items: center;
   gap: 0.45rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-size: 0.7rem;
 }
 
 .agent-tools-list li .i-lucide-wand-sparkles {
   flex: 0 0 auto;
-  color: var(--widgetr-cobalt);
+  color: var(--widgetr-accent);
 }
 
 .agent-tools-list code {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--ui-text-toned);
+  color: var(--widgetr-ink);
   font-family: var(--font-mono);
   font-size: 0.62rem;
 }
 
 .agent-tools-empty {
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-size: 0.72rem;
   line-height: 1.5;
 }

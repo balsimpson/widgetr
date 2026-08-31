@@ -45,7 +45,7 @@ describe('local widget project storage', () => {
   it('creates a clean duplicate identity without copying session metadata', () => {
     const source = createNewWidgetProject(firstTimestamp, 'Weather')
     source.revision = 4
-    source.selection = { size: 'small', elementId: 'temperature' }
+    source.selection = { size: 'small', elementId: 'welcome' }
 
     const duplicate = duplicateWidgetProject(source, secondTimestamp)
 

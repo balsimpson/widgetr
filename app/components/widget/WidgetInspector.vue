@@ -19,6 +19,7 @@ import type {
 const props = defineProps<{
   project: WidgetProject
   selection: WidgetSelection | null
+  focusedSize?: WidgetSize
   mode?: 'element' | 'widget'
   embedded?: boolean
 }>()
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 
 const selectedSize = computed<WidgetSize>(() => (
   props.selection?.size
+  ?? props.focusedSize
   ?? resolveDesignScope(props.project.designScope)[0]
   ?? 'medium'
 ))
@@ -943,15 +945,15 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 .inspector-panel {
   display: grid;
   align-content: start;
-  gap: 0.9rem;
+  gap: 0.85rem;
   min-width: 0;
-  padding: 1.25rem;
+  padding: 1rem;
   overflow-y: auto;
-  background: var(--ui-bg);
+  background: transparent;
 }
 
 .inspector-panel-embedded {
-  padding: 1.25rem;
+  padding: 1rem;
   background: transparent;
 }
 
@@ -966,8 +968,8 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 .inspector-heading h2,
 .section-heading h3 {
   margin: 0;
-  color: var(--ui-text-highlighted);
-  font-weight: 700;
+  color: var(--widgetr-ink);
+  font-weight: 650;
   letter-spacing: -0.02em;
 }
 
@@ -984,7 +986,7 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 .section-meta {
   flex: 0 0 auto;
   padding-top: 0.2rem;
-  color: var(--ui-text-muted);
+  color: var(--widgetr-muted);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.08em;
@@ -995,7 +997,7 @@ function updateOverlayOpacity(value: string | number | undefined): void {
   display: grid;
   gap: 0.8rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--ui-border-muted);
+  border-top: 1px solid var(--widgetr-border);
 }
 
 .inspector-accordion .inspector-section {

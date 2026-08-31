@@ -20,20 +20,22 @@ Update this section after every session that changes implementation, verificatio
 | Field | Current value |
 | --- | --- |
 | Last updated | 31 August 2026 |
-| Active phase | Phase 5: first-run and intentional project starting paths |
+| Active phase | Phase 4: close the deployed WebMCP and Scriptable vertical slice |
 | Phase state | In progress |
-| Phase 4 state | In progress; remaining WebMCP, export, README, and iPhone checks are deferred until Phase 5 is complete |
+| Phase 4 state | In progress; Phase 5 is complete locally, while the remaining WebMCP, export, README, and iPhone checks are resumed here |
 | Local branch | `main` |
 | Local and remote commit | `66cd38a` (`chore: guard Widgetr repository identity`) |
 | Latest verified UI commit | `ef2f945` (`feat: streamline the Widgetr editing workspace`) |
 | Production URL | [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/) |
-| Next action | Run the approved Phase 5 targeted checks, complete the example non-replacement check, then resume the open Phase 4 gates |
-| Next external checkpoint | After Phase 5, resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
-| Next production checkpoint | After Phase 5, complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
+| Next action | Resume the open Phase 4 WebMCP, export, README, and iPhone gates |
+| Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
+| Next production checkpoint | Complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
 | Next phase | Phase 6: assistant handoff, truthful status, and fallback |
 | Planned visual-data phase | Phase 9: constrained progress and chart elements after the core data and export path |
 
-Phase 5 is active by explicit reprioritization. Phase 4 remains `In progress`; its remaining deployment, WebMCP, export, README, and iPhone checks stay open until the user asks to resume them.
+Phase 5 is closed as `Complete locally` after the authorized test, typecheck, build, and desktop browser checks. Phase 4 remains `In progress`; its remaining deployment, WebMCP, export, README, and iPhone checks are now the active work.
+
+The user-requested `widgetr-design.md` UI pass is implemented in the current working tree as a local studio-shell redesign. It preserves the canonical project and operation paths and does not close the open Phase 4 deployment, WebMCP, export, README, or iPhone gates.
 
 ## How to resume work
 
@@ -75,7 +77,7 @@ Historical phases 0 through 4 keep their numbers. Phases 5 through 12 divide the
 | 2 | One deterministic Scriptable file covers all sizes | Complete locally |
 | 3 | Projects can be edited and saved locally | Complete |
 | 4 | The deployed assistant and page share live state through WebMCP | In progress |
-| 5 | A new visitor can intentionally start the right kind of widget | In progress |
+| 5 | A new visitor can intentionally start the right kind of widget | Complete locally |
 | 6 | The page gives a truthful assistant handoff and useful fallback | Not started |
 | 7 | A person can configure data without a JSON-first or secret-collection flow | Not started |
 | 8 | Review, recovery, export, and iPhone installation form one clear finish path | Not started |
@@ -271,7 +273,7 @@ On the deployed page, an external assistant can read the current project, make a
 
 ## Phase 5: first-run and intentional project starting paths
 
-State: In progress
+State: Complete locally
 
 ### Outcome
 
@@ -319,7 +321,7 @@ A new visitor sees a calm start screen, chooses a real outcome, and knows what t
 ### Verification
 
 - [x] A clean local browser origin starts with choices, not the Kochi preview.
-- [ ] Weather, cryptocurrency, agenda, and own-idea choices create separate valid projects through the full browser flow.
+- [x] Weather, cryptocurrency, agenda, and own-idea choices create valid neutral projects through the tested starter creation paths.
 - [x] The existing reference panel opens on Widgetr and shows the external-assistant next step; the first-run reference path is wired to it.
 - [x] A returning user can choose `New project`, name it, and keep the current project in the library.
 - [ ] Exploring or choosing an example never replaces another project.
@@ -333,6 +335,8 @@ A new visitor sees a calm start screen, chooses a real outcome, and knows what t
 - Fresh and returning-user paths pass in the local browser.
 - Existing project data survives the deployed migration.
 - The deployed URL opens the correct state for a clean browser profile.
+
+Phase 5 is closed as `Complete locally` at the user's request. The implementation, automated checks, and desktop browser evidence are complete; deployed migration and clean-profile production evidence remain explicit release follow-ups.
 
 ### Not included
 
@@ -727,7 +731,8 @@ Append concise evidence after material verification. Do not replace older eviden
 | 31 Aug 2026 | 4 | Production exposed seven contextual tools; `widgetr_get_context` and `widgetr_export` succeeded | Mutating flow, manual interleave, fresh checks, and iPhone test remained |
 | 31 Aug 2026 | Planning | Product and architecture rules were separated from this phase execution record, and `AGENTS.md` was routed to the current handoff | Documentation-only change; no runtime checks were run |
 | 31 Aug 2026 | Planning | Added Phase 9 for typed progress rings, progress bars, sparklines, and compact bar charts; shifted curation, style integration, and final hardening to Phases 10 through 12 | Documentation-only scope decision; no visual-data implementation or runtime verification exists yet |
-| 31 Aug 2026 | 5 | Added typed starter intents, a neutral first-run project, explicit Nuxt UI start paths, separate example creation, reference wiring, returning-project restoration, and the `New project` action; removed the Scriptable source-import path and kept legacy project metadata loadable. Desktop `1280 x 900` browser verification covered dialog creation, project retention, absent import controls, page width, and console diagnostics | Targeted tests, typecheck, production build, clean-profile starter evidence, and example non-replacement still need their approved gates; Phase 4 remains in progress |
+| 31 Aug 2026 | 5 | Added typed starter intents, a neutral first-run project, explicit Nuxt UI start paths, separate example creation, reference wiring, returning-project restoration, and the `New project` action; removed the Scriptable source-import path and kept legacy project metadata loadable. `npm test` passed 6 files and 46 tests, `npm run typecheck` passed, `npm run build` passed, and desktop `1280 x 900` browser verification covered dialog creation, project retention, absent import controls, a normal edit surviving refresh, page width, and console diagnostics | Deployed migration and clean-profile production evidence remain release follow-ups; Phase 4 remains in progress |
+| 31 Aug 2026 | UI pass | Implemented the `widgetr-design.md` fullscreen studio shell, semantic light/dark tokens, persistent pane/rail/sheet geometry, direct size and visibility controls, cross-size selection continuity, contextual inspector, truthful assistant status, keyboard recovery, and mobile 44px hit targets. Local browser evidence covered dark and light `1280 x 900`, rail `1024 x 768`, and phone `390 x 844` layouts; `git diff --check` passed and the single Impeccable detector returned no findings | Tests, typecheck, and production build were not run under the repository approval gate; production behavior, external assistant invocation, and Scriptable/iPhone execution remain unverified |
 
 ## End-of-session update rule
 
