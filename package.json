@@ -8,6 +8,7 @@
     "generate": "nuxt generate",
     "postinstall": "nuxt prepare",
     "preview": "nuxt preview",
+    "repo:check": "node scripts/assert-widgetr-repo.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "nuxt typecheck"

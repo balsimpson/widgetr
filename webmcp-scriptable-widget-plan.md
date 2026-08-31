@@ -2,12 +2,13 @@
 
 ## Approved product and delivery plan
 
-Last updated: 28 August 2026  
-Status: Phase 0 complete; Phase 4 deployed; real Scriptable and external-agent WebMCP verification pending
+Last updated: 31 August 2026
+
+Status: Phase 4 deployed; production WebMCP discovery, context, and export verified; mutating WebMCP and real Scriptable verification pending
 Working title: Scriptable Widget Builder  
 Challenge: [The WebMCP Challenge](https://webmcp.devpost.com/)
 
-> This document describes a new standalone project. It is stored temporarily in the current `ScriptableEditor` repository because that is where the planning work took place. The new product must be created in its own repository. It must not be implemented by adding WebMCP to the current project.
+> This is the product contract for the standalone Widgetr repository. `ScriptableEditor` is reference-only and must not receive Widgetr implementation code, dependencies, commits, deployment work, or submission state.
 
 ## Current implementation handoff
 
@@ -15,23 +16,27 @@ This section is the resume point for a new chat. The implementation lives in `/U
 
 | Area | Status | Evidence or remaining work |
 | --- | --- | --- |
-| Repository | Public | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr), and `origin/main` now points to the Phase 4 commit `6ea44f0`. |
-| Runtime | Ready locally | Use Node 22.23.1 at `/Users/balsimpson/.local/bin/node` with npm. The system Node 25 runtime is outside Nuxt's supported even-LTS range. |
-| Agent handoff | Added | [`AGENTS.md`](./AGENTS.md) contains the repository rules, file map, invariants, verification gates, and resume order. |
+| Repository | Public and clean | GitHub remote is [`balsimpson/widgetr`](https://github.com/balsimpson/widgetr). Local `main` and `origin/main` point to `ef2f945` (`feat: streamline the Widgetr editing workspace`). |
+| Runtime | Ready locally | Use npm with the preferred Node 24 major from `.nvmrc`, or another version allowed by `package.json`: `^22.19.0`, `^24.11.0`, or `>=26.0.0`. |
+| Agent handoff | Guarded | [`AGENTS.md`](./AGENTS.md) contains the repository rules and current resume state. `npm run repo:check` must verify the exact Git root, `balsimpson/widgetr` origin, and `widgetr` package name before any repository-affecting work. |
 | Phase 0 foundation | Complete | Nuxt, npm, Nuxt UI, Tailwind, README, deployment instructions, `.env.example`, `.nvmrc`, strict TypeScript setup, MIT license, public GitHub remote, and Vercel deployment are complete. |
 | Phase 1 kernel | Implemented | Canonical schema, constraints, separate layout trees, shared revision-checked operations, fixture, and exact-size browser renderer are implemented. |
 | Phase 1 checkpoint | Manually verified | Local browser checks passed for one-size, two-size, all-size, and stale-revision behavior. The 390px responsive check has no page-level horizontal overflow. The deployed URL also rendered all three previews and accepted scoped operations without console errors or horizontal overflow. |
-| Automated verification | Passed locally | `npm run typecheck` passes; `npm test` passes with 6 files and 42 tests. Do not run `npm run build` for this phase. |
+| Automated verification | Refresh required | The last checkpoint before the `ef2f945` UI refactor passed strict typecheck and 6 test files with 42 tests. Typecheck, tests, and a deliberate production build have not been rerun for the latest commit. |
 | Phase 2 export | Implemented locally | Deterministic generator, `config.widgetFamily` branches, preflight diagnostics, Scriptable API runtime harness, and shared viewer/copy/download source are implemented. Real iPhone execution remains. |
 | Phase 3 editor | Implemented locally | IndexedDB projects, CRUD and autosave, three previews, structure and inspector editing, session undo/redo, local reference-image persistence, and best-effort Scriptable import are implemented. The local browser checkpoint passed. |
-| Phase 4 WebMCP | Deployed | Contextual imperative tools for widget, text, image, and group contexts are registered over the shared operation path with revision checks, scope handling, bounded results, confirmation, and an editor status panel. Production now serves Phase 4; the WebMCP-capable in-app browser shows `Registered` and the expected contextual names with no browser warnings or errors. Actual external-agent tool execution remains unverified because the active browser backend rejected `webmcp_list_tools`. |
-| Visual design | Deferred | The current page is a functional kernel harness. Do the intentional design pass later, after the state and export work is stable. |
+| Phase 4 WebMCP | Read-only production flow verified | The production in-app browser discovers seven contextual tools. External calls to `widgetr_get_context` and `widgetr_export` succeed. The full create/select/context-change/edit/manual-interleave mutation flow remains. |
+| Export checkpoint | Ready with warnings | Production `widgetr_export` returned `ready: true` and `sourceLength: 65438`. Two `LOCAL_IMAGE_SOURCE` warnings identify `/sample-monsoon.svg` references that may not work in Scriptable and must be resolved or verified on an iPhone. |
+| Visual design | Preview-first workspace deployed | Commit `ef2f945` is live at `https://widgetrmcp.vercel.app/` and was visually checked without browser warnings, errors, or page-level horizontal overflow. Later visual-library and admin work remains behind the MVP checkpoints. |
+| Hackathon submission | Registered, not drafted | The account is registered for the WebMCP Challenge, but no Devpost project or submission draft exists. The deadline is 3 September 2026 at 1:00 PM Pacific Time, or 4 September 2026 at 1:30 AM IST. Do not invent `.devpost-hackathon-state.json`; let the Devpost workflow create it when submission work starts. |
 
 ### Resume order
 
-1. Verify the generated file in real Scriptable on an iPhone, including small, medium, and large widget families.
-2. Run the deployed external-agent WebMCP checkpoint: create, select, change context, edit, and export through the production URL when the WebMCP browser backend supports tool discovery and calls.
-3. Keep later data, admin, and visual-polish work behind the phase checkpoints below.
+1. After explicit approval, run fresh typecheck, unit tests, and a deliberate production build for `ef2f945`.
+2. Resolve or deliberately accept the two local-image export warnings, then verify the generated file in real Scriptable on an iPhone for small, medium, and large widget families.
+3. Complete the production mutating WebMCP checkpoint: create, select, observe the contextual tool change, edit, preserve a manual interleaved change, and export.
+4. Prepare the judge-facing README, Devpost project and copy, screenshots, and a public demo video under three minutes.
+5. Keep Phase 5 through Phase 7 work out of the submission path unless a verified judging requirement makes it necessary.
 
 The current implementation is concentrated in `app/types/widget.ts`, `app/domain/widget/`, `app/components/widget/`, `app/composables/`, `app/pages/index.vue`, and `tests/unit/`.
 
@@ -668,7 +673,7 @@ Checkpoint:
 
 ### Phase 4: WebMCP vertical slice
 
-Status: Implemented and deployed as of 28 August 2026. The local browser checkpoint and production page-side registration check passed. Deployed external-agent execution remains.
+Status: Implemented and deployed as of 31 August 2026. Production tool discovery and external read-only context and export calls pass. The deployed mutating and manual-interleave checkpoint remains.
 
 Deliverables:
 
@@ -682,9 +687,10 @@ Deliverables:
 Checkpoint:
 
 - [x] Production serves the Phase 4 page, and the WebMCP-capable in-app browser reports `Registered` with the expected contextual tool names.
+- [x] A deployed external agent can call `widgetr_get_context` and receive the current canonical project revision and contextual tool set.
 - [ ] A deployed external agent can create a widget, select an element, observe the tool set change, alter it, and see the same state update in the interface.
 - [ ] A manual change made between agent calls is preserved.
-- [ ] The agent can export through the same preflight and generator used by the UI.
+- [x] The agent can export through the same preflight and generator used by the UI; production returned a ready result with two local-image warnings.
 
 ### Phase 5: Data onboarding and iPhone diagnostics
 

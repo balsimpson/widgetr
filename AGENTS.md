@@ -8,26 +8,43 @@
 - Before resuming work, read the plan's **Current implementation handoff** section. It records the current phase, verification state, and next work order.
 - Preserve unrelated changes in the worktree. Do not reset, clean, or delete files to make the checkout look tidy.
 
+## Repository identity hard gate
+
+Before any edit, stage, commit, push, deployment, or Devpost state change:
+
+1. Set the working directory to `/Users/balsimpson/Documents/Projects/Widgetr` explicitly.
+2. Run `npm run repo:check`.
+3. Run `git status --short --branch` and inspect existing changes before touching files.
+
+The guard must confirm all three identities:
+
+- Git root: `/Users/balsimpson/Documents/Projects/Widgetr`
+- `origin`: `https://github.com/balsimpson/widgetr.git`
+- package name: `widgetr`
+
+If any identity differs or the guard cannot read it, stop. Do not edit, stage, commit, push, deploy, or create submission state. A task's inherited current directory, a similarly named folder, and prior chat context are not proof of repository identity. Never perform Widgetr work from `/Users/balsimpson/Documents/ScriptableEditor`; that checkout is reference-only.
+
 ## Current resume state
 
-As of 28 August 2026:
+As of 31 August 2026:
 
 - Phase 0 is complete. The local Nuxt foundation, MIT license, public GitHub remote, and Vercel deployment are verified at `https://widgetrmcp.vercel.app/`.
 - Phase 1 is implemented and manually verified in the local browser.
 - Phase 1 includes the canonical schema, supported constraints, separate small/medium/large layout trees, revision-checked operations, shared rendering, and a fixed sample fixture.
-- Phase 1 through Phase 4 automated checks pass: 6 test files, 42 tests, and strict typecheck.
+- The last automated checkpoint before the latest UI refactor passed strict typecheck and 6 test files with 42 tests. Commit `ef2f945` still needs a fresh typecheck, test, and deliberate production build checkpoint; do not describe those checks as current until they run.
 - Phase 2 is implemented locally and browser-smoke-tested. Real Scriptable execution on an iPhone and public release setup are still pending.
 - Phase 3 is implemented locally and browser-smoke-tested: IndexedDB projects, autosave, selection and inspector editing, session undo/redo, local reference-image persistence, and best-effort import are covered.
-- Phase 4 is implemented and deployed: contextual imperative WebMCP registration, revision-aware operations, scope handling, bounded results, destructive confirmation, and shared manual/agent state are covered locally. Production now shows Phase 4 and the WebMCP-capable in-app browser reports `Registered` with the expected contextual tools and no browser warnings/errors. Actual external-agent execution remains unverified because the active backend rejected `webmcp_list_tools`.
-- Visual design refinement is intentionally deferred. Keep the current page as a functional kernel harness until the state and export work are stable.
-- The next order is: verify the generated file in real Scriptable, then rerun the deployed external-agent WebMCP checkpoint when the browser backend supports tool discovery and calls. Keep both separate from the local implementation and page-side registration evidence.
+- Phase 4 is implemented and deployed. The production WebMCP-capable in-app browser discovers seven contextual tools, and external read-only calls to `widgetr_get_context` and `widgetr_export` succeed. The export is ready and generated 65,438 source characters, with two `LOCAL_IMAGE_SOURCE` warnings for `/sample-monsoon.svg`. A complete mutating create/select/edit/manual-interleave flow remains unverified.
+- The preview-first editing workspace from commit `ef2f945` is deployed and visually verified on production without browser warnings, errors, or page-level horizontal overflow.
+- The WebMCP Challenge registration exists, but no Devpost project or submission draft exists yet. The deadline is 3 September 2026 at 1:00 PM Pacific Time, which is 4 September 2026 at 1:30 AM IST.
+- The next order is: run fresh automated and production-build checks after approval, resolve and verify the local-image export behavior on a real iPhone for all three widget families, complete the deployed mutating WebMCP flow, then prepare the judge-facing README, Devpost project, copy, screenshots, and demo video.
 
 ## Resume checklist
 
 When starting a new task in this repository:
 
 1. Read this file and the plan handoff section.
-2. Confirm the checkout with `pwd` and `git status --short --branch`.
+2. Set the exact Widgetr working directory, run `npm run repo:check`, then run `git status --short --branch`.
 3. Inspect `package.json`, `.nvmrc`, and the relevant files below before editing.
 4. Check whether the requested work belongs to the current phase. Do not start a later phase incidentally.
 5. Preserve the one canonical state and one shared operation path.
@@ -43,7 +60,7 @@ For every rendered UI check, use this sequence:
 1. From `/Users/balsimpson/Documents/Projects/Widgetr`, confirm the target before starting anything:
 
    ```text
-   pwd
+   npm run repo:check
    git status --short --branch
    ```
 
@@ -82,6 +99,7 @@ For every rendered UI check, use this sequence:
 - `webmcp-scriptable-widget-plan.md`: approved product plan, phase deliverables, checkpoints, privacy boundaries, and definition of done.
 - `README.md`: local setup, current scope, and project boundary.
 - `AGENTS.md`: these project-specific operating instructions.
+- `scripts/assert-widgetr-repo.mjs`: hard identity guard for the exact Git root, origin, and package name.
 
 ### Runtime foundation
 
@@ -108,8 +126,8 @@ For every rendered UI check, use this sequence:
 
 - `app/components/widget/WidgetNodeRenderer.vue`: recursive renderer for every supported Phase 1 element.
 - `app/components/widget/WidgetPreview.vue`: exact reference dimensions and preview frame for each widget size.
-- `app/pages/index.vue`: functional operation bench and three-preview browser harness. Keep it focused on kernel behavior until a later design pass.
-- `public/sample-monsoon.svg`: local fixture image used by the sample widget.
+- `app/pages/index.vue`: preview-first editing workspace, manual controls, status surfaces, and the three widget-size previews.
+- `public/sample-monsoon.svg`: local fixture image used by the sample widget. Its two exported references currently trigger `LOCAL_IMAGE_SOURCE` warnings and need real-iPhone verification or replacement.
 
 ### Verification
 
@@ -155,7 +173,7 @@ For every rendered UI check, use this sequence:
 - Phase 0 complete: public remote `https://github.com/balsimpson/widgetr` and production URL `https://widgetrmcp.vercel.app/` are verified. Real iPhone Scriptable execution remains a Phase 2 checkpoint.
 - Phase 2 implemented locally: deterministic state-to-Scriptable generation, `config.widgetFamily` branching, preflight diagnostics, and one shared viewer/copy/download source string. Real iPhone execution remains to be verified.
 - Phase 3 implemented locally: IndexedDB projects, structure view, selection/inspector, autosave, undo/redo, local reference images, and best-effort import. The local browser checkpoint passed.
-- Phase 4 implemented locally: contextual imperative WebMCP tools are a thin adapter over `applyWidgetOperation`; the local browser checkpoint passed. A deployed external-agent run remains to be verified.
+- Phase 4 deployed: contextual imperative WebMCP tools are a thin adapter over `applyWidgetOperation`. Production discovery plus read-only context and export calls pass; the full deployed mutating and manual-interleave checkpoint remains.
 - Phase 5 later: data onboarding, CORS distinctions, iPhone diagnostics, and Keychain-only secret entry.
 - Phase 6 and 7 later: private design curation, approved-style provenance, and constrained adaptation.
 - Phase 8 later: hardening, deployed WebMCP testing, real iPhone Scriptable testing, and challenge submission evidence.
