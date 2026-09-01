@@ -464,13 +464,17 @@ function finishCanvasPan(event: PointerEvent): void {
 }
 
 function handleCanvasClickCapture(event: MouseEvent): void {
-  if (!suppressNextCanvasClick.value) {
+  if (suppressNextCanvasClick.value) {
+    event.preventDefault()
+    event.stopPropagation()
+    suppressNextCanvasClick.value = false
     return
   }
 
-  event.preventDefault()
-  event.stopPropagation()
-  suppressNextCanvasClick.value = false
+  const target = event.target instanceof Element ? event.target : null
+  if (!target?.closest('.widget-preview, .preview-caption-button')) {
+    clearSelection()
+  }
 }
 
 function selectNavigationMode(mode: NavigationMode): void {
