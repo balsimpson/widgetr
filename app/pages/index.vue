@@ -49,8 +49,13 @@ const {
 
 const lastResult = ref<OperationResult | null>(null)
 const lastChangeReceiptMessage = ref<string | null>(null)
-const historyPast = ref<WidgetProject[]>([])
-const historyFuture = ref<WidgetProject[]>([])
+type HistoryEntry = {
+  snapshot: WidgetProject
+  message: string
+}
+
+const historyPast = ref<HistoryEntry[]>([])
+const historyFuture = ref<HistoryEntry[]>([])
 const structureSize = ref<WidgetSize>('medium')
 const previewView = ref<WidgetSize | 'all'>('medium')
 const previewVisibility = ref<Record<WidgetSize, boolean>>({
@@ -211,6 +216,21 @@ const selectedSizeLabel = computed(() => {
   return size[0]!.toUpperCase() + size.slice(1)
 })
 
+const agentHistory = computed(() => [
+  ...historyFuture.value.slice().reverse().map((entry, index) => ({
+    id: `future-${entry.snapshot.revision}-${index}`,
+    message: entry.message,
+    detail: 'Redo available',
+    direction: 'future' as const
+  })),
+  ...historyPast.value.slice().reverse().map((entry, index) => ({
+    id: `past-${entry.snapshot.revision}-${index}`,
+    message: entry.message,
+    detail: 'Undo available',
+    direction: 'past' as const
+  }))
+])
+
 const changeReceiptMessage = computed(() => (
   lastChangeReceiptMessage.value
 ))
@@ -326,7 +346,7 @@ function commitOperation(
 
   const recordHistory = options.recordHistory ?? operation.type !== 'set-selection'
   if (recordHistory) {
-    historyPast.value = [...historyPast.value, previousState]
+    historyPast.value = [...historyPast.value, { snapshot: previousState, message: result.message }]
     historyFuture.value = []
   }
 
@@ -581,11 +601,14 @@ function undo(): void {
   }
 
   historyPast.value = historyPast.value.slice(0, -1)
-  historyFuture.value = [...historyFuture.value, cloneWidgetProject(project.value)]
+  historyFuture.value = [...historyFuture.value, {
+    snapshot: cloneWidgetProject(project.value),
+    message: previous.message
+  }]
   const result = commitOperation({
     type: 'restore-snapshot',
     expectedRevision: project.value.revision,
-    snapshot: previous
+    snapshot: previous.snapshot
   }, { recordHistory: false })
 
   if (!result.ok) {
@@ -601,11 +624,14 @@ function redo(): void {
   }
 
   historyFuture.value = historyFuture.value.slice(0, -1)
-  historyPast.value = [...historyPast.value, cloneWidgetProject(project.value)]
+  historyPast.value = [...historyPast.value, {
+    snapshot: cloneWidgetProject(project.value),
+    message: next.message
+  }]
   const result = commitOperation({
     type: 'restore-snapshot',
     expectedRevision: project.value.revision,
-    snapshot: next
+    snapshot: next.snapshot
   }, { recordHistory: false })
 
   if (!result.ok) {
@@ -1315,10 +1341,12 @@ onBeforeUnmount(() => {
             </button>
             <template #content>
               <WidgetAgentToolsPanel
+                :open="agentOpen"
                 :status="webmcpStatus"
                 :context="webmcpContext"
                 :tool-names="webmcpRegisteredToolNames"
                 :error="webmcpError"
+                :history="agentHistory"
               />
             </template>
           </UPopover>
