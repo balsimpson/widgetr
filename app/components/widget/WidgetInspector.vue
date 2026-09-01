@@ -1011,6 +1011,11 @@ function updateOverlayOpacity(value: string | number | undefined): void {
   gap: 0.7rem;
 }
 
+:deep(input[type='color']) {
+  height: 2rem;
+  min-height: 2rem;
+}
+
 @media (max-width: 25rem) {
   .inspector-grid {
     grid-template-columns: 1fr;

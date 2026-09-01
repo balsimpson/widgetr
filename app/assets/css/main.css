@@ -74,6 +74,13 @@ button,
   outline-offset: 3px;
 }
 
+input.ring-accented:focus-visible,
+textarea.ring-accented:focus-visible,
+select.ring-accented:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

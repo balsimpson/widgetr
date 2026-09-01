@@ -48,9 +48,10 @@ const {
 } = useWidgetProjects()
 
 const lastResult = ref<OperationResult | null>(null)
+const lastChangeReceiptMessage = ref<string | null>(null)
 const historyPast = ref<WidgetProject[]>([])
 const historyFuture = ref<WidgetProject[]>([])
-const structureSize = ref<WidgetSize>('small')
+const structureSize = ref<WidgetSize>('medium')
 const previewView = ref<WidgetSize | 'all'>('medium')
 const previewVisibility = ref<Record<WidgetSize, boolean>>({
   small: true,
@@ -185,6 +186,10 @@ const visiblePreviewSizes = computed(() => (
     : [previewView.value]
 ))
 
+const layerPreviewSize = computed<WidgetSize>(() => (
+  previewView.value === 'all' ? structureSize.value : previewView.value
+))
+
 const activeProject = computed(() => projects.value.find(item => item.id === project.value.id) ?? project.value)
 
 const selectedElementTitle = computed(() => {
@@ -206,14 +211,8 @@ const selectedSizeLabel = computed(() => {
   return size[0]!.toUpperCase() + size.slice(1)
 })
 
-const hasChangeReceipt = computed(() => Boolean(
-  lastResult.value?.ok && lastResult.value.changedSizes.length > 0
-))
-
 const changeReceiptMessage = computed(() => (
-  hasChangeReceipt.value && lastResult.value?.ok
-    ? lastResult.value.message
-    : null
+  lastChangeReceiptMessage.value
 ))
 
 const inspectorOpen = computed({
@@ -279,7 +278,12 @@ const statusDockMessage = computed(() => {
 })
 
 const statusDockDetail = computed(() => (
-  statusDockMessage.value === agentStatusLabel.value ? null : agentStatusLabel.value
+  webmcpStatus.value === 'registered'
+  && persistenceState.value !== 'saving'
+  && persistenceState.value !== 'error'
+  && !changeReceiptMessage.value
+    ? agentStatusLabel.value
+    : null
 ))
 
 const statusDockExpanded = computed(() => (
@@ -300,7 +304,7 @@ const statusDockColor = computed(() => {
   if (webmcpStatus.value === 'registered') {
     return 'success'
   }
-  return 'neutral'
+  return 'error'
 })
 
 function commitOperation(
@@ -310,6 +314,11 @@ function commitOperation(
   const previousState = cloneWidgetProject(project.value)
   const result = applyWidgetOperation(project.value, operation)
   lastResult.value = result
+  lastChangeReceiptMessage.value = result.ok
+    && operation.type !== 'set-selection'
+    && result.changedSizes.length > 0
+    ? result.message
+    : null
 
   if (!result.ok) {
     return result
@@ -326,8 +335,8 @@ function commitOperation(
   return result
 }
 
-function selectElement(selection: WidgetSelection): void {
-  closeContextualSurfaces()
+function selectElement(selection: WidgetSelection, options: { keepLayers?: boolean } = {}): void {
+  closeContextualSurfaces(options)
   structureSize.value = selection.size
   previewView.value = selection.size
 
@@ -345,6 +354,10 @@ function selectElement(selection: WidgetSelection): void {
   }, { recordHistory: false })
 }
 
+function selectElementFromLayers(selection: WidgetSelection): void {
+  selectElement(selection, { keepLayers: true })
+}
+
 function clearSelection(): void {
   if (!project.value.selection) {
     return
@@ -357,9 +370,11 @@ function clearSelection(): void {
   }, { recordHistory: false })
 }
 
-function closeContextualSurfaces(): void {
+function closeContextualSurfaces(options: { keepLayers?: boolean } = {}): void {
   projectsOpen.value = false
-  layersOpen.value = false
+  if (!options.keepLayers) {
+    layersOpen.value = false
+  }
   settingsOpen.value = false
   referenceOpen.value = false
   exportOpen.value = false
@@ -374,7 +389,7 @@ function startCanvasPan(event: PointerEvent): void {
   }
 
   const target = event.target instanceof Element ? event.target : null
-  if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
+  if (target?.closest('input, textarea, select, [contenteditable="true"], .widget-node, .preview-caption-button')) {
     return
   }
 
@@ -866,6 +881,7 @@ function syncPreviewView(event?: MediaQueryList | MediaQueryListEvent): void {
   const isNarrow = event ? event.matches : previewMediaQuery?.matches ?? false
   if (isNarrow) {
     previewView.value = 'medium'
+    structureSize.value = 'medium'
   }
 }
 
@@ -946,13 +962,10 @@ onBeforeUnmount(() => {
             title="Projects"
             @click="openProjects"
           />
-          <div class="project-identity">
-            <span class="wordmark">Widgetr</span>
-          </div>
         </div>
 
         <div class="topbar-trailing">
-          <div v-if="historyPast.length || historyFuture.length" class="history-actions" aria-label="Session history">
+          <div class="history-actions" aria-label="Session history">
             <UButton
               icon="i-lucide-undo-2"
               color="neutral"
@@ -1038,12 +1051,12 @@ onBeforeUnmount(() => {
                   <span class="panel-kicker">OUTLINE</span>
                   <h2 id="layers-panel-heading">Layers</h2>
                 </div>
-                <span class="panel-count">{{ structureSize }}</span>
+                <span class="panel-count">{{ layerPreviewSize }}</span>
               </div>
               <UFormField label="Preview size">
                 <USelect
                   class="w-full"
-                  :model-value="structureSize"
+                  :model-value="layerPreviewSize"
                   :items="structureSizeOptions"
                   value-key="value"
                   aria-label="Layer preview size"
@@ -1052,8 +1065,8 @@ onBeforeUnmount(() => {
               </UFormField>
               <ul class="structure-tree">
                 <WidgetStructureTree
-                  :element="project.layouts[structureSize].root"
-                  :size="structureSize"
+                  :element="project.layouts[layerPreviewSize].root"
+                  :size="layerPreviewSize"
                   :selection="project.selection"
                   @select="selectElement"
                 />
@@ -1109,11 +1122,12 @@ onBeforeUnmount(() => {
         <section class="canvas-panel" aria-labelledby="canvas-heading">
           <h1 id="canvas-heading" class="sr-only">Canvas</h1>
 
-          <div class="canvas-project-title" aria-label="Current project">
-            <h2 id="canvas-project-title-heading">{{ project.name }}</h2>
-          </div>
+          <div class="canvas-control-stack">
+            <div class="canvas-project-title" aria-label="Current project">
+              <h2 id="canvas-project-title-heading">{{ project.name }}</h2>
+            </div>
 
-          <div class="canvas-floating-controls" aria-label="Canvas controls">
+            <div class="canvas-floating-controls" aria-label="Canvas controls">
             <div class="size-controls" role="group" aria-label="Widget sizes">
               <UButton
                 v-for="size in WIDGET_SIZES"
@@ -1194,6 +1208,7 @@ onBeforeUnmount(() => {
                 </div>
               </template>
             </UPopover>
+            </div>
           </div>
 
           <div class="canvas-stage">
@@ -1228,9 +1243,9 @@ onBeforeUnmount(() => {
                   v-for="size in visiblePreviewSizes"
                   :key="size"
                   :project="project"
-                  :size="size"
-                  @select="selectElement"
-                />
+                :size="size"
+                @select="selectElement"
+              />
               </div>
             </div>
           </div>
@@ -1289,12 +1304,14 @@ onBeforeUnmount(() => {
             >
               <span class="status-dock-icon" aria-hidden="true">
                 <UIcon name="i-lucide-bot" />
+                <span class="status-dock-dot" />
               </span>
-              <span v-if="statusDockExpanded" class="status-dock-copy" aria-live="polite">
-                <span class="status-dock-message">{{ statusDockMessage }}</span>
-                <span v-if="statusDockDetail" class="status-dock-detail">{{ statusDockDetail }}</span>
-              </span>
-              <span class="status-dock-dot" aria-hidden="true" />
+              <Transition name="status-dock-copy">
+                <span v-if="statusDockExpanded" class="status-dock-copy" aria-live="polite">
+                  <span class="status-dock-message">{{ statusDockMessage }}</span>
+                  <span v-if="statusDockDetail" class="status-dock-detail">{{ statusDockDetail }}</span>
+                </span>
+              </Transition>
             </button>
             <template #content>
               <WidgetAgentToolsPanel
@@ -1305,17 +1322,6 @@ onBeforeUnmount(() => {
               />
             </template>
           </UPopover>
-          <UButton
-            v-if="changeReceiptMessage && historyPast.length"
-            label="Undo"
-            color="neutral"
-            variant="soft"
-            size="xs"
-            class="canvas-status-undo"
-            aria-label="Undo last change"
-            title="Undo last change"
-            @click="undo"
-          />
         </div>
       </Teleport>
     </template>
@@ -1356,27 +1362,28 @@ onBeforeUnmount(() => {
       inset
       title="Layers"
       description="Select an element to edit it."
-      :ui="{ content: 'sm:max-w-sm' }"
+      class="layers-slideover"
+      :ui="{ content: 'sm:max-w-sm', body: 'p-0 sm:p-0' }"
     >
       <template #body>
         <div class="layers-drawer">
           <UFormField label="Preview size">
             <USelect
               class="w-full"
-              :model-value="structureSize"
+              :model-value="layerPreviewSize"
               :items="structureSizeOptions"
               value-key="value"
               aria-label="Layer preview size"
-              @update:model-value="value => structureSize = value as WidgetSize"
+              @update:model-value="value => focusPreview(value as WidgetSize)"
             />
           </UFormField>
 
           <ul class="structure-tree">
             <WidgetStructureTree
-              :element="project.layouts[structureSize].root"
-              :size="structureSize"
+              :element="project.layouts[layerPreviewSize].root"
+              :size="layerPreviewSize"
               :selection="project.selection"
-              @select="selectElement"
+              @select="selectElementFromLayers"
             />
           </ul>
         </div>
@@ -1607,16 +1614,19 @@ onBeforeUnmount(() => {
         </UFormField>
       </template>
       <template #footer>
-        <div class="modal-actions">
+        <div class="modal-actions project-modal-actions">
           <UButton
             label="Cancel"
             color="neutral"
             variant="outline"
+            size="sm"
             @click="newProjectOpen = false"
           />
           <UButton
             label="Create project"
             color="primary"
+            variant="solid"
+            size="sm"
             :disabled="!newProjectName.trim()"
             @click="submitNewProject"
           />
@@ -2305,10 +2315,22 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
+:global(body > [data-slot="content"][data-side="right"] > [data-slot="header"]) {
+  position: relative;
+}
+
 :global(.inspector-pin-button) {
-  margin-inline-start: auto;
-  margin-inline-end: 2rem;
+  position: absolute;
+  top: 1rem;
+  right: 3.5rem;
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0;
   border-radius: 999px;
+  justify-content: center;
 }
 
 .studio-inspector-content {
@@ -2322,6 +2344,10 @@ onBeforeUnmount(() => {
   align-content: start;
   gap: 1rem;
   padding: 1.25rem;
+}
+
+.layers-drawer {
+  padding: 1rem;
 }
 
 .structure-tree {
@@ -2385,6 +2411,21 @@ onBeforeUnmount(() => {
 .modal-actions {
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.project-modal-actions {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.project-modal-actions :deep(button) {
+  min-height: 2rem;
+}
+
+@media (min-width: 48rem) {
+  .project-modal-actions {
+    justify-content: space-between;
+  }
 }
 
 .export-actions {
@@ -2898,12 +2939,26 @@ onBeforeUnmount(() => {
 }
 
 .topbar-leading {
-  max-width: min(30rem, calc(100vw - 15rem));
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .topbar-trailing {
   gap: 0.5rem;
   flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .topbar-projects-trigger,
@@ -2928,7 +2983,18 @@ onBeforeUnmount(() => {
 }
 
 .topbar-projects-trigger {
+  width: 2.875rem;
+  min-width: 2.875rem;
+  min-height: 2.875rem;
+  padding: 0;
   color: var(--widgetr-ink);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.topbar-projects-trigger :deep([data-slot="leadingIcon"]) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .topbar-projects-trigger :deep(span:not([class*="icon"])),
@@ -2957,8 +3023,22 @@ onBeforeUnmount(() => {
 }
 
 .history-actions {
-  padding: 0;
-  border: 0;
+  gap: 0.1rem;
+  padding: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 11%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 62%, transparent);
+  box-shadow: 0 12px 30px rgb(29 29 31 / 8%);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+}
+
+.history-actions :deep(button) {
+  background: transparent;
+}
+
+.history-actions :deep(button:not(:disabled):hover) {
+  background: color-mix(in srgb, var(--widgetr-ink) 8%, transparent);
 }
 
 .assistant-status-button {
@@ -3041,6 +3121,10 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
+:global(body > [data-slot="content"].layers-slideover > [data-slot="header"]) {
+  padding: 1rem !important;
+}
+
 :global(body > [data-slot="content"][data-side] > [data-slot="body"]) {
   min-height: 0;
   background: transparent;
@@ -3089,13 +3173,27 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.canvas-project-title {
+.canvas-control-stack {
   position: absolute;
-  top: 4.55rem;
-  left: max(1rem, env(safe-area-inset-left));
-  z-index: 14;
-  max-width: min(24rem, calc(100vw - 2rem));
+  top: 4rem;
+  left: 50%;
+  z-index: 15;
+  display: flex;
+  width: max-content;
+  max-width: calc(100vw - 1rem);
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  transform: translateX(-50%);
   pointer-events: none;
+}
+
+.canvas-project-title {
+  position: static;
+  width: min(24rem, calc(100vw - 2rem));
+  max-width: 100%;
+  pointer-events: none;
+  text-align: center;
 }
 
 .canvas-project-title h2 {
@@ -3111,15 +3209,12 @@ onBeforeUnmount(() => {
 }
 
 .canvas-floating-controls {
-  position: absolute;
-  top: 4.4rem;
-  left: 50%;
-  z-index: 15;
+  position: static;
   display: flex;
-  max-width: calc(100vw - 2rem);
+  width: max-content;
+  max-width: calc(100vw - 1rem);
   align-items: center;
   gap: 0.25rem;
-  transform: translateX(-50%);
   padding: 0.25rem;
   border: 1px solid color-mix(in srgb, var(--widgetr-ink) 11%, transparent);
   border-radius: 999px;
@@ -3127,6 +3222,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 16px 40px rgb(29 29 31 / 10%);
   backdrop-filter: blur(24px) saturate(1.25);
   -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  pointer-events: auto;
 }
 
 .canvas-floating-controls .size-controls {
@@ -3184,6 +3280,11 @@ onBeforeUnmount(() => {
 .tools-menu {
   display: grid;
   gap: 0.2rem;
+}
+
+.tools-menu :deep(button) {
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .canvas-stage {
@@ -3283,8 +3384,10 @@ onBeforeUnmount(() => {
 }
 
 .canvas-status-trigger {
+  box-sizing: border-box;
   display: inline-flex;
-  min-width: 2.65rem;
+  width: 3rem;
+  min-width: 3rem;
   min-height: 2.65rem;
   align-items: center;
   justify-content: center;
@@ -3296,9 +3399,16 @@ onBeforeUnmount(() => {
   box-shadow: 0 14px 34px rgb(0 0 0 / 18%), 0 0 0 1px color-mix(in srgb, var(--widgetr-ink) 4%, transparent);
   color: var(--widgetr-ink);
   cursor: pointer;
+  overflow: hidden;
   backdrop-filter: blur(24px) saturate(1.25);
   -webkit-backdrop-filter: blur(24px) saturate(1.25);
-  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition:
+    width 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-width 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
 }
 
 .canvas-status-trigger:hover {
@@ -3313,13 +3423,16 @@ onBeforeUnmount(() => {
 }
 
 .canvas-status-trigger-expanded {
+  width: min(22rem, calc(100vw - 2rem));
+  min-width: min(22rem, calc(100vw - 2rem));
+  max-width: min(22rem, calc(100vw - 2rem));
   justify-content: flex-start;
-  max-width: min(32rem, calc(100vw - 4.5rem));
   padding-right: 0.7rem;
   padding-left: 0.45rem;
 }
 
 .status-dock-icon {
+  position: relative;
   display: grid;
   width: 1.8rem;
   height: 1.8rem;
@@ -3337,17 +3450,30 @@ onBeforeUnmount(() => {
 
 .status-dock-copy {
   display: grid;
+  width: 0;
+  flex: 1 1 auto;
   min-width: 0;
   gap: 0.08rem;
+  overflow: hidden;
   text-align: left;
+}
+
+.status-dock-copy-enter-active,
+.status-dock-copy-leave-active {
+  transition: opacity 160ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.status-dock-copy-enter-from,
+.status-dock-copy-leave-to {
+  opacity: 0;
+  transform: translateX(-0.35rem);
 }
 
 .status-dock-message,
 .status-dock-detail {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .status-dock-message {
@@ -3364,11 +3490,14 @@ onBeforeUnmount(() => {
 }
 
 .status-dock-dot {
+  position: absolute;
+  top: -0.08rem;
+  right: -0.08rem;
   width: 0.42rem;
   height: 0.42rem;
-  flex: 0 0 auto;
   border-radius: 999px;
   background: var(--widgetr-muted);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--widgetr-pane-solid) 88%, transparent);
 }
 
 .canvas-status-trigger-success .status-dock-dot {
@@ -3384,14 +3513,16 @@ onBeforeUnmount(() => {
   background: var(--widgetr-danger);
 }
 
-.canvas-status-undo {
-  min-height: 2.25rem;
-  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 15%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--widgetr-pane-solid) 76%, transparent);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 14%);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+@media (prefers-reduced-motion: reduce) {
+  .canvas-status-trigger,
+  .status-dock-copy-enter-active,
+  .status-dock-copy-leave-active {
+    transition: none;
+  }
+
+  .canvas-status-trigger-warning .status-dock-dot {
+    animation: none;
+  }
 }
 
 .studio-alert {
@@ -3404,10 +3535,6 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 56.25rem) and (max-width: 74.999rem) {
-  .canvas-project-title {
-    top: 7.2rem;
-  }
-
   .assistant-status-button :deep([data-slot="leadingIcon"]) {
     display: inline-flex;
   }
@@ -3439,22 +3566,10 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  .canvas-project-title {
-    top: 7.2rem;
-    right: 0.75rem;
-    left: 0.75rem;
-    max-width: none;
-  }
-
   .canvas-floating-controls {
-    top: 4rem;
-    right: auto;
-    left: 0.5rem;
     width: max-content;
     max-width: calc(100vw - 1rem);
-    justify-content: flex-start;
     overflow-x: auto;
-    transform: none;
   }
 
   .topbar-projects-trigger,
@@ -3463,6 +3578,12 @@ onBeforeUnmount(() => {
     width: var(--widgetr-touch-target);
     min-width: var(--widgetr-touch-target);
     min-height: var(--widgetr-touch-target);
+  }
+
+  .topbar-projects-trigger {
+    width: 2.875rem;
+    min-width: 2.875rem;
+    min-height: 2.875rem;
   }
 
   .canvas-floating-controls .floating-tools-trigger {
@@ -3511,20 +3632,15 @@ onBeforeUnmount(() => {
   }
 
   .canvas-status-trigger {
+    width: var(--widgetr-touch-target);
     min-width: var(--widgetr-touch-target);
     min-height: var(--widgetr-touch-target);
   }
 
   .canvas-status-trigger-expanded {
-    max-width: min(32rem, calc(100vw - 5.75rem));
-  }
-
-  .status-dock-copy {
-    max-width: calc(100vw - 9rem);
-  }
-
-  .canvas-status-undo {
-    min-height: var(--widgetr-touch-target);
+    width: min(22rem, calc(100vw - 1.5rem));
+    min-width: min(22rem, calc(100vw - 1.5rem));
+    max-width: min(22rem, calc(100vw - 1.5rem));
   }
 
   .studio-alert {
@@ -3537,7 +3653,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 30rem) {
   .topbar-trailing {
-    gap: 0.1rem;
+    gap: 0.55rem;
   }
 
   .topbar-leading {
@@ -3564,17 +3680,15 @@ onBeforeUnmount(() => {
     height: 0.9rem;
   }
 
-  .canvas-status-dock-shell {
-    gap: 0.25rem;
-  }
-
   .canvas-status-trigger {
     padding-right: 0.45rem;
     padding-left: 0.4rem;
   }
 
   .canvas-status-trigger-expanded {
-    max-width: min(32rem, calc(100vw - 5.25rem));
+    width: min(22rem, calc(100vw - 1.5rem));
+    min-width: min(22rem, calc(100vw - 1.5rem));
+    max-width: min(22rem, calc(100vw - 1.5rem));
   }
 
   .status-dock-message {
