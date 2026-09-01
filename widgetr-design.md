@@ -6,6 +6,12 @@ Widgetr should feel like a focused creative application rather than a web page i
 
 This document records the agreed redesign direction for the WebMCP challenge. It defines the experience, visual system, interaction model, and behavior states. It does not change the canonical `WidgetProject` model, the shared operation path, export rules, or the current implementation phase by itself.
 
+## Canvas-first revision — 31 August 2026
+
+The latest UI pass supersedes the earlier persistent-pane treatment for the studio shell. The canvas is now the product surface: it owns the viewport edge to edge, keeps the focused widget in generous negative space, and carries only small status/readout islands when they help orientation. Projects, Layers, Reference, Widget settings, and the selection inspector open as inset floating glass sheets without a canvas-wide scrim; they are not permanent desktop furniture.
+
+The top bar is reduced to project identity and a few global actions. Size and visibility controls float above the canvas in a translucent glass group, while lower-frequency tools live behind a single Tools affordance. Glass is reserved for these spatially continuous control layers and feedback receipts, with solid sheet fallbacks for legibility. The canonical `WidgetProject`, operation path, scope behavior, persistence, export, and assistant truthfulness remain unchanged.
+
 ## Product model
 
 Widgetr has two surfaces with different jobs:
@@ -57,31 +63,29 @@ Open directly into the studio with the last project. Restore the focused size fr
 
 ## Studio shell
 
-The desktop layout is one continuous workspace with three functional regions:
+The studio is one continuous canvas with a few floating control islands:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ project · sizes · undo/redo · assistant status · export                  │
-├───────────────┬───────────────────────────────────────┬─────────────────┤
-│ Projects      │                                       │ Inspector       │
-│ Layers        │             Widget canvas             │ selected object │
-│ Reference     │             focused on stage          │ or project      │
-│               │                                       │                 │
-└───────────────┴───────────────────────────────────────┴─────────────────┘
+│  project                                                   undo · export │
+│                     [ Small  Medium  Large  Visibility  Tools ]         │
+│                                                                         │
+│                         Widget canvas                                  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-The canvas has visual priority. The left navigation pane and the right inspector support the document without competing with it.
+The canvas has visual priority. Navigation and inspection support the document only when summoned, then return the full viewport to the canvas when dismissed.
 
 ### Top bar
 
-The top bar is persistent and quiet. It should contain:
+The top bar is persistent and quiet. It should contain only:
 
 - project identity on the leading side;
-- direct size buttons: `Small`, `Medium`, and `Large`;
-- a separate visibility affordance for the all-sizes view;
-- Undo and Redo;
-- the assistant connection/activity status;
+- Undo and Redo when there is session history to act on;
 - Export.
+
+Direct size buttons and the separate visibility affordance live in the floating canvas controls. New project, Projects, Layers, Reference, and Widget settings live behind the floating `Tools` affordance.
 
 The primary user-facing ready state is:
 
@@ -89,19 +93,19 @@ The primary user-facing ready state is:
 
 Use `assistant` or `AI assistant` in user-facing copy. Use `agent` only in internal implementation language. Use `WebMCP` in technical documentation. Provider-specific help may explain that ChatGPT calls these capabilities site tools.
 
-The top bar should not become a control cabinet. Less frequent actions can move into an overflow menu as the layout narrows.
+The top bar should not become a control cabinet. Less frequent actions stay out of the persistent shell at every width.
+
+Keep assistant status in one fixed bottom canvas dock, independent of the canvas pan position and any open sheet. The dock is compact (bot icon plus status dot) when the workspace is idle, then expands into a short status capsule while an element is selected, a change is being saved, or assistant tools are registering or unavailable. The bot icon opens the assistant handoff details; do not duplicate that control in the top bar or create a second circular action beside Export. When expanded, pair selection or save feedback with the existing assistant status so the dock is the single source of contextual feedback.
 
 ### Left navigation pane
 
-Use one leading pane with separate modes rather than two permanent left sidebars. The modes are:
+Use one transient leading sheet with separate modes rather than permanent sidebars. The modes are:
 
 - `Projects`: project list, recent documents, and example entry points;
 - `Layers`: the editable outline of the current widget;
 - `Reference`: the reference image or captured view associated with the project.
 
-Only one mode is open at a time. The pane can be collapsed without changing the canvas or selection.
-
-On narrow screens, this becomes a slim rail with the same three destinations. Opening a destination presents it as a slide-over sheet, keeping the canvas central.
+Only one mode is open at a time. Opening a destination presents it as an inset floating sheet without changing the canvas or selection. Dismissing it restores the unobstructed canvas at every width; the sheet never relies on a darkened page-wide backdrop to establish hierarchy.
 
 ### Canvas
 
@@ -113,12 +117,15 @@ The canvas is the document surface, not a decorative preview card. It should:
 - avoid fake device frames and excessive chrome;
 - expose selection directly on the widget;
 - support a deliberate all-sizes view when requested.
+- support click-drag panning on the stage, including beneath open floating sheets; a click without movement keeps its normal selection behavior.
+
+The project name lives in a dedicated canvas title treatment rather than the compact identity pill. It stays readable at every width and wraps instead of truncating longer names. A very low-contrast grid or similar spatial cue can give the stage personality without becoming another surface or competing with the widget.
 
 The focused view is the default because it keeps editing legible. All three outputs remain first-class project content and are never treated as competing variants.
 
 ### Inspector
 
-The inspector is contextual. With no selection, it shows project-level controls. With a selection, it shows controls for the selected element or group. It should be organized into short sections such as:
+The inspector is contextual and transient. With no selection, Widget settings opens as a floating sheet; with a selection, the selected element or group opens in the same inset glass pattern. It should be organized into short sections such as:
 
 - Content
 - Appearance
@@ -127,28 +134,30 @@ The inspector is contextual. With no selection, it shows project-level controls.
 
 Sections use disclosure controls so the panel remains readable without hiding the existence of available controls. The inspector is the complete control surface; the canvas toolbar is only a shortcut surface.
 
+The inspector header includes a pin action for people who want the controls to stay open while they work. A pinned inspector remains visible after clearing a selection and falls back to widget settings; an unpinned inspector closes with the selection. The close action always unpins and dismisses it.
+
 ## Preview and size behavior
 
 The three named sizes are always clear and direct:
 
 ```text
-Widget sizes    [Small] [Medium] [Large]        [Visibility ▾]
+Widget sizes    [Small] [Medium] [Large] [All]   [Visibility ▾]
 ```
 
 - Clicking `Small`, `Medium`, or `Large` focuses that output for editing.
-- `Show all sizes` opens an overview containing the visible outputs.
+- Clicking a preview's size caption selects that output's complete `Widget` surface.
+- `All` focuses the overview containing the visible outputs and sits in the same size-control group as the three focused views.
 - The visibility control is separate from the named size buttons so hiding a size cannot be confused with deleting it.
 - Hidden sizes remain in the project, remain exportable, and can be focused directly from the named size controls.
-- The visibility popover controls only which outputs appear in the all-sizes overview by default.
+- The visibility popover controls only which outputs appear in the overview.
 
 The visibility affordance should communicate state plainly:
 
 ```text
-Visible in all-sizes view
+Show in overview
 ☑ Small
 ☑ Medium
 ☐ Large
-Show all sizes
 ```
 
 The all-sizes view is for seeing the complete set of outputs at once. It is not labeled or framed as a comparison mode.
@@ -165,6 +174,7 @@ Make the interface feel composed, not decorated. Every visible control should ex
 - Use quiet graphite, silver, and cool neutral surfaces as the base.
 - Use a restrained indigo as the interaction accent. It should lean slightly violet so it feels authored rather than like a default link blue.
 - Reserve indigo for selection, focus, active navigation, primary actions, and meaningful status.
+- Choose the active-state foreground per appearance so indigo controls maintain readable contrast in both light and dark modes; do not force white text where the dark appearance needs a graphite label.
 - Do not use gradients, neon glow, colored shadows, or a uniformly blue interface.
 - Keep semantic colors distinct from the indigo accent so success, warning, and failure remain legible.
 
@@ -181,8 +191,9 @@ The accent should be recognizable as Widgetr's interaction color, not as a decor
 ### Surfaces and depth
 
 - Treat the studio as one continuous workspace.
-- Use quiet tonal layers to distinguish the stage, pane, and inspector.
-- Use translucency or blur only where it improves spatial continuity and remains readable in both appearances.
+- Let the stage carry most of the viewport and use generous negative space around the widget.
+- Use translucent glass layers for floating controls, contextual readouts, receipts, and inset sheets so they preserve the canvas beneath them.
+- Use solid, readable sheet surfaces as the fallback for navigation and inspection; they appear only while that task is active and never require a page-wide scrim.
 - Avoid nested card stacks. A panel should not look like a card inside another card inside the page.
 - Use borders, tonal shifts, and small elevation changes sparingly.
 
@@ -201,11 +212,11 @@ Use a restrained, familiar icon set with consistent stroke weight. Global action
 
 The canvas is the primary editing surface.
 
-- A single click selects one element or one group.
+- A size caption selects the complete `Widget` surface; a single click on a visible child selects that element or group.
 - Selection shows a precise outline or bounding treatment on the canvas, a highlighted row in Layers, and the matching inspector state.
-- Double-clicking a group enters that group and reveals its children.
-- A breadcrumb shows the current group path.
-- Escape exits the current group level and returns to the parent selection.
+- Selecting the complete `Widget` surface adds a distinct outer outline around the preview so the widget-level selection is visible even when child outlines are also present.
+- Children can also be selected from Layers without changing the canvas view.
+- Escape clears the current selection.
 - Multi-select is out of scope for the challenge; the interaction model stays intentionally precise with one element or group at a time.
 
 The Layers mode is a secondary precision route, not a duplicate editor. It should support:
@@ -222,9 +233,13 @@ The outline should represent the real structured document. Do not create an arbi
 
 ### Contextual toolbar
 
-When an element or group is selected, show a small contextual toolbar near the selection or at the canvas edge. In the UI-first pass it exposes only `Open inspector`, `Hide` or `Show`, and `Set scope` for every supported selection. A group also exposes `Enter group`. The inspector remains the place for complete control, and the toolbar does not invent element-type-specific shortcuts.
+Do not add a separate `Enter group` control. The size caption selects the complete `Widget` surface, while clicking a visible child or choosing it from Layers selects that element directly. Selection identity, visibility, scope, and clearing belong to the inspector.
 
-The toolbar should disappear when there is no selection and should not permanently consume canvas space.
+The canvas should not reserve space for a selection toolbar that duplicates direct selection.
+
+### Export handoff
+
+Export opens as a centered modal with a readable glass surface over the canvas. The modal keeps the generated Scriptable source visible in a scrollable code area, offers direct copy and `.js` download actions, and explains the next steps: move the source into Scriptable, run it once, and add a Scriptable widget that uses the script. Export should not replace the canvas with a side panel or dismiss the user's working context.
 
 ### Scope of a change
 
@@ -330,26 +345,27 @@ The studio should communicate local persistence quietly through truthful status,
 - `Saving…`
 - `Could not save locally`
 
+The canvas-first shell keeps the saved state quiet once it is stable: `Saving…` and `Could not save locally` expand the bottom status dock alongside the assistant icon, while a stable save is represented by the compact ready state and remains available in the Projects and assistant surfaces. This keeps persistence truthful without turning the canvas into a status dashboard.
+
 History, direct edits, assistant edits, and export should continue to use the canonical project state and operation path. The redesign does not introduce a second state model for the canvas.
 
-Export is opened from the top bar in an in-context sheet with:
+Export is opened from the top bar in a centered in-context modal with:
 
 - `Copy code`;
 - `Download .js`;
 - the current project and export target clearly identified.
 
-The sheet should make the generated Scriptable output easy to inspect without turning the studio into a code editor.
+The modal should make the generated Scriptable output easy to inspect without turning the studio into a code editor.
 
 ## Responsive behavior
 
 The layout is adaptive rather than a desktop layout compressed until it breaks.
 
-- On wide screens, show the full Projects/Layers/Reference pane, canvas, and inspector.
-- As space decreases, the leading pane becomes a slim rail and the inspector becomes narrower while retaining its hierarchy.
-- On narrow screens, open Projects, Layers, and Reference as slide-over sheets.
+- On every width, let the canvas own the viewport and keep Projects/Layers/Reference behind the Tools affordance.
+- Open navigation and inspection as inset floating sheets only while that task is active; dismissing a sheet returns the unobstructed canvas.
 - Keep the focused canvas visible as the primary surface.
-- Move low-frequency top-bar actions into overflow when needed.
-- Preserve direct access to the three named sizes and the separate visibility affordance at every supported width.
+- Keep low-frequency actions out of the persistent top bar and behind Tools.
+- Preserve direct access to Small, Medium, Large, All, and the separate visibility affordance at every supported width.
 
 ## Motion and feedback
 
@@ -456,11 +472,11 @@ The geometry tokens are:
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--widgetr-topbar-height` | `52px` | Persistent top bar |
-| `--widgetr-pane-width` | `240px` | Expanded leading pane |
-| `--widgetr-rail-width` | `52px` | Compact leading rail |
-| `--widgetr-inspector-width` | `320px` | Wide inspector |
-| `--widgetr-inspector-min-width` | `280px` | Smallest persistent inspector |
+| `--widgetr-topbar-height` | `52px` | Floating top-bar overlay baseline |
+| `--widgetr-pane-width` | `240px` | Leading sheet width |
+| `--widgetr-rail-width` | `52px` | Reserved compact control width |
+| `--widgetr-inspector-width` | `320px` | Wide inspector sheet |
+| `--widgetr-inspector-min-width` | `280px` | Smallest inspector sheet |
 | `--widgetr-control-height` | `32px` | Desktop controls |
 | `--widgetr-touch-target` | `44px` | Touch hit area, including compact icon controls |
 | `--widgetr-radius-control` | `8px` | Buttons, fields, and disclosure rows |
@@ -476,14 +492,14 @@ The root app shell uses `min-height: 100vh`, `min-height: 100dvh`, `height: 100d
 
 | Width | Shell | Navigation | Inspector | Canvas behavior |
 | --- | --- | --- | --- | --- |
-| `>= 1200px` | 52px top bar plus three-region workspace | 240px persistent pane | 320px persistent pane | Focused widget is centered; all-sizes overview scrolls only inside the canvas region |
-| `900px-1199px` | Same top bar | 52px rail with labels in tooltips | 280-300px persistent pane | Canvas receives the remaining width and keeps the focused preview legible |
-| `600px-899px` | Same top bar, low-frequency actions in overflow | Left navigation opens as a sheet | Inspector opens as a right sheet, max 360px | Focused preview remains visible behind a sheet; no page-level horizontal scroll |
-| `< 600px` | Same top bar with project name truncated safely | Full-width left sheet | Full-width right sheet | One focused preview at a time; Small, Medium, Large, and visibility remain directly reachable in a compact horizontal control |
+| `>= 1200px` | Full-viewport canvas with small glass islands | Left sheet on demand | Right sheet on selection or settings | Focused widget is centered in generous negative space; all-sizes overview scrolls only inside the canvas |
+| `900px-1199px` | Same canvas-first shell | Left sheet on demand | Right sheet on selection or settings | Canvas keeps the focused preview legible without reserving pane width |
+| `600px-899px` | Same canvas-first shell, compact floating controls | Full-width or max-width left sheet | Right sheet, max 360px | Focused preview remains visible behind a sheet; no page-level horizontal scroll |
+| `< 600px` | Same canvas-first shell with project name wrapping safely | Full-width left sheet | Full-width right sheet | One focused preview at a time; Small, Medium, Large, All, and visibility stay directly reachable in a compact horizontal control |
 
 The app root never scrolls. The canvas region owns preview scrolling, each pane owns its own list scrolling, and each sheet owns its body scrolling. Do not create nested scroll containers for the same axis. The canonical `WIDGET_DIMENSIONS` remain unchanged. Responsive behavior scales the rendered preview with `contain` or a CSS transform; it never mutates the widget's layout dimensions or aspect ratio.
 
-The top bar has a fixed priority order. The leading group is project identity and navigation. The center group is focused size and scope. The trailing group is Undo, Redo, assistant status, and Export. New project, reference, agent diagnostics, and other low-frequency actions move into overflow on compact and phone layouts. Export remains visible through the compact layout and moves into overflow only when the phone width cannot fit it without crowding the focused-size control.
+The canvas controls have a fixed priority order. The leading top-bar group is project identity and a Projects entry point. The trailing group is history when available and Export. The centered floating group owns focused size and visibility. New project, Layers, Reference, Widget settings, and assistant diagnostics stay behind the Tools affordance; the bottom status dock owns assistant status and contextual feedback. Export remains visible as a compact icon control so the canvas never loses its primary action.
 
 ### Component and state ownership
 
@@ -495,7 +511,7 @@ Create focused UI components under `app/components/studio/`:
 | --- | --- |
 | `StudioShell.vue` | Viewport shell, top bar slot, navigation slot, canvas slot, inspector slot, and scroll ownership |
 | `StudioTopBar.vue` | Project identity, focused size, scope summary, history, status, export, and overflow priority |
-| `StudioNavigation.vue` | Projects, Layers, and Reference modes, including persistent pane, rail, and sheet presentation |
+| `StudioNavigation.vue` | Projects, Layers, and Reference modes, presented as one transient sheet without permanent pane or rail furniture |
 | `StudioCanvas.vue` | Stage, focused/all-sizes layout, preview scale, selection overlay, and canvas empty states |
 | `StudioSizeControls.vue` | Small, Medium, Large, all-sizes visibility, and selected-pair scope disclosure |
 | `StudioSelectionToolbar.vue` | Existing common actions only, with collision-safe placement near the selection or canvas edge |
@@ -512,7 +528,7 @@ Adapt the existing `WidgetPreview.vue`, `WidgetNodeRenderer.vue`, `WidgetStructu
 2. **Build the shared shell.** Extract the top bar, navigation region, canvas stage, and inspector region. Keep the existing project, history, persistence, and WebMCP behavior wired through the same page coordinator. Do not change operation schemas in this step.
 3. **Make the canvas the hero.** Add direct size buttons, a separate visibility control, focused/all-sizes rendering, accurate scaling, and the quiet stage. The selected widget is the only rich object on the screen. Keep the current canonical dimensions and renderer.
 4. **Add selection continuity.** Synchronize canvas and Layers selection, add the outline and breadcrumb presentation, and add the contextual toolbar using only supported operations. Defer unsupported layer rename, duplicate, and delete actions. Preserve the current selected-pair scope in the advanced control.
-5. **Add adaptive navigation and inspector presentation.** Use the persistent pane and inspector on wide screens, the rail at compact widths, and sheets at narrow widths. Define focus return and Escape behavior before adding transitions.
+5. **Add adaptive navigation and inspector presentation.** Keep navigation and inspection transient at every width, with sheets that preserve canvas context and return focus on dismissal. Define Escape behavior before adding transitions.
 6. **Add truthful feedback and restrained motion.** Implement save status, assistant status, stale and failed receipts, export states, and the first-change focus treatment. Use the motion and reduced-motion rules below. Do not invent assistant reasoning or connection claims.
 7. **Run the bounded verification pass.** Capture the specified viewports in light and dark appearance, exercise the listed states, run `git diff --check`, and run the Impeccable detector once on changed UI files. Typecheck, tests, and production build remain separate approval-gated checks.
 
@@ -531,7 +547,7 @@ Every state needs a visible location, one useful action, preserved work, and an 
 | Failed or cancelled operation | `Change not applied` receipt with the actual reason | Preserve the document and offer a clear retry or correction path |
 | Restored project | Short `Back to your project` confirmation | Restore project-local selection and focused size where available |
 | Read-only example | `Example` marker and read-only controls | `Use as starting point` creates a recoverable editable copy |
-| Saving, saved, save failure | `Saving`, `Saved locally`, or `Could not save locally` in the same status location | Preserve the current session and explain whether refresh can lose it |
+| Saving, saved, save failure | `Saving` or `Could not save locally` in the low-profile status location; stable saves stay quiet and are available in Projects/assistant surfaces | Preserve the current session and explain whether refresh can lose it |
 | Export warning, blocker, success | Warning or blocker beside the affected target; success after copy/download | Name the next action and never claim Scriptable success without device evidence |
 
 ### Interaction, keyboard, and accessibility contract
@@ -557,10 +573,10 @@ The first assistant change is the emotional peak. Focus the changed element, dra
 
 The first implementation is complete only when all of the following are observable in the local browser:
 
-- At 1280 x 900, the shell fills the viewport, the top bar is 52px, the expanded leading pane is 240px, the inspector is 320px, the canvas owns the remaining space, and the document has no horizontal or vertical scroll.
-- At 1024 x 768, the navigation is a 52px rail, the inspector remains usable, and the focused preview does not become a clipped card.
+- At 1280 x 900, the shell fills the viewport, the canvas owns the full stage, floating controls remain comfortably separated, and the document has no horizontal or vertical scroll.
+- At 1024 x 768, navigation and inspection remain available as sheets without reserving canvas width, and the focused preview does not become a clipped card.
 - At 390 x 844, the root width is 390px, there is no page-level horizontal overflow, navigation and inspector open as sheets, touch targets are at least 44 x 44 CSS pixels, and the three sizes plus visibility remain reachable.
-- The same shell works in light and dark appearance. The widget remains the focal object and the stage, panes, and inspector retain one visual grammar.
+- The same shell works in light and dark appearance. The widget remains the focal object and the stage, floating controls, sheets, and receipts retain one visual grammar.
 - Selecting from the canvas or Layers updates the outline, breadcrumb, inspector, and assistant-readable context. Clearing selection closes selection-only controls.
 - The assistant status matrix, persistence states, read-only example state, and export warning/blocker/success states show the specified copy, action, preserved work, and announcement.
 - Keyboard-only navigation can open and close every pane, move through Layers, select a canvas element, edit a supported field, undo, redo, and recover focus.
@@ -575,14 +591,14 @@ The direction is ready for implementation when a reviewer can confirm that:
 
 1. The page reads as a fullscreen studio, not a website with a hero section.
 2. The canvas is the dominant surface and the focused widget is the default view.
-3. Small, Medium, and Large are directly addressable, while visibility is clearly separate.
+3. Small, Medium, Large, and All are directly addressable, while visibility is clearly separate.
 4. A single click, double-click, Layers selection, breadcrumb, and Escape produce an understandable selection flow.
 5. `This size` and `All sizes` are visible and unambiguous at the point of change.
 6. The assistant conversation stays external while the page shows live selection, activity, and receipts.
 7. A user edit made during an assistant operation cannot be overwritten by stale assistant work.
 8. The assistant can read the latest revision, selection, scope, and recent change context.
 9. Undo is the page's immediate recovery path for direct and assistant changes.
-10. The layout remains usable when the sidebars become a rail and then sheets.
+10. The layout remains usable when navigation and inspection appear as transient sheets at every width.
 11. Light/dark appearance, keyboard focus, reduced motion, and readable contrast are treated as core states.
 
 ## References

@@ -104,6 +104,12 @@ const contextLabel = computed(() => {
   align-content: start;
   gap: 0.8rem;
   padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
+  border-radius: var(--widgetr-radius-panel);
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 78%, transparent);
+  box-shadow: 0 18px 44px rgb(29 29 31 / 14%);
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
 }
 
 .panel-heading {

@@ -21,6 +21,10 @@ export function findWidgetElement(
 }
 
 export function widgetElementLabel(element: WidgetElement): string {
+  if (element.id === 'root') {
+    return 'Widget'
+  }
+
   const words = element.id.split('-').filter(Boolean)
   if (words.length === 0) {
     return element.type

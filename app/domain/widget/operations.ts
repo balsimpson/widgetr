@@ -1,4 +1,5 @@
 import { resolveDesignScope, validateWidgetProject, widgetOperationSchema } from './schema'
+import { widgetElementLabel } from './tree'
 import { WIDGET_SIZES } from '~/types/widget'
 import type {
   DesignScope,
@@ -250,13 +251,16 @@ export function applyWidgetOperation(
   if (operation.type === 'set-selection') {
     nextState.selection = operation.selection
     const sizes = operation.selection ? [operation.selection.size] : []
+    const selectedElement = operation.selection
+      ? findElement(nextState.layouts[operation.selection.size].root, operation.selection.elementId)
+      : null
     return finish(
       state,
       nextState,
       sizes,
       [],
       operation.selection
-        ? `Selected ${operation.selection.elementId} in the ${operation.selection.size} layout.`
+        ? `Selected ${selectedElement ? widgetElementLabel(selectedElement) : operation.selection.elementId} in the ${operation.selection.size} layout.`
         : 'Selection cleared.',
       now
     )

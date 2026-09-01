@@ -16,6 +16,17 @@ const emit = defineEmits<{
 const layout = computed(() => props.project.layouts[props.size])
 const dimensions = computed(() => WIDGET_DIMENSIONS[props.size])
 const label = computed(() => props.size[0]!.toUpperCase() + props.size.slice(1))
+const isWidgetSelected = computed(() => (
+  props.project.selection?.size === props.size
+  && props.project.selection.elementId === layout.value.root.id
+))
+
+function selectWidget(): void {
+  emit('select', {
+    size: props.size,
+    elementId: layout.value.root.id
+  })
+}
 
 const previewStyle = computed(() => ({
   ...backgroundStyle(layout.value.background, props.project),
@@ -32,12 +43,20 @@ const previewStyle = computed(() => ({
     :style="{ width: `${dimensions.width}px` }"
   >
     <figcaption class="preview-caption">
-      <span>{{ label }}</span>
+      <button
+        type="button"
+        class="preview-caption-button"
+        :aria-label="`Select ${label} widget`"
+        @click="selectWidget"
+      >
+        <span>{{ label }}</span>
+      </button>
     </figcaption>
 
     <div class="calibration-frame">
       <div
         class="widget-preview"
+        :class="{ 'widget-preview-selected': isWidgetSelected }"
         :style="previewStyle"
         :aria-label="`${label} widget preview`"
       >
@@ -72,7 +91,31 @@ const previewStyle = computed(() => ({
   text-transform: uppercase;
 }
 
-.preview-caption span:first-child {
+.preview-caption-button {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  margin: -0.25rem -0.35rem;
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--widgetr-ink);
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.preview-caption-button:hover {
+  background: color-mix(in srgb, var(--widgetr-ink) 8%, transparent);
+}
+
+.preview-caption-button:focus-visible {
+  outline: 2px solid var(--widgetr-accent);
+  outline-offset: 2px;
+}
+
+.preview-caption-button span {
   color: var(--widgetr-ink);
   font-family: var(--font-sans);
   font-size: 0.75rem;
@@ -91,6 +134,17 @@ const previewStyle = computed(() => ({
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--widgetr-ink) 18%, transparent);
   box-shadow:
+    0 1px 0 rgb(255 255 255 / 65%) inset,
+    0 18px 42px rgb(29 29 31 / 16%);
+  transition: border-color 160ms ease, box-shadow 160ms ease, outline-color 160ms ease;
+}
+
+.widget-preview-selected {
+  border-color: var(--widgetr-accent);
+  outline: 2px solid var(--widgetr-accent);
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--widgetr-accent) 18%, transparent),
     0 1px 0 rgb(255 255 255 / 65%) inset,
     0 18px 42px rgb(29 29 31 / 16%);
 }

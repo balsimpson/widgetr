@@ -10,7 +10,6 @@ import { useWidgetWebMcp } from '~/composables/useWidgetWebMcp'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
 import { WIDGET_SIZES } from '~/types/widget'
 import type {
-  DesignScope,
   OperationResult,
   WidgetOperation,
   WidgetProject,
@@ -58,7 +57,6 @@ const previewVisibility = ref<Record<WidgetSize, boolean>>({
   medium: true,
   large: true
 })
-const sourceOpen = ref(false)
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 
 type NavigationMode = 'projects' | 'layers' | 'reference'
@@ -70,15 +68,26 @@ const navigationModes: Array<{ label: string, value: NavigationMode, icon: strin
 ]
 
 const navigationMode = ref<NavigationMode>('projects')
-const compactActionsOpen = ref(false)
+const toolsOpen = ref(false)
 const visibilityOpen = ref(false)
-const isSheetViewport = ref(false)
 const projectsOpen = ref(false)
 const layersOpen = ref(false)
 const settingsOpen = ref(false)
 const referenceOpen = ref(false)
 const exportOpen = ref(false)
 const agentOpen = ref(false)
+const inspectorPinned = ref(false)
+const previewScrollRef = ref<HTMLElement | null>(null)
+const canvasPanX = ref(0)
+const canvasPanY = ref(0)
+const isCanvasPanning = ref(false)
+const suppressNextCanvasClick = ref(false)
+let panPointerId: number | null = null
+let panStartX = 0
+let panStartY = 0
+let panStartOffsetX = 0
+let panStartOffsetY = 0
+let panMoved = false
 
 const newProjectOpen = ref(false)
 const newProjectName = ref('')
@@ -104,6 +113,9 @@ const generatedSource = computed(() => exportResult.value.code ?? '')
 const blockingIssues = computed(() => exportResult.value.issues.filter(issue => issue.severity === 'blocking'))
 const warningIssues = computed(() => exportResult.value.issues.filter(issue => issue.severity === 'warning'))
 const exportReady = computed(() => generatedSource.value.length > 0)
+const previewPanStyle = computed(() => ({
+  transform: `translate3d(${canvasPanX.value}px, ${canvasPanY.value}px, 0)`
+}))
 
 const scopeLabel = computed(() => {
   if (activeSizes.value.length === WIDGET_SIZES.length) {
@@ -188,16 +200,6 @@ const selectedElementTitle = computed(() => {
   return element ? widgetElementLabel(element) : 'Edit selection'
 })
 
-const selectedElement = computed(() => {
-  const selection = project.value.selection
-  if (!selection) {
-    return null
-  }
-  return findWidgetElement(project.value.layouts[selection.size].root, selection.elementId)
-})
-
-const selectedElementType = computed(() => selectedElement.value?.type ?? 'element')
-const selectedElementVisible = computed(() => selectedElement.value?.visible ?? true)
 const selectedSizeLabel = computed(() => {
   const size = project.value.selection?.size
     ?? (previewView.value === 'all' ? structureSize.value : previewView.value)
@@ -215,9 +217,10 @@ const changeReceiptMessage = computed(() => (
 ))
 
 const inspectorOpen = computed({
-  get: () => project.value.selection !== null,
+  get: () => inspectorPinned.value || project.value.selection !== null,
   set: (open: boolean) => {
     if (!open) {
+      inspectorPinned.value = false
       clearSelection()
     }
   }
@@ -259,17 +262,45 @@ const agentStatusLabel = computed(() => {
   }
 })
 
-const agentStatusColor = computed(() => {
-  switch (webmcpStatus.value) {
-    case 'registered':
-      return 'success'
-    case 'registering':
-      return 'warning'
-    case 'error':
-      return 'error'
-    default:
-      return 'neutral'
+const statusDockMessage = computed(() => {
+  if (persistenceState.value === 'error') {
+    return 'Could not save locally'
   }
+  if (persistenceState.value === 'saving') {
+    return 'Saving locally…'
+  }
+  if (changeReceiptMessage.value) {
+    return changeReceiptMessage.value
+  }
+  if (project.value.selection) {
+    return `Selected ${selectedElementTitle.value} in the ${selectedSizeLabel.value.toLowerCase()} layout.`
+  }
+  return agentStatusLabel.value
+})
+
+const statusDockDetail = computed(() => (
+  statusDockMessage.value === agentStatusLabel.value ? null : agentStatusLabel.value
+))
+
+const statusDockExpanded = computed(() => (
+  Boolean(project.value.selection)
+  || Boolean(changeReceiptMessage.value)
+  || persistenceState.value === 'saving'
+  || persistenceState.value === 'error'
+  || webmcpStatus.value !== 'registered'
+))
+
+const statusDockColor = computed(() => {
+  if (persistenceState.value === 'error' || webmcpStatus.value === 'error') {
+    return 'error'
+  }
+  if (persistenceState.value === 'saving' || webmcpStatus.value === 'registering') {
+    return 'warning'
+  }
+  if (webmcpStatus.value === 'registered') {
+    return 'success'
+  }
+  return 'neutral'
 })
 
 function commitOperation(
@@ -333,17 +364,89 @@ function closeContextualSurfaces(): void {
   referenceOpen.value = false
   exportOpen.value = false
   agentOpen.value = false
-  compactActionsOpen.value = false
+  toolsOpen.value = false
   visibilityOpen.value = false
+}
+
+function startCanvasPan(event: PointerEvent): void {
+  if (event.button !== 0 || panPointerId !== null) {
+    return
+  }
+
+  const target = event.target instanceof Element ? event.target : null
+  if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
+    return
+  }
+
+  const viewport = previewScrollRef.value
+  if (!viewport) {
+    return
+  }
+
+  panPointerId = event.pointerId
+  panStartX = event.clientX
+  panStartY = event.clientY
+  panStartOffsetX = canvasPanX.value
+  panStartOffsetY = canvasPanY.value
+  panMoved = false
+  viewport.setPointerCapture(event.pointerId)
+}
+
+function moveCanvasPan(event: PointerEvent): void {
+  if (panPointerId !== event.pointerId) {
+    return
+  }
+
+  const deltaX = event.clientX - panStartX
+  const deltaY = event.clientY - panStartY
+  if (!panMoved && Math.hypot(deltaX, deltaY) < 4) {
+    return
+  }
+
+  panMoved = true
+  isCanvasPanning.value = true
+  canvasPanX.value = panStartOffsetX + deltaX
+  canvasPanY.value = panStartOffsetY + deltaY
+  event.preventDefault()
+}
+
+function finishCanvasPan(event: PointerEvent): void {
+  if (panPointerId !== event.pointerId) {
+    return
+  }
+
+  const viewport = previewScrollRef.value
+  const didPan = panMoved
+  panPointerId = null
+  panMoved = false
+  isCanvasPanning.value = false
+
+  if (viewport?.hasPointerCapture(event.pointerId)) {
+    viewport.releasePointerCapture(event.pointerId)
+  }
+
+  if (!didPan) {
+    return
+  }
+
+  suppressNextCanvasClick.value = true
+  window.setTimeout(() => {
+    suppressNextCanvasClick.value = false
+  }, 0)
+}
+
+function handleCanvasClickCapture(event: MouseEvent): void {
+  if (!suppressNextCanvasClick.value) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  suppressNextCanvasClick.value = false
 }
 
 function selectNavigationMode(mode: NavigationMode): void {
   navigationMode.value = mode
-  if (!isSheetViewport.value) {
-    closeContextualSurfaces()
-    return
-  }
-
   closeContextualSurfaces()
   if (mode === 'projects') {
     projectsOpen.value = true
@@ -364,11 +467,11 @@ function openLayers(): void {
 
 function openWidgetSettings(): void {
   closeContextualSurfaces()
-  if (isSheetViewport.value) {
-    settingsOpen.value = true
-    return
-  }
+  const keepPinnedInspector = inspectorPinned.value
   clearSelection()
+  if (!keepPinnedInspector) {
+    settingsOpen.value = true
+  }
 }
 
 function openReference(): void {
@@ -412,11 +515,6 @@ function setPreviewView(value: WidgetSize | 'all'): void {
   }
 }
 
-function showAllSizes(): void {
-  setPreviewView('all')
-  visibilityOpen.value = false
-}
-
 function setVisibility(size: WidgetSize, visible: boolean): void {
   const next = { ...previewVisibility.value, [size]: visible }
   if (!Object.values(next).some(Boolean)) {
@@ -430,48 +528,6 @@ function handleVisibilityChange(size: WidgetSize, event: Event): void {
   if (target instanceof HTMLInputElement) {
     setVisibility(size, target.checked)
   }
-}
-
-function setDesignScope(scope: DesignScope): void {
-  commitOperation({
-    type: 'set-design-scope',
-    expectedRevision: project.value.revision,
-    scope
-  })
-}
-
-function setFocusedScope(): void {
-  const size = previewView.value === 'all' ? structureSize.value : previewView.value
-  setDesignScope({ kind: 'one', size })
-}
-
-function setAllScope(): void {
-  setDesignScope({ kind: 'all' })
-}
-
-function toggleSelectedVisibility(): void {
-  const selection = project.value.selection
-  if (!selection || !selectedElement.value) {
-    return
-  }
-  commitOperation({
-    type: 'update-element-content',
-    expectedRevision: project.value.revision,
-    elementId: selection.elementId,
-    patch: { visible: !selectedElementVisible.value }
-  })
-}
-
-function enterSelectedGroup(): void {
-  const selection = project.value.selection
-  const element = selectedElement.value
-  const child = element && (element.type === 'group' || element.type === 'repeat')
-    ? element.children[0]
-    : null
-  if (!selection || !child) {
-    return
-  }
-  selectElement({ size: selection.size, elementId: child.id })
 }
 
 function finishAgentConfirmation(confirmed: boolean): void {
@@ -804,18 +860,6 @@ function downloadExport(): void {
   URL.revokeObjectURL(href)
 }
 
-function openSourceViewer(): void {
-  exportOpen.value = false
-  sourceOpen.value = true
-}
-
-function downloadAndClose(): void {
-  downloadExport()
-  if (exportReady.value) {
-    exportOpen.value = false
-  }
-}
-
 let previewMediaQuery: MediaQueryList | null = null
 
 function syncPreviewView(event?: MediaQueryList | MediaQueryListEvent): void {
@@ -823,10 +867,6 @@ function syncPreviewView(event?: MediaQueryList | MediaQueryListEvent): void {
   if (isNarrow) {
     previewView.value = 'medium'
   }
-}
-
-function syncSheetViewport(): void {
-  isSheetViewport.value = window.matchMedia('(max-width: 56.25rem)').matches
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -850,7 +890,7 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 
   if (event.key === 'Escape') {
-    if (projectsOpen.value || layersOpen.value || settingsOpen.value || referenceOpen.value || exportOpen.value || agentOpen.value || visibilityOpen.value) {
+    if (projectsOpen.value || layersOpen.value || settingsOpen.value || referenceOpen.value || exportOpen.value || agentOpen.value || toolsOpen.value || visibilityOpen.value) {
       closeContextualSurfaces()
       return
     }
@@ -871,14 +911,11 @@ onMounted(() => {
   previewMediaQuery = window.matchMedia('(max-width: 58rem)')
   syncPreviewView()
   previewMediaQuery.addEventListener('change', syncPreviewView)
-  syncSheetViewport()
-  window.addEventListener('resize', syncSheetViewport)
   window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   previewMediaQuery?.removeEventListener('change', syncPreviewView)
-  window.removeEventListener('resize', syncSheetViewport)
   window.removeEventListener('keydown', handleKeydown)
   if (referenceUrl.value) {
     URL.revokeObjectURL(referenceUrl.value)
@@ -900,155 +937,49 @@ onBeforeUnmount(() => {
       <header class="studio-topbar">
         <div class="topbar-leading">
           <UButton
-            label="Projects"
             icon="i-lucide-panels-top-left"
             color="neutral"
             variant="ghost"
             size="sm"
             class="topbar-projects-trigger"
+            aria-label="Projects"
+            title="Projects"
             @click="openProjects"
           />
-          <span class="topbar-divider" aria-hidden="true" />
           <div class="project-identity">
             <span class="wordmark">Widgetr</span>
-            <span class="project-name" :title="project.name">{{ project.name }}</span>
           </div>
-        </div>
-
-        <div class="topbar-center">
-          <div class="size-controls" role="group" aria-label="Widget sizes">
-            <UButton
-              v-for="size in WIDGET_SIZES"
-              :key="size"
-              :label="size[0]!.toUpperCase() + size.slice(1)"
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              class="size-control"
-              :class="{ 'size-control-active': previewView === size }"
-              :aria-pressed="previewView === size"
-              @click="focusPreview(size)"
-            />
-            <UPopover v-model:open="visibilityOpen" :content="{ align: 'center', sideOffset: 8 }">
-              <UButton
-                label="Visibility"
-                icon="i-lucide-sliders-horizontal"
-                color="neutral"
-                variant="soft"
-                size="sm"
-                class="visibility-control"
-              />
-              <template #content>
-                <div class="visibility-popover">
-                  <div class="visibility-popover-heading">
-                    <strong>Visible in all-sizes view</strong>
-                    <span>Hidden sizes remain available above.</span>
-                  </div>
-                  <label v-for="size in WIDGET_SIZES" :key="size" class="visibility-row">
-                    <input
-                      type="checkbox"
-                      :checked="previewVisibility[size]"
-                      @change="handleVisibilityChange(size, $event)"
-                    >
-                    <span>{{ size[0]!.toUpperCase() + size.slice(1) }}</span>
-                  </label>
-                  <UButton
-                    label="Show all sizes"
-                    icon="i-lucide-layout-grid"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    block
-                    @click="showAllSizes"
-                  />
-                </div>
-              </template>
-            </UPopover>
-          </div>
-          <span class="scope-summary" :title="`Changes currently apply to ${scopeLabel.toLowerCase()}`">
-            <UIcon name="i-lucide-target" aria-hidden="true" />
-            {{ scopeControlLabel }}
-          </span>
         </div>
 
         <div class="topbar-trailing">
-          <div class="history-actions" aria-label="Session history">
-          <UButton
-            icon="i-lucide-undo-2"
-            color="neutral"
-            variant="ghost"
-            :disabled="historyPast.length === 0"
-            aria-label="Undo"
-            @click="undo"
-          />
-          <UButton
-            icon="i-lucide-redo-2"
-            color="neutral"
-            variant="ghost"
-            :disabled="historyFuture.length === 0"
-            aria-label="Redo"
-            @click="redo"
-          />
-          </div>
-          <UButton
-            label="New project"
-            icon="i-lucide-plus"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            class="topbar-new-project"
-            @click="openNewProject"
-          />
-          <UPopover
-            v-model:open="agentOpen"
-            :content="{ align: 'end', sideOffset: 8 }"
-            :ui="{ content: 'w-96 max-w-[calc(100vw-2rem)] p-0' }"
-          >
+          <div v-if="historyPast.length || historyFuture.length" class="history-actions" aria-label="Session history">
             <UButton
-              :label="agentStatusLabel"
-              icon="i-lucide-bot"
-              :color="agentStatusColor"
-              variant="soft"
-              size="sm"
-              class="assistant-status-button"
-            />
-            <template #content>
-              <WidgetAgentToolsPanel
-                :status="webmcpStatus"
-                :context="webmcpContext"
-                :tool-names="webmcpRegisteredToolNames"
-                :error="webmcpError"
-              />
-            </template>
-          </UPopover>
-          <UPopover
-            v-model:open="compactActionsOpen"
-            :content="{ align: 'end', sideOffset: 8 }"
-            :ui="{ content: 'w-64 max-w-[calc(100vw-2rem)] p-2' }"
-            class="compact-actions"
-          >
-            <UButton
-              icon="i-lucide-ellipsis"
+              icon="i-lucide-undo-2"
               color="neutral"
               variant="ghost"
-              size="sm"
-              aria-label="More actions"
+              :disabled="historyPast.length === 0"
+              aria-label="Undo"
+              title="Undo"
+              @click="undo"
             />
-            <template #content>
-              <div class="compact-actions-menu">
-                <UButton label="New project" icon="i-lucide-plus" color="neutral" variant="ghost" block @click="openNewProject" />
-                <UButton label="Widget settings" icon="i-lucide-settings-2" color="neutral" variant="ghost" block @click="openWidgetSettings" />
-                <UButton label="Layers" icon="i-lucide-layers-2" color="neutral" variant="ghost" block @click="openLayers" />
-                <UButton label="Reference" icon="i-lucide-image-plus" color="neutral" variant="ghost" block @click="openReference" />
-              </div>
-            </template>
-          </UPopover>
+            <UButton
+              icon="i-lucide-redo-2"
+              color="neutral"
+              variant="ghost"
+              :disabled="historyFuture.length === 0"
+              aria-label="Redo"
+              title="Redo"
+              @click="redo"
+            />
+          </div>
           <UButton
             label="Export"
             icon="i-lucide-download"
             color="primary"
             size="sm"
             class="topbar-export"
+            aria-label="Export"
+            title="Export"
             @click="openExport"
           />
         </div>
@@ -1176,53 +1107,96 @@ onBeforeUnmount(() => {
         </aside>
 
         <section class="canvas-panel" aria-labelledby="canvas-heading">
-          <div class="canvas-toolbar">
-            <div>
-              <span class="panel-kicker">LIVE DOCUMENT</span>
-              <h2 id="canvas-heading">Canvas</h2>
-              <p class="canvas-subtitle">The preview is the document. Select an element to edit it.</p>
+          <h1 id="canvas-heading" class="sr-only">Canvas</h1>
+
+          <div class="canvas-project-title" aria-label="Current project">
+            <h2 id="canvas-project-title-heading">{{ project.name }}</h2>
+          </div>
+
+          <div class="canvas-floating-controls" aria-label="Canvas controls">
+            <div class="size-controls" role="group" aria-label="Widget sizes">
+              <UButton
+                v-for="size in WIDGET_SIZES"
+                :key="size"
+                :label="size[0]!.toUpperCase() + size.slice(1)"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="size-control"
+                :class="{ 'size-control-active': previewView === size }"
+                :aria-pressed="previewView === size"
+                @click="focusPreview(size)"
+              />
+              <UButton
+                label="All"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="size-control size-control-all"
+                :class="{ 'size-control-active': previewView === 'all' }"
+                aria-label="All sizes"
+                title="All sizes"
+                :aria-pressed="previewView === 'all'"
+                @click="setPreviewView('all')"
+              />
+              <UPopover
+                v-model:open="visibilityOpen"
+                :content="{ align: 'center', sideOffset: 8 }"
+                :ui="{ content: 'bg-transparent p-0 shadow-none ring-0' }"
+              >
+                <UButton
+                  label="Visibility"
+                  icon="i-lucide-sliders-horizontal"
+                  color="neutral"
+                  variant="soft"
+                  size="sm"
+                  class="visibility-control"
+                />
+                <template #content>
+                  <div class="visibility-popover">
+                    <div class="visibility-popover-heading">
+                      <strong>Show in overview</strong>
+                    </div>
+                    <label v-for="size in WIDGET_SIZES" :key="size" class="visibility-row">
+                      <input
+                        type="checkbox"
+                        :checked="previewVisibility[size]"
+                        @change="handleVisibilityChange(size, $event)"
+                      >
+                      <span>{{ size[0]!.toUpperCase() + size.slice(1) }}</span>
+                    </label>
+                  </div>
+                </template>
+              </UPopover>
             </div>
-            <div class="canvas-actions">
-              <UButton label="Widget settings" icon="i-lucide-settings-2" color="neutral" variant="ghost" size="sm" @click="openWidgetSettings" />
-              <UButton label="Layers" icon="i-lucide-layers-2" color="neutral" variant="ghost" size="sm" @click="openLayers" />
-              <UButton label="Reference" icon="i-lucide-image-plus" color="neutral" variant="ghost" size="sm" @click="openReference" />
-            </div>
+
+            <UPopover
+              v-model:open="toolsOpen"
+              :content="{ align: 'center', sideOffset: 8 }"
+              :ui="{ content: 'w-64 max-w-[calc(100vw-2rem)] bg-transparent p-0 shadow-none ring-0' }"
+            >
+              <UButton
+                icon="i-lucide-sliders-vertical"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="floating-tools-trigger"
+                aria-label="Tools"
+                title="Tools"
+              />
+              <template #content>
+                <div class="tools-menu">
+                  <UButton label="Projects" icon="i-lucide-folder-kanban" color="neutral" variant="ghost" block @click="openProjects" />
+                  <UButton label="Layers" icon="i-lucide-layers-2" color="neutral" variant="ghost" block @click="openLayers" />
+                  <UButton label="Reference" icon="i-lucide-image-plus" color="neutral" variant="ghost" block @click="openReference" />
+                  <UButton label="Widget settings" icon="i-lucide-settings-2" color="neutral" variant="ghost" block @click="openWidgetSettings" />
+                  <UButton label="New project" icon="i-lucide-plus" color="neutral" variant="ghost" block @click="openNewProject" />
+                </div>
+              </template>
+            </UPopover>
           </div>
 
           <div class="canvas-stage">
-            <div class="stage-toolbar">
-              <div class="stage-view-label">
-                <UIcon name="i-lucide-scan" aria-hidden="true" />
-                <span>{{ previewView === 'all' ? 'All sizes' : `${selectedSizeLabel} focused` }}</span>
-              </div>
-              <span class="stage-size-note">{{ visiblePreviewSizes.length }} visible output{{ visiblePreviewSizes.length === 1 ? '' : 's' }}</span>
-            </div>
-
-            <div v-if="project.selection" class="selection-context" aria-live="polite">
-              <div class="selection-context-copy">
-                <span class="selection-label">Selection</span>
-                <strong>{{ selectedElementTitle }}</strong>
-                <span>{{ selectedSizeLabel }} · {{ selectedElementType }}</span>
-              </div>
-              <div class="selection-actions">
-                <UButton label="Open inspector" icon="i-lucide-panel-right" color="neutral" variant="soft" size="sm" @click="inspectorOpen = true" />
-                <UButton :label="selectedElementVisible ? 'Hide' : 'Show'" :icon="selectedElementVisible ? 'i-lucide-eye-off' : 'i-lucide-eye'" color="neutral" variant="ghost" size="sm" @click="toggleSelectedVisibility" />
-                <UPopover :content="{ align: 'end', sideOffset: 8 }">
-                  <UButton label="Scope" icon="i-lucide-target" color="neutral" variant="ghost" size="sm" />
-                  <template #content>
-                    <div class="scope-popover">
-                      <span class="panel-kicker">APPLY CHANGES TO</span>
-                      <UButton label="This size" :variant="activeSizes.length === 1 ? 'soft' : 'ghost'" color="primary" block @click="setFocusedScope" />
-                      <UButton label="All sizes" :variant="activeSizes.length === WIDGET_SIZES.length ? 'soft' : 'ghost'" color="primary" block @click="setAllScope" />
-                      <span v-if="activeSizes.length === 2" class="scope-popover-note">Selected sizes: {{ scopeLabel }}</span>
-                    </div>
-                  </template>
-                </UPopover>
-                <UButton v-if="selectedElement && (selectedElement.type === 'group' || selectedElement.type === 'repeat')" label="Enter group" icon="i-lucide-corner-down-right" color="neutral" variant="ghost" size="sm" @click="enterSelectedGroup" />
-                <UButton label="Clear" icon="i-lucide-x" color="neutral" variant="ghost" size="sm" @click="clearSelection" />
-              </div>
-            </div>
-
             <UAlert
               v-if="lastResult && !lastResult.ok"
               class="operation-result"
@@ -1233,16 +1207,22 @@ onBeforeUnmount(() => {
               :description="lastResult.message"
             />
 
-            <div v-if="changeReceiptMessage" class="change-receipt" aria-live="polite">
-              <span class="receipt-icon"><UIcon name="i-lucide-check" aria-hidden="true" /></span>
-              <span class="receipt-copy">{{ changeReceiptMessage }}</span>
-              <UButton v-if="historyPast.length" label="Undo" color="neutral" variant="ghost" size="xs" @click="undo" />
-            </div>
-
-            <div class="preview-scroll">
+            <div
+              ref="previewScrollRef"
+              class="preview-scroll"
+              :class="{ 'is-panning': isCanvasPanning }"
+              aria-label="Canvas surface. Drag to pan."
+              @pointerdown="startCanvasPan"
+              @pointermove="moveCanvasPan"
+              @pointerup="finishCanvasPan"
+              @pointercancel="finishCanvasPan"
+              @lostpointercapture="finishCanvasPan"
+              @click.capture="handleCanvasClickCapture"
+            >
               <div
                 class="preview-grid"
                 :class="{ 'preview-grid-single': visiblePreviewSizes.length === 1 }"
+                :style="previewPanStyle"
               >
                 <WidgetPreview
                   v-for="size in visiblePreviewSizes"
@@ -1255,15 +1235,6 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <footer class="canvas-footer">
-            <span class="assistant-inline-status" :class="`assistant-inline-status-${webmcpStatus}`" aria-live="polite">
-              <span class="status-dot" aria-hidden="true" />
-              {{ agentStatusLabel }}
-            </span>
-            <span class="canvas-footer-separator" aria-hidden="true" />
-            <span>{{ persistenceState === 'saving' ? 'Saving locally…' : persistenceState === 'error' ? 'Could not save locally' : 'Saved locally' }}</span>
-            <span class="canvas-footer-scope">{{ scopeControlLabel }} · {{ scopeLabel }}</span>
-          </footer>
         </section>
 
         <aside class="studio-inspector" aria-label="Inspector">
@@ -1295,11 +1266,67 @@ onBeforeUnmount(() => {
           />
         </aside>
       </section>
+
+      <Teleport to="body">
+        <div
+          class="canvas-status-dock-shell"
+          :class="{ 'canvas-status-dock-shell-expanded': statusDockExpanded }"
+        >
+          <UPopover
+            v-model:open="agentOpen"
+            :content="{ align: 'center', side: 'top', sideOffset: 12 }"
+            :ui="{ content: 'w-96 max-w-[calc(100vw-2rem)] bg-transparent p-0 shadow-none ring-0' }"
+          >
+            <button
+              type="button"
+              class="canvas-status-trigger"
+              :class="[
+                `canvas-status-trigger-${statusDockColor}`,
+                { 'canvas-status-trigger-expanded': statusDockExpanded }
+              ]"
+              :aria-label="agentStatusLabel"
+              :title="agentStatusLabel"
+            >
+              <span class="status-dock-icon" aria-hidden="true">
+                <UIcon name="i-lucide-bot" />
+              </span>
+              <span v-if="statusDockExpanded" class="status-dock-copy" aria-live="polite">
+                <span class="status-dock-message">{{ statusDockMessage }}</span>
+                <span v-if="statusDockDetail" class="status-dock-detail">{{ statusDockDetail }}</span>
+              </span>
+              <span class="status-dock-dot" aria-hidden="true" />
+            </button>
+            <template #content>
+              <WidgetAgentToolsPanel
+                :status="webmcpStatus"
+                :context="webmcpContext"
+                :tool-names="webmcpRegisteredToolNames"
+                :error="webmcpError"
+              />
+            </template>
+          </UPopover>
+          <UButton
+            v-if="changeReceiptMessage && historyPast.length"
+            label="Undo"
+            color="neutral"
+            variant="soft"
+            size="xs"
+            class="canvas-status-undo"
+            aria-label="Undo last change"
+            title="Undo last change"
+            @click="undo"
+          />
+        </div>
+      </Teleport>
     </template>
 
     <USlideover
       v-model:open="projectsOpen"
       side="left"
+      :overlay="false"
+      :dismissible="false"
+      :modal="false"
+      inset
       title="Projects"
       description="Switch between projects saved in this browser."
       :ui="{ content: 'sm:max-w-sm', body: 'p-0 sm:p-0' }"
@@ -1323,6 +1350,10 @@ onBeforeUnmount(() => {
     <USlideover
       v-model:open="layersOpen"
       side="left"
+      :overlay="false"
+      :dismissible="false"
+      :modal="false"
+      inset
       title="Layers"
       description="Select an element to edit it."
       :ui="{ content: 'sm:max-w-sm' }"
@@ -1354,6 +1385,10 @@ onBeforeUnmount(() => {
 
     <USlideover
       v-model:open="settingsOpen"
+      :overlay="false"
+      :dismissible="false"
+      :modal="false"
+      inset
       title="Widget settings"
       description="Set the surface and size scope for this widget."
       :ui="{ content: 'sm:max-w-md', body: 'p-0 sm:p-0' }"
@@ -1373,6 +1408,10 @@ onBeforeUnmount(() => {
 
     <USlideover
       v-model:open="referenceOpen"
+      :overlay="false"
+      :dismissible="false"
+      :modal="false"
+      inset
       title="Reference"
       description="Keep a local visual direction nearby while you design."
       :ui="{ content: 'sm:max-w-md' }"
@@ -1425,16 +1464,20 @@ onBeforeUnmount(() => {
       </template>
     </USlideover>
 
-    <USlideover
+    <UModal
       v-model:open="exportOpen"
-      title="Export widget"
-      description="One standalone Scriptable file for all three sizes."
-      :ui="{ content: 'sm:max-w-md' }"
+      class="export-modal-content"
+      title="Export your widget"
+      description="Take this generated Scriptable file to your iPhone or iPad."
+      :ui="{ body: 'p-0', footer: 'export-modal-footer' }"
     >
       <template #body>
-        <section class="drawer-section export-panel" aria-labelledby="export-heading">
-          <div class="export-status-row">
-            <span>Export status</span>
+        <section class="export-modal-body" aria-labelledby="export-heading">
+          <div class="export-intro">
+            <div>
+              <h2 id="export-heading">Ready to take with you</h2>
+              <p>Download the file or copy it into Scriptable. It includes all three widget sizes from this project.</p>
+            </div>
             <UBadge
               :color="exportStatusColor"
               variant="soft"
@@ -1459,9 +1502,25 @@ onBeforeUnmount(() => {
             :description="warningDescription"
           />
 
-          <p class="export-note">
-            {{ generatedSource.length.toLocaleString() }} characters. The preview, copy, and download use the same generated source.
-          </p>
+          <section class="export-next-steps" aria-labelledby="export-next-steps-heading">
+            <h3 id="export-next-steps-heading">Next steps</h3>
+            <ol>
+              <li>Copy the source below or download the <strong>.js</strong> file.</li>
+              <li>Open Scriptable on your iPhone or iPad, create a script, and paste it in.</li>
+              <li>Run it once, then add a Scriptable widget and choose that script.</li>
+            </ol>
+          </section>
+
+          <section class="export-code-panel" aria-labelledby="export-code-heading">
+            <div class="export-code-heading">
+              <div>
+                <h3 id="export-code-heading">Scriptable source</h3>
+                <p>{{ generatedSource.length.toLocaleString() }} characters</p>
+              </div>
+              <UIcon name="i-lucide-code-2" aria-hidden="true" />
+            </div>
+            <pre class="export-code" tabindex="0"><code>{{ generatedSource }}</code></pre>
+          </section>
         </section>
       </template>
       <template #footer>
@@ -1471,7 +1530,7 @@ onBeforeUnmount(() => {
             icon="i-lucide-download"
             color="primary"
             :disabled="!exportReady"
-            @click="downloadAndClose"
+            @click="downloadExport"
           />
           <UButton
             :label="copyButtonLabel"
@@ -1481,35 +1540,45 @@ onBeforeUnmount(() => {
             :disabled="!exportReady"
             @click="copyExport"
           />
-          <UButton
-            label="View source"
-            icon="i-lucide-code-2"
-            color="neutral"
-            variant="outline"
-            :disabled="!exportReady"
-            @click="openSourceViewer"
-          />
         </div>
       </template>
-    </USlideover>
+    </UModal>
 
     <USlideover
-      v-if="project.selection && isSheetViewport"
       v-model:open="inspectorOpen"
-      :title="selectedElementTitle"
-      description="Edit the selected element and choose where changes apply."
+      :overlay="false"
+      :dismissible="false"
+      :modal="false"
+      inset
+      :title="project.selection ? selectedElementTitle : 'Widget inspector'"
+      :description="project.selection ? 'Edit the selected element and choose where changes apply.' : 'Adjust widget settings while you work.'"
       :ui="{ content: 'sm:max-w-md', body: 'p-0 sm:p-0' }"
     >
+      <template #actions>
+        <UButton
+          :icon="inspectorPinned ? 'i-lucide-pin-off' : 'i-lucide-pin'"
+          :color="inspectorPinned ? 'primary' : 'neutral'"
+          :variant="inspectorPinned ? 'soft' : 'ghost'"
+          size="sm"
+          class="inspector-pin-button"
+          :aria-label="inspectorPinned ? 'Unpin inspector' : 'Pin inspector'"
+          :title="inspectorPinned ? 'Unpin inspector' : 'Pin inspector'"
+          :aria-pressed="inspectorPinned"
+          @click="inspectorPinned = !inspectorPinned"
+        />
+      </template>
       <template #body>
         <WidgetInspector
           class="slideover-inspector"
           embedded
+          :mode="project.selection ? 'element' : 'widget'"
           :project="project"
           :selection="project.selection"
+          :focused-size="previewView === 'all' ? structureSize : previewView"
           @operation="commitOperation"
         />
       </template>
-      <template #footer>
+      <template #footer v-if="project.selection">
         <UButton
           label="Clear selection"
           icon="i-lucide-x"
@@ -1617,24 +1686,6 @@ onBeforeUnmount(() => {
     </UModal>
 
     <UModal
-      v-model:open="sourceOpen"
-      title="Generated Scriptable source"
-      description="Read-only output from the current canonical widget state."
-    >
-      <template #body>
-        <UTextarea
-          :model-value="generatedSource"
-          class="export-code w-full"
-          aria-label="Generated Scriptable source"
-          readonly
-          :rows="24"
-          wrap="off"
-          spellcheck="false"
-        />
-      </template>
-    </UModal>
-
-    <UModal
       v-model:open="agentConfirmationOpen"
       :title="agentConfirmation?.title"
       description="Widgetr will not apply this agent-requested change until you confirm it."
@@ -1705,10 +1756,7 @@ onBeforeUnmount(() => {
 .scope-summary,
 .history-actions,
 .canvas-actions,
-.selection-actions,
 .canvas-footer,
-.stage-toolbar,
-.stage-view-label,
 .assistant-inline-status,
 .navigation-section-heading,
 .inspector-breadcrumb,
@@ -1756,16 +1804,6 @@ onBeforeUnmount(() => {
   letter-spacing: -0.02em;
 }
 
-.project-name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--widgetr-muted);
-  font-size: 0.78rem;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .size-controls {
   gap: 0.15rem;
   padding: 0.15rem;
@@ -1782,6 +1820,10 @@ onBeforeUnmount(() => {
   background: var(--widgetr-accent) !important;
   color: white !important;
   box-shadow: 0 1px 2px rgb(29 29 31 / 18%);
+}
+
+:global(.dark) .size-control-active {
+  color: var(--widgetr-stage) !important;
 }
 
 .visibility-control {
@@ -1819,8 +1861,7 @@ onBeforeUnmount(() => {
 }
 
 .compact-actions-menu,
-.visibility-popover,
-.scope-popover {
+.visibility-popover {
   display: grid;
   gap: 0.35rem;
   padding: 0.65rem;
@@ -1831,21 +1872,18 @@ onBeforeUnmount(() => {
 }
 
 .visibility-popover-heading {
-  display: grid;
-  gap: 0.15rem;
-  padding: 0.2rem 0.25rem 0.45rem;
+  display: block;
+  padding: 0.1rem 0.25rem 0.35rem;
   border-bottom: 1px solid var(--widgetr-border);
 }
 
-.visibility-popover-heading strong,
-.scope-popover-note {
+.visibility-popover-heading strong {
   color: var(--widgetr-ink);
   font-size: 0.72rem;
   font-weight: 600;
 }
 
-.visibility-popover-heading span,
-.scope-popover-note {
+.visibility-popover-heading span {
   color: var(--widgetr-muted);
   font-size: 0.65rem;
   line-height: 1.4;
@@ -2092,78 +2130,6 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--widgetr-stage) 88%, var(--widgetr-pane-solid));
 }
 
-.stage-toolbar {
-  min-height: 2.75rem;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0 0.9rem;
-  border-bottom: 1px solid var(--widgetr-border);
-  color: var(--widgetr-muted);
-  font-size: 0.65rem;
-}
-
-.stage-view-label {
-  gap: 0.4rem;
-  color: var(--widgetr-ink);
-  font-weight: 600;
-}
-
-.stage-view-label .i-lucide-scan {
-  width: 0.9rem;
-  height: 0.9rem;
-  color: var(--widgetr-accent);
-}
-
-.stage-size-note {
-  color: var(--widgetr-muted);
-}
-
-.selection-context {
-  display: flex;
-  min-height: 3.7rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-  padding: 0.65rem 0.9rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--widgetr-accent) 25%, var(--widgetr-border));
-  background: color-mix(in srgb, var(--widgetr-accent) 7%, transparent);
-}
-
-.selection-context-copy {
-  display: grid;
-  min-width: 0;
-  gap: 0.18rem;
-}
-
-.selection-label {
-  color: var(--widgetr-accent-strong);
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.selection-context-copy strong {
-  overflow: hidden;
-  color: var(--widgetr-ink);
-  font-size: 0.78rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selection-context-copy > span:last-child {
-  color: var(--widgetr-muted);
-  font-size: 0.64rem;
-  text-transform: capitalize;
-}
-
-.selection-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.15rem;
-}
-
 .operation-result {
   margin: 0.75rem 0.9rem 0;
 }
@@ -2183,18 +2149,18 @@ onBeforeUnmount(() => {
 
 .receipt-icon {
   display: grid;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.6rem;
+  height: 1.6rem;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 999px;
-  background: var(--widgetr-success);
-  color: white;
+  background: color-mix(in srgb, var(--widgetr-accent) 14%, transparent);
+  color: var(--widgetr-accent);
 }
 
-.receipt-icon .i-lucide-check {
-  width: 0.8rem;
-  height: 0.8rem;
+.receipt-icon .i-lucide-bot {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .receipt-copy {
@@ -2215,7 +2181,10 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: clamp(1rem, 4vw, 2.75rem);
+  cursor: grab;
+  touch-action: none;
 }
 
 .preview-grid {
@@ -2226,6 +2195,12 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: max-content;
   min-width: min(100%, 10rem);
+  will-change: transform;
+}
+
+.preview-scroll.is-panning {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .preview-grid-single {
@@ -2277,6 +2252,11 @@ onBeforeUnmount(() => {
   animation: status-pulse 1.4s ease-in-out infinite;
 }
 
+.assistant-inline-status-saving .status-dot {
+  background: var(--widgetr-warning);
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+
 .assistant-inline-status-error .status-dot {
   background: var(--widgetr-danger);
 }
@@ -2323,6 +2303,12 @@ onBeforeUnmount(() => {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+:global(.inspector-pin-button) {
+  margin-inline-start: auto;
+  margin-inline-end: 2rem;
+  border-radius: 999px;
 }
 
 .studio-inspector-content {
@@ -2395,23 +2381,6 @@ onBeforeUnmount(() => {
   font-size: 0.58rem;
 }
 
-.export-panel {
-  gap: 1rem;
-}
-
-.export-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  color: var(--widgetr-muted);
-  font-size: 0.75rem;
-}
-
-.export-note {
-  margin: 0;
-}
-
 .export-actions,
 .modal-actions {
   flex-wrap: wrap;
@@ -2422,16 +2391,157 @@ onBeforeUnmount(() => {
   align-items: stretch;
 }
 
-.export-code :deep(textarea) {
-  min-height: 34rem;
+.modal-copy {
+  margin: 0;
+}
+
+.export-modal-body {
+  display: grid;
+  gap: 1.15rem;
+  padding: 1.35rem 1.5rem 1.5rem;
+}
+
+.export-intro,
+.export-code-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.export-intro h2,
+.export-next-steps h3,
+.export-code-heading h3 {
+  margin: 0;
+  color: var(--widgetr-ink);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.export-intro h2 {
+  font-size: 1.05rem;
+}
+
+.export-intro p,
+.export-code-heading p,
+.export-next-steps li {
+  color: var(--widgetr-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.export-intro p {
+  max-width: 54ch;
+  margin: 0.35rem 0 0;
+}
+
+.export-next-steps {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-accent) 20%, var(--widgetr-border));
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--widgetr-accent) 6%, transparent);
+}
+
+.export-next-steps h3,
+.export-code-heading h3 {
+  font-size: 0.8rem;
+}
+
+.export-next-steps ol {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.15rem;
+  list-style: decimal;
+}
+
+.export-next-steps li {
+  padding-left: 0.15rem;
+}
+
+.export-next-steps strong {
+  color: var(--widgetr-ink);
+  font-weight: 650;
+}
+
+.export-code-panel {
+  display: grid;
+  min-height: 0;
+  gap: 0.55rem;
+}
+
+.export-code-heading {
+  align-items: center;
+}
+
+.export-code-heading p {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.export-code-heading > .i-lucide-code-2 {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  color: var(--widgetr-muted);
+}
+
+.export-code {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: min(34dvh, 22rem);
+  margin: 0;
+  overflow: auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--widgetr-border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--widgetr-stage) 78%, var(--widgetr-pane-solid));
+  color: var(--widgetr-ink);
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  line-height: 1.5;
+  line-height: 1.55;
+  tab-size: 2;
   white-space: pre;
 }
 
-.modal-copy {
-  margin: 0;
+.export-code:focus-visible {
+  outline: 2px solid var(--widgetr-accent);
+  outline-offset: 2px;
+}
+
+:global(body > [data-slot="content"].export-modal-content) {
+  width: min(58rem, calc(100vw - 2rem)) !important;
+  max-width: none !important;
+  max-height: calc(100dvh - 2rem) !important;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 14%, transparent);
+  border-radius: 1.5rem;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 92%, transparent);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 25%), 0 0 0 1px color-mix(in srgb, var(--widgetr-ink) 5%, transparent);
+  backdrop-filter: blur(28px) saturate(1.2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
+}
+
+:global(body > [data-slot="content"].export-modal-content > [data-slot="header"]) {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--widgetr-border);
+  background: transparent;
+}
+
+:global(body > [data-slot="content"].export-modal-content > [data-slot="footer"]) {
+  justify-content: flex-end;
+  padding: 0.95rem 1.5rem 1.2rem;
+  border-top: 1px solid var(--widgetr-border);
+  background: transparent;
+}
+
+.export-actions {
+  justify-content: flex-end;
+  width: 100%;
+  gap: 0.65rem;
 }
 
 @keyframes receipt-in {
@@ -2476,10 +2586,6 @@ onBeforeUnmount(() => {
 
   .assistant-status-button :deep(span:not([class*="icon"])) {
     display: none;
-  }
-
-  .project-name {
-    max-width: 8rem;
   }
 
   .topbar-center {
@@ -2591,8 +2697,7 @@ onBeforeUnmount(() => {
   .compact-actions,
   .history-actions :deep(button),
   .compact-actions :deep(button),
-  .canvas-actions :deep(button),
-  .selection-actions :deep(button) {
+  .canvas-actions :deep(button) {
     min-height: var(--widgetr-touch-target);
   }
 
@@ -2658,16 +2763,6 @@ onBeforeUnmount(() => {
 
   .canvas-stage {
     margin: 0.55rem;
-  }
-
-  .selection-context {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .selection-actions {
-    width: 100%;
-    justify-content: flex-start;
   }
 
   .preview-scroll {
@@ -2756,16 +2851,743 @@ onBeforeUnmount(() => {
     height: 0.9rem;
   }
 
-  .stage-toolbar {
-    padding: 0 0.7rem;
-  }
-
-  .stage-size-note {
-    display: none;
-  }
-
   .canvas-actions :deep(button) {
     min-height: var(--widgetr-touch-target);
   }
+}
+
+/* Canvas-first revision: the document owns the viewport; controls recede into glass. */
+.studio-shell {
+  position: relative;
+  height: 100dvh;
+  min-height: 100dvh;
+  background: var(--widgetr-stage);
+}
+
+.studio-topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem max(1rem, env(safe-area-inset-right)) 0.55rem max(1rem, env(safe-area-inset-left));
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.studio-topbar > * {
+  pointer-events: auto;
+}
+
+.topbar-leading,
+.topbar-trailing {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 10%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 62%, transparent);
+  box-shadow: 0 12px 30px rgb(29 29 31 / 8%);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+}
+
+.topbar-leading {
+  max-width: min(30rem, calc(100vw - 15rem));
+}
+
+.topbar-trailing {
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.topbar-projects-trigger,
+.history-actions :deep(button),
+.topbar-export {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border-radius: 999px;
+  justify-content: center;
+}
+
+.assistant-status-button {
+  width: auto;
+  min-width: 0;
+  min-height: 2.25rem;
+  max-width: 12rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  justify-content: center;
+}
+
+.topbar-projects-trigger {
+  color: var(--widgetr-ink);
+}
+
+.topbar-projects-trigger :deep(span:not([class*="icon"])),
+.topbar-export :deep(span:not([class*="icon"])) {
+  display: none;
+}
+
+.assistant-status-button :deep([data-slot="label"]) {
+  display: inline-flex;
+}
+
+.topbar-divider {
+  display: none;
+}
+
+.project-identity {
+  gap: 0.4rem;
+  padding: 0 0.55rem 0 0.35rem;
+}
+
+.wordmark {
+  color: var(--widgetr-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.history-actions {
+  padding: 0;
+  border: 0;
+}
+
+.assistant-status-button {
+  max-width: none;
+  padding-right: 0.35rem;
+  padding-left: 0.35rem;
+  border-color: transparent !important;
+  border-radius: 0.75rem;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.assistant-status-button :deep([data-slot="leadingIcon"]) {
+  display: none;
+}
+
+.assistant-status-button:hover {
+  background: color-mix(in srgb, var(--widgetr-ink) 6%, transparent) !important;
+}
+
+.topbar-export {
+  background: var(--widgetr-accent) !important;
+  color: white !important;
+}
+
+.studio-workspace {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.studio-navigation,
+.studio-inspector {
+  display: none;
+}
+
+.studio-shell :deep([data-slot="content"][data-side="left"]),
+.studio-shell :deep([data-slot="content"][data-side="right"]) {
+  border-color: color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
+  background: var(--widgetr-pane-solid);
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 88%, transparent);
+  box-shadow: 0 20px 64px rgb(29 29 31 / 18%);
+  backdrop-filter: blur(28px) saturate(1.2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
+}
+
+/* Slideover surfaces are temporary tools, not a second app shell. */
+:global(body > [data-slot="content"][data-side="left"]),
+:global(body > [data-slot="content"][data-side="right"]) {
+  top: calc(var(--widgetr-topbar-height) + 0.75rem) !important;
+  right: 1rem !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: min(26rem, calc(100vw - 2rem)) !important;
+  max-width: min(26rem, calc(100vw - 2rem)) !important;
+  height: auto !important;
+  max-height: calc(100dvh - var(--widgetr-topbar-height) - 1.5rem) !important;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 14%, transparent) !important;
+  border-radius: 1.5rem !important;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 82%, transparent) !important;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 22%), 0 0 0 1px color-mix(in srgb, var(--widgetr-ink) 5%, transparent);
+  backdrop-filter: blur(28px) saturate(1.25);
+  -webkit-backdrop-filter: blur(28px) saturate(1.25);
+}
+
+:global(body > [data-slot="content"][data-side="left"]) {
+  right: auto !important;
+  left: 1rem !important;
+  width: min(22rem, calc(100vw - 2rem)) !important;
+  max-width: min(22rem, calc(100vw - 2rem)) !important;
+}
+
+:global(body > [data-slot="content"][data-side] > [data-slot="header"]) {
+  min-height: auto !important;
+  padding: 1rem 1.15rem 0.85rem !important;
+  border-bottom: 1px solid var(--widgetr-border);
+  background: transparent;
+}
+
+:global(body > [data-slot="content"][data-side] > [data-slot="body"]) {
+  min-height: 0;
+  background: transparent;
+}
+
+:global(body > [data-slot="content"][data-side] > [data-slot="footer"]) {
+  padding: 0.8rem 1.15rem 1rem !important;
+  border-top: 1px solid var(--widgetr-border);
+  background: transparent;
+}
+
+.canvas-panel {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--widgetr-stage);
+}
+
+.canvas-panel::before,
+.canvas-panel::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+}
+
+.canvas-panel::before {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--widgetr-ink) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--widgetr-ink) 5%, transparent) 1px, transparent 1px);
+  background-position: center;
+  background-size: 4rem 4rem;
+  opacity: 0.55;
+}
+
+.canvas-panel::after {
+  background: radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--widgetr-accent) 6%, transparent), transparent 42%);
+  opacity: 0.65;
+}
+
+.canvas-toolbar {
+  display: none;
+}
+
+.canvas-project-title {
+  position: absolute;
+  top: 4.55rem;
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 14;
+  max-width: min(24rem, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.canvas-project-title h2 {
+  margin: 0;
+  color: var(--widgetr-ink);
+  font-size: clamp(0.95rem, 1.45vw, 1.2rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+  text-shadow: 0 8px 22px color-mix(in srgb, var(--widgetr-stage) 72%, transparent);
+}
+
+.canvas-floating-controls {
+  position: absolute;
+  top: 4.4rem;
+  left: 50%;
+  z-index: 15;
+  display: flex;
+  max-width: calc(100vw - 2rem);
+  align-items: center;
+  gap: 0.25rem;
+  transform: translateX(-50%);
+  padding: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 11%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 62%, transparent);
+  box-shadow: 0 16px 40px rgb(29 29 31 / 10%);
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+}
+
+.canvas-floating-controls .size-controls {
+  flex: 0 0 auto;
+  padding: 0.1rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.canvas-floating-controls .size-control {
+  min-width: 3.5rem;
+  justify-content: center;
+}
+
+.canvas-floating-controls .visibility-control {
+  min-width: 6rem;
+  margin-left: 0.25rem;
+  padding-right: 0.75rem;
+  padding-left: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
+  border-radius: 999px;
+  gap: 0.45rem;
+  justify-content: center;
+}
+
+.floating-tools-trigger {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  margin-left: 0.15rem;
+  padding: 0;
+  border-left: 1px solid color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
+  border-radius: 0 999px 999px 0;
+  justify-content: center;
+}
+
+.tools-menu,
+.visibility-popover {
+  min-width: 15rem;
+  padding: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
+  border-radius: var(--widgetr-radius-panel);
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 78%, transparent);
+  box-shadow: 0 18px 44px rgb(29 29 31 / 14%);
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+}
+
+.visibility-popover {
+  min-width: 13.5rem;
+  gap: 0.15rem;
+}
+
+.tools-menu {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.canvas-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  z-index: 1;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.preview-scroll {
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 7.8rem 2rem 4.8rem;
+}
+
+.operation-result,
+.change-receipt {
+  position: absolute;
+  left: 50%;
+  z-index: 16;
+  width: min(32rem, calc(100vw - 2rem));
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.operation-result {
+  bottom: 5.2rem;
+}
+
+.change-receipt {
+  bottom: 5.2rem;
+  width: max-content;
+  min-width: 0;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.38rem 0.45rem 0.38rem 0.4rem;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 68%, transparent);
+  box-shadow: 0 14px 32px rgb(29 29 31 / 10%);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+}
+
+.change-receipt {
+  border-color: color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
+}
+
+.change-receipt :deep(button) {
+  min-height: 2rem;
+  border-radius: 999px;
+  padding-right: 0.55rem;
+  padding-left: 0.55rem;
+}
+
+.canvas-footer {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 12;
+  width: max-content;
+  min-height: 0;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 10%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 58%, transparent);
+  box-shadow: 0 10px 26px rgb(29 29 31 / 8%);
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.canvas-footer-scope,
+.canvas-footer-separator {
+  display: none;
+}
+
+.canvas-status-dock-shell {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.canvas-status-dock-shell :deep([data-slot="trigger"]),
+.canvas-status-dock-shell :deep(button) {
+  pointer-events: auto;
+}
+
+.canvas-status-trigger {
+  display: inline-flex;
+  min-width: 2.65rem;
+  min-height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 15%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 76%, transparent);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 18%), 0 0 0 1px color-mix(in srgb, var(--widgetr-ink) 4%, transparent);
+  color: var(--widgetr-ink);
+  cursor: pointer;
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.canvas-status-trigger:hover {
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 88%, transparent);
+  border-color: color-mix(in srgb, var(--widgetr-ink) 24%, transparent);
+  transform: translateY(-1px);
+}
+
+.canvas-status-trigger:focus-visible {
+  outline: 2px solid var(--widgetr-accent);
+  outline-offset: 3px;
+}
+
+.canvas-status-trigger-expanded {
+  justify-content: flex-start;
+  max-width: min(32rem, calc(100vw - 4.5rem));
+  padding-right: 0.7rem;
+  padding-left: 0.45rem;
+}
+
+.status-dock-icon {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-accent) 17%, transparent);
+  color: var(--widgetr-accent-strong);
+}
+
+.status-dock-icon .i-lucide-bot {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.status-dock-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+  text-align: left;
+}
+
+.status-dock-message,
+.status-dock-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-dock-message {
+  color: var(--widgetr-ink);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.status-dock-detail {
+  color: var(--widgetr-muted);
+  font-size: 0.61rem;
+  line-height: 1.25;
+}
+
+.status-dock-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--widgetr-muted);
+}
+
+.canvas-status-trigger-success .status-dock-dot {
+  background: var(--widgetr-success);
+}
+
+.canvas-status-trigger-warning .status-dock-dot {
+  background: var(--widgetr-warning);
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+.canvas-status-trigger-error .status-dock-dot {
+  background: var(--widgetr-danger);
+}
+
+.canvas-status-undo {
+  min-height: 2.25rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 15%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 76%, transparent);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 14%);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.studio-alert {
+  position: absolute;
+  top: 4.6rem;
+  left: 1rem;
+  z-index: 20;
+  width: min(28rem, calc(100vw - 2rem));
+  margin: 0;
+}
+
+@media (min-width: 56.25rem) and (max-width: 74.999rem) {
+  .canvas-project-title {
+    top: 7.2rem;
+  }
+
+  .assistant-status-button :deep([data-slot="leadingIcon"]) {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 56.249rem) {
+  :global(body > [data-slot="content"][data-side="left"]),
+  :global(body > [data-slot="content"][data-side="right"]) {
+    top: auto !important;
+    right: 0.75rem !important;
+    bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 3.5rem) !important;
+    left: 0.75rem !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(calc(80dvh - 3.5rem), 42rem) !important;
+    border-radius: 1.35rem !important;
+  }
+
+  .studio-topbar {
+    min-height: 3.25rem;
+    padding: 0.45rem max(0.65rem, env(safe-area-inset-right)) 0.45rem max(0.65rem, env(safe-area-inset-left));
+  }
+
+  .topbar-leading {
+    max-width: calc(100vw - 10rem);
+  }
+
+  .wordmark {
+    display: none;
+  }
+
+  .canvas-project-title {
+    top: 7.2rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    max-width: none;
+  }
+
+  .canvas-floating-controls {
+    top: 4rem;
+    right: auto;
+    left: 0.5rem;
+    width: max-content;
+    max-width: calc(100vw - 1rem);
+    justify-content: flex-start;
+    overflow-x: auto;
+    transform: none;
+  }
+
+  .topbar-projects-trigger,
+  .topbar-export,
+  .history-actions :deep(button) {
+    width: var(--widgetr-touch-target);
+    min-width: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
+  }
+
+  .canvas-floating-controls .floating-tools-trigger {
+    width: var(--widgetr-touch-target);
+    min-width: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
+  }
+
+  .assistant-status-button {
+    width: var(--widgetr-touch-target);
+    min-width: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
+    padding-right: 0.45rem;
+    padding-left: 0.45rem;
+  }
+
+  .assistant-status-button :deep([data-slot="label"]) {
+    display: none;
+  }
+
+  .assistant-status-button :deep([data-slot="leadingIcon"]) {
+    display: inline-flex;
+  }
+
+  .preview-caption-button {
+    min-width: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
+  }
+
+  .preview-scroll {
+    padding: 11.5rem 0.75rem 4.8rem;
+  }
+
+  .canvas-footer {
+    right: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    justify-content: center;
+    border-radius: 1rem;
+  }
+
+  .canvas-status-dock-shell {
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .canvas-status-trigger {
+    min-width: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
+  }
+
+  .canvas-status-trigger-expanded {
+    max-width: min(32rem, calc(100vw - 5.75rem));
+  }
+
+  .status-dock-copy {
+    max-width: calc(100vw - 9rem);
+  }
+
+  .canvas-status-undo {
+    min-height: var(--widgetr-touch-target);
+  }
+
+  .studio-alert {
+    top: 8rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+  }
+}
+
+@media (max-width: 30rem) {
+  .topbar-trailing {
+    gap: 0.1rem;
+  }
+
+  .topbar-leading {
+    max-width: calc(100vw - 12rem);
+  }
+
+  .canvas-floating-controls {
+    padding: 0.2rem;
+  }
+
+  .canvas-floating-controls .size-control {
+    min-width: 3rem;
+  }
+
+  .canvas-floating-controls .visibility-control {
+    min-width: 2.75rem;
+    padding-right: 0.45rem;
+    padding-left: 0.45rem;
+    font-size: 0;
+  }
+
+  .canvas-floating-controls .visibility-control :deep(svg) {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  .canvas-status-dock-shell {
+    gap: 0.25rem;
+  }
+
+  .canvas-status-trigger {
+    padding-right: 0.45rem;
+    padding-left: 0.4rem;
+  }
+
+  .canvas-status-trigger-expanded {
+    max-width: min(32rem, calc(100vw - 5.25rem));
+  }
+
+  .status-dock-message {
+    font-size: 0.66rem;
+  }
+
+  .status-dock-detail {
+    font-size: 0.58rem;
+  }
+
+  .canvas-project-title h2 {
+    font-size: 0.98rem;
+  }
+
 }
 </style>
