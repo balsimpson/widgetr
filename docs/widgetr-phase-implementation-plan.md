@@ -24,8 +24,8 @@ Update this section after every session that changes implementation, verificatio
 | Phase state | In progress |
 | Phase 4 state | In progress; Phase 5 is complete locally, while the remaining WebMCP, export, README, and iPhone checks are resumed here |
 | Local branch | `main` |
-| Local and remote commit | `0800a34` (`feat: ship Apple-like studio UI`) |
-| Latest verified UI commit | `0800a34` (`feat: ship Apple-like studio UI`); canvas-first, inset floating-sheet, and plain-language layer-label follow-ups are currently uncommitted |
+| Local and remote commit | `3f4065e` (`polish Widgetr canvas status dock`) |
+| Latest verified UI commit | `3f4065e` (`polish Widgetr canvas status dock`); canvas-first, floating-sheet, panning, and unified bot/status-dock follow-ups are included |
 | Production URL | [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/) |
 | Next action | Resume the open Phase 4 WebMCP, export, README, and iPhone gates |
 | Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
