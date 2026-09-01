@@ -3023,8 +3023,11 @@ onBeforeUnmount(() => {
 }
 
 .history-actions {
+  box-sizing: border-box;
   gap: 0.1rem;
-  padding: 0.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0 0.25rem;
   border: 1px solid color-mix(in srgb, var(--widgetr-ink) 11%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--widgetr-pane-solid) 62%, transparent);
@@ -3034,6 +3037,7 @@ onBeforeUnmount(() => {
 }
 
 .history-actions :deep(button) {
+  height: 2.25rem;
   background: transparent;
 }
 
@@ -3584,6 +3588,11 @@ onBeforeUnmount(() => {
     width: 2.875rem;
     min-width: 2.875rem;
     min-height: 2.875rem;
+  }
+
+  .history-actions {
+    height: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
   }
 
   .canvas-floating-controls .floating-tools-trigger {
