@@ -58,11 +58,6 @@ const historyPast = ref<HistoryEntry[]>([])
 const historyFuture = ref<HistoryEntry[]>([])
 const structureSize = ref<WidgetSize>('medium')
 const previewView = ref<WidgetSize | 'all'>('medium')
-const previewVisibility = ref<Record<WidgetSize, boolean>>({
-  small: true,
-  medium: true,
-  large: true
-})
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 
 type NavigationMode = 'projects' | 'layers' | 'reference'
@@ -75,7 +70,6 @@ const navigationModes: Array<{ label: string, value: NavigationMode, icon: strin
 
 const navigationMode = ref<NavigationMode>('projects')
 const toolsOpen = ref(false)
-const visibilityOpen = ref(false)
 const projectsOpen = ref(false)
 const layersOpen = ref(false)
 const settingsOpen = ref(false)
@@ -187,7 +181,7 @@ const structureSizeOptions = WIDGET_SIZES.map(size => ({
 
 const visiblePreviewSizes = computed(() => (
   previewView.value === 'all'
-    ? WIDGET_SIZES.filter(size => previewVisibility.value[size])
+    ? WIDGET_SIZES
     : [previewView.value]
 ))
 
@@ -400,7 +394,6 @@ function closeContextualSurfaces(options: { keepLayers?: boolean } = {}): void {
   exportOpen.value = false
   agentOpen.value = false
   toolsOpen.value = false
-  visibilityOpen.value = false
 }
 
 function startCanvasPan(event: PointerEvent): void {
@@ -547,21 +540,6 @@ function setPreviewView(value: WidgetSize | 'all'): void {
   previewView.value = value
   if (value !== 'all') {
     structureSize.value = value
-  }
-}
-
-function setVisibility(size: WidgetSize, visible: boolean): void {
-  const next = { ...previewVisibility.value, [size]: visible }
-  if (!Object.values(next).some(Boolean)) {
-    return
-  }
-  previewVisibility.value = next
-}
-
-function handleVisibilityChange(size: WidgetSize, event: Event): void {
-  const target = event.target
-  if (target instanceof HTMLInputElement) {
-    setVisibility(size, target.checked)
   }
 }
 
@@ -932,7 +910,7 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 
   if (event.key === 'Escape') {
-    if (projectsOpen.value || layersOpen.value || settingsOpen.value || referenceOpen.value || exportOpen.value || agentOpen.value || toolsOpen.value || visibilityOpen.value) {
+    if (projectsOpen.value || layersOpen.value || settingsOpen.value || referenceOpen.value || exportOpen.value || agentOpen.value || toolsOpen.value) {
       closeContextualSurfaces()
       return
     }
@@ -1179,35 +1157,6 @@ onBeforeUnmount(() => {
                 :aria-pressed="previewView === 'all'"
                 @click="setPreviewView('all')"
               />
-              <UPopover
-                v-model:open="visibilityOpen"
-                :content="{ align: 'center', sideOffset: 8 }"
-                :ui="{ content: 'bg-transparent p-0 shadow-none ring-0' }"
-              >
-                <UButton
-                  label="Visibility"
-                  icon="i-lucide-sliders-horizontal"
-                  color="neutral"
-                  variant="soft"
-                  size="sm"
-                  class="visibility-control"
-                />
-                <template #content>
-                  <div class="visibility-popover">
-                    <div class="visibility-popover-heading">
-                      <strong>Show in overview</strong>
-                    </div>
-                    <label v-for="size in WIDGET_SIZES" :key="size" class="visibility-row">
-                      <input
-                        type="checkbox"
-                        :checked="previewVisibility[size]"
-                        @change="handleVisibilityChange(size, $event)"
-                      >
-                      <span>{{ size[0]!.toUpperCase() + size.slice(1) }}</span>
-                    </label>
-                  </div>
-                </template>
-              </UPopover>
             </div>
 
             <UPopover
@@ -1863,12 +1812,6 @@ onBeforeUnmount(() => {
   color: var(--widgetr-stage) !important;
 }
 
-.visibility-control {
-  margin-left: 0.15rem;
-  border-left: 1px solid var(--widgetr-border);
-  border-radius: 0 0.5rem 0.5rem 0;
-}
-
 .scope-summary {
   gap: 0.35rem;
   padding-left: 0.35rem;
@@ -1897,49 +1840,10 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-.compact-actions-menu,
-.visibility-popover {
+.compact-actions-menu {
   display: grid;
   gap: 0.35rem;
   padding: 0.65rem;
-}
-
-.visibility-popover {
-  min-width: 14rem;
-}
-
-.visibility-popover-heading {
-  display: block;
-  padding: 0.1rem 0.25rem 0.35rem;
-  border-bottom: 1px solid var(--widgetr-border);
-}
-
-.visibility-popover-heading strong {
-  color: var(--widgetr-ink);
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-
-.visibility-popover-heading span {
-  color: var(--widgetr-muted);
-  font-size: 0.65rem;
-  line-height: 1.4;
-}
-
-.visibility-row {
-  display: flex;
-  min-height: var(--widgetr-touch-target);
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0 0.25rem;
-  color: var(--widgetr-ink);
-  font-size: 0.75rem;
-}
-
-.visibility-row input {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--widgetr-accent);
 }
 
 .studio-alert {
@@ -2666,11 +2570,6 @@ onBeforeUnmount(() => {
     padding-left: 0.45rem;
   }
 
-  .visibility-control {
-    padding-right: 0.45rem;
-    padding-left: 0.45rem;
-  }
-
   .studio-workspace {
     grid-template-columns: var(--widgetr-rail-width) minmax(0, 1fr) var(--widgetr-inspector-min-width);
   }
@@ -2759,7 +2658,6 @@ onBeforeUnmount(() => {
 
   .topbar-projects-trigger,
   .size-control,
-  .visibility-control,
   .assistant-status-button,
   .topbar-export,
   .compact-actions,
@@ -2769,7 +2667,6 @@ onBeforeUnmount(() => {
     min-height: var(--widgetr-touch-target);
   }
 
-  .visibility-control,
   .assistant-status-button,
   .history-actions :deep(button),
   .compact-actions,
@@ -2905,18 +2802,6 @@ onBeforeUnmount(() => {
 
   .size-control :deep(span:not([class*="icon"])) {
     font-size: 0.68rem;
-  }
-
-  .visibility-control {
-    min-width: var(--widgetr-touch-target);
-    padding-right: 0.4rem;
-    padding-left: 0.4rem;
-    font-size: 0;
-  }
-
-  .visibility-control :deep(svg) {
-    width: 0.9rem;
-    height: 0.9rem;
   }
 
   .canvas-actions :deep(button) {
@@ -3269,17 +3154,6 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.canvas-floating-controls .visibility-control {
-  min-width: 6rem;
-  margin-left: 0.25rem;
-  padding-right: 0.75rem;
-  padding-left: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
-  border-radius: 999px;
-  gap: 0.45rem;
-  justify-content: center;
-}
-
 .floating-tools-trigger {
   width: 2.25rem;
   min-width: 2.25rem;
@@ -3291,8 +3165,7 @@ onBeforeUnmount(() => {
   justify-content: center;
 }
 
-.tools-menu,
-.visibility-popover {
+.tools-menu {
   min-width: 15rem;
   padding: 0.55rem;
   border: 1px solid color-mix(in srgb, var(--widgetr-ink) 12%, transparent);
@@ -3301,11 +3174,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 18px 44px rgb(29 29 31 / 14%);
   backdrop-filter: blur(24px) saturate(1.25);
   -webkit-backdrop-filter: blur(24px) saturate(1.25);
-}
-
-.visibility-popover {
-  min-width: 13.5rem;
-  gap: 0.15rem;
 }
 
 .tools-menu {
@@ -3702,18 +3570,6 @@ onBeforeUnmount(() => {
 
   .canvas-floating-controls .size-control {
     min-width: 3rem;
-  }
-
-  .canvas-floating-controls .visibility-control {
-    min-width: 2.75rem;
-    padding-right: 0.45rem;
-    padding-left: 0.45rem;
-    font-size: 0;
-  }
-
-  .canvas-floating-controls .visibility-control :deep(svg) {
-    width: 0.9rem;
-    height: 0.9rem;
   }
 
   .canvas-status-trigger {

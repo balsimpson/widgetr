@@ -10,7 +10,7 @@ This document records the agreed redesign direction for the WebMCP challenge. It
 
 The latest UI pass supersedes the earlier persistent-pane treatment for the studio shell. The canvas is now the product surface: it owns the viewport edge to edge, keeps the focused widget in generous negative space, and carries only small status/readout islands when they help orientation. Projects, Layers, Reference, Widget settings, and the selection inspector open as inset floating glass sheets without a canvas-wide scrim; they are not permanent desktop furniture.
 
-The top bar is reduced to project identity and a few global actions. Size and visibility controls float above the canvas in a translucent glass group, while lower-frequency tools live behind a single Tools affordance. Glass is reserved for these spatially continuous control layers and feedback receipts, with solid sheet fallbacks for legibility. The canonical `WidgetProject`, operation path, scope behavior, persistence, export, and assistant truthfulness remain unchanged.
+The top bar is reduced to project identity and a few global actions. Size controls float above the canvas in a translucent glass group, while lower-frequency tools live behind a single Tools affordance. Glass is reserved for these spatially continuous control layers and feedback receipts, with solid sheet fallbacks for legibility. The canonical `WidgetProject`, operation path, scope behavior, persistence, export, and assistant truthfulness remain unchanged.
 
 ## Product model
 
@@ -68,7 +68,7 @@ The studio is one continuous canvas with a few floating control islands:
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  project                                                   undo · export │
-│                     [ Small  Medium  Large  Visibility  Tools ]         │
+│                     [ Small  Medium  Large  All  Tools ]               │
 │                                                                         │
 │                         Widget canvas                                  │
 │                                                                         │
@@ -85,7 +85,7 @@ The top bar is persistent and quiet. It should contain only:
 - Undo and Redo when there is session history to act on;
 - Export.
 
-Direct size buttons and the separate visibility affordance live in the floating canvas controls. New project, Projects, Layers, Reference, and Widget settings live behind the floating `Tools` affordance.
+Direct size buttons live in the floating canvas controls. New project, Projects, Layers, Reference, and Widget settings live behind the floating `Tools` affordance.
 
 The primary user-facing ready state is:
 
@@ -141,24 +141,12 @@ The inspector header includes a pin action for people who want the controls to s
 The three named sizes are always clear and direct:
 
 ```text
-Widget sizes    [Small] [Medium] [Large] [All]   [Visibility ▾]
+Widget sizes    [Small] [Medium] [Large] [All]   [Tools]
 ```
 
 - Clicking `Small`, `Medium`, or `Large` focuses that output for editing.
 - Clicking a preview's size caption selects that output's complete `Widget` surface.
-- `All` focuses the overview containing the visible outputs and sits in the same size-control group as the three focused views.
-- The visibility control is separate from the named size buttons so hiding a size cannot be confused with deleting it.
-- Hidden sizes remain in the project, remain exportable, and can be focused directly from the named size controls.
-- The visibility popover controls only which outputs appear in the overview.
-
-The visibility affordance should communicate state plainly:
-
-```text
-Show in overview
-☑ Small
-☑ Medium
-☐ Large
-```
+- `All` focuses the overview containing all three outputs and sits in the same size-control group as the three focused views.
 
 The all-sizes view is for seeing the complete set of outputs at once. It is not labeled or framed as a comparison mode.
 
@@ -200,7 +188,7 @@ The accent should be recognizable as Widgetr's interaction color, not as a decor
 ### Shape and density
 
 - Use controlled corner rounding for panels, controls, and selection handles.
-- Reserve pill shapes for segmented modes, compact statuses, and the size/visibility controls where appropriate.
+- Reserve pill shapes for segmented modes, compact statuses, and the size controls where appropriate.
 - Keep the canvas airy and the controls compact but comfortable.
 - Use an 8-point spacing rhythm, with smaller optical adjustments where text or icon geometry requires them.
 
@@ -365,7 +353,7 @@ The layout is adaptive rather than a desktop layout compressed until it breaks.
 - Open navigation and inspection as inset floating sheets only while that task is active; dismissing a sheet returns the unobstructed canvas.
 - Keep the focused canvas visible as the primary surface.
 - Keep low-frequency actions out of the persistent top bar and behind Tools.
-- Preserve direct access to Small, Medium, Large, All, and the separate visibility affordance at every supported width.
+- Preserve direct access to Small, Medium, Large, and All at every supported width.
 
 ## Motion and feedback
 
@@ -495,11 +483,11 @@ The root app shell uses `min-height: 100vh`, `min-height: 100dvh`, `height: 100d
 | `>= 1200px` | Full-viewport canvas with small glass islands | Left sheet on demand | Right sheet on selection or settings | Focused widget is centered in generous negative space; all-sizes overview scrolls only inside the canvas |
 | `900px-1199px` | Same canvas-first shell | Left sheet on demand | Right sheet on selection or settings | Canvas keeps the focused preview legible without reserving pane width |
 | `600px-899px` | Same canvas-first shell, compact floating controls | Full-width or max-width left sheet | Right sheet, max 360px | Focused preview remains visible behind a sheet; no page-level horizontal scroll |
-| `< 600px` | Same canvas-first shell with project name wrapping safely | Full-width left sheet | Full-width right sheet | One focused preview at a time; Small, Medium, Large, All, and visibility stay directly reachable in a compact horizontal control |
+| `< 600px` | Same canvas-first shell with project name wrapping safely | Full-width left sheet | Full-width right sheet | One focused preview at a time; Small, Medium, Large, and All stay directly reachable in a compact horizontal control |
 
 The app root never scrolls. The canvas region owns preview scrolling, each pane owns its own list scrolling, and each sheet owns its body scrolling. Do not create nested scroll containers for the same axis. The canonical `WIDGET_DIMENSIONS` remain unchanged. Responsive behavior scales the rendered preview with `contain` or a CSS transform; it never mutates the widget's layout dimensions or aspect ratio.
 
-The canvas controls have a fixed priority order. The leading top-bar group is project identity and a Projects entry point. The trailing group is history when available and Export. The centered floating group owns focused size and visibility. New project, Layers, Reference, Widget settings, and assistant diagnostics stay behind the Tools affordance; the bottom status dock owns assistant status and contextual feedback. Export remains visible as a compact icon control so the canvas never loses its primary action.
+The canvas controls have a fixed priority order. The leading top-bar group is project identity and a Projects entry point. The trailing group is history when available and Export. The centered floating group owns focused size and All; low-frequency actions including New project, Layers, Reference, Widget settings, and assistant diagnostics stay behind the Tools affordance. The bottom status dock owns assistant status and contextual feedback. Export remains visible as a compact icon control so the canvas never loses its primary action.
 
 ### Component and state ownership
 
@@ -513,7 +501,7 @@ Create focused UI components under `app/components/studio/`:
 | `StudioTopBar.vue` | Project identity, focused size, scope summary, history, status, export, and overflow priority |
 | `StudioNavigation.vue` | Projects, Layers, and Reference modes, presented as one transient sheet without permanent pane or rail furniture |
 | `StudioCanvas.vue` | Stage, focused/all-sizes layout, preview scale, selection overlay, and canvas empty states |
-| `StudioSizeControls.vue` | Small, Medium, Large, all-sizes visibility, and selected-pair scope disclosure |
+| `StudioSizeControls.vue` | Small, Medium, Large, All, and selected-pair scope disclosure |
 | `StudioSelectionToolbar.vue` | Existing common actions only, with collision-safe placement near the selection or canvas edge |
 | `StudioInspectorPane.vue` | Selection-driven inspector presentation and project-level settings entry point |
 | `StudioAssistantStatus.vue` | Truthful unavailable, registering, ready, active, stale, failed, and restored states |
@@ -526,7 +514,7 @@ Adapt the existing `WidgetPreview.vue`, `WidgetNodeRenderer.vue`, `WidgetStructu
 
 1. **Lock the visual foundation.** Replace the current token names in `app/assets/css/main.css`, add the light/dark semantic values above, add the viewport shell, and remove the centered page-card treatment. At the end of this step, the empty shell must fill the viewport at 1280 x 900 without document scroll.
 2. **Build the shared shell.** Extract the top bar, navigation region, canvas stage, and inspector region. Keep the existing project, history, persistence, and WebMCP behavior wired through the same page coordinator. Do not change operation schemas in this step.
-3. **Make the canvas the hero.** Add direct size buttons, a separate visibility control, focused/all-sizes rendering, accurate scaling, and the quiet stage. The selected widget is the only rich object on the screen. Keep the current canonical dimensions and renderer.
+3. **Make the canvas the hero.** Add direct size buttons, focused/all-sizes rendering, accurate scaling, and the quiet stage. The selected widget is the only rich object on the screen. Keep the current canonical dimensions and renderer.
 4. **Add selection continuity.** Synchronize canvas and Layers selection, add the outline and breadcrumb presentation, and add the contextual toolbar using only supported operations. Defer unsupported layer rename, duplicate, and delete actions. Preserve the current selected-pair scope in the advanced control.
 5. **Add adaptive navigation and inspector presentation.** Keep navigation and inspection transient at every width, with sheets that preserve canvas context and return focus on dismissal. Define Escape behavior before adding transitions.
 6. **Add truthful feedback and restrained motion.** Implement save status, assistant status, stale and failed receipts, export states, and the first-change focus treatment. Use the motion and reduced-motion rules below. Do not invent assistant reasoning or connection claims.
@@ -575,7 +563,7 @@ The first implementation is complete only when all of the following are observab
 
 - At 1280 x 900, the shell fills the viewport, the canvas owns the full stage, floating controls remain comfortably separated, and the document has no horizontal or vertical scroll.
 - At 1024 x 768, navigation and inspection remain available as sheets without reserving canvas width, and the focused preview does not become a clipped card.
-- At 390 x 844, the root width is 390px, there is no page-level horizontal overflow, navigation and inspector open as sheets, touch targets are at least 44 x 44 CSS pixels, and the three sizes plus visibility remain reachable.
+- At 390 x 844, the root width is 390px, there is no page-level horizontal overflow, navigation and inspector open as sheets, touch targets are at least 44 x 44 CSS pixels, and the four size choices remain reachable.
 - The same shell works in light and dark appearance. The widget remains the focal object and the stage, floating controls, sheets, and receipts retain one visual grammar.
 - Selecting from the canvas or Layers updates the outline, breadcrumb, inspector, and assistant-readable context. Clearing selection closes selection-only controls.
 - The assistant status matrix, persistence states, read-only example state, and export warning/blocker/success states show the specified copy, action, preserved work, and announcement.
@@ -591,7 +579,7 @@ The direction is ready for implementation when a reviewer can confirm that:
 
 1. The page reads as a fullscreen studio, not a website with a hero section.
 2. The canvas is the dominant surface and the focused widget is the default view.
-3. Small, Medium, Large, and All are directly addressable, while visibility is clearly separate.
+3. Small, Medium, Large, and All are directly addressable in one compact control group.
 4. A single click, double-click, Layers selection, breadcrumb, and Escape produce an understandable selection flow.
 5. `This size` and `All sizes` are visible and unambiguous at the point of change.
 6. The assistant conversation stays external while the page shows live selection, activity, and receipts.
