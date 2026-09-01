@@ -45,6 +45,20 @@ When starting a new task in this repository:
 6. For UI behavior changes, follow the [`Widgetr local browser runbook`](./docs/widgetr-local-browser-runbook.md). Source inspection alone is not visual verification.
 7. Report checks that were not run instead of implying they passed.
 
+## Local preview preflight
+
+Before opening or claiming the in-app browser preview is available:
+
+1. Check the documented Widgetr port first:
+
+   ```text
+   lsof -nP -iTCP:3100 -sTCP:LISTEN
+   ```
+
+2. Identify any listener before using it. If port 3100 is free, start exactly one Widgetr dev server from this repository using the [local browser runbook](./docs/widgetr-local-browser-runbook.md), retain its terminal session, and wait for Nuxt's `ready` output. A URL, a stale tab, or a successful source edit is not evidence that a server is running.
+3. Open the exact URL for the verified Widgetr listener: `http://127.0.0.1:3100/` by default, or the explicitly reported port if an existing Widgetr session is intentionally using another port. Do not assume `http://localhost:3000/` is the current Widgetr preview.
+4. If there is no verified listener or the server is not ready, stop and report that the preview is unavailable instead of opening a browser tab or claiming that it is visible.
+
 ## Smallest-change routing map
 
 Start with the owning file below and search only that file (or the two files named for a cross-boundary change). Do not scan every component before making a focused UI change. Use `rg -n -C 5` with the exact visible copy, class, handler, or operation named in the request, then widen the search only when the owner is not present.
