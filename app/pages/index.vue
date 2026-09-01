@@ -2904,9 +2904,10 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-.topbar-projects-trigger :deep([data-slot="leadingIcon"]) {
-  width: 1rem;
-  height: 1rem;
+.topbar-projects-trigger :deep([data-slot="leadingIcon"]),
+.topbar-export :deep([data-slot="leadingIcon"]) {
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .topbar-projects-trigger :deep(span:not([class*="icon"])),
