@@ -291,23 +291,6 @@ const statusDockMessage = computed(() => {
   return agentStatusLabel.value
 })
 
-const statusDockDetail = computed(() => (
-  webmcpStatus.value === 'registered'
-  && persistenceState.value !== 'saving'
-  && persistenceState.value !== 'error'
-  && !changeReceiptMessage.value
-    ? agentStatusLabel.value
-    : null
-))
-
-const statusDockExpanded = computed(() => (
-  Boolean(project.value.selection)
-  || Boolean(changeReceiptMessage.value)
-  || persistenceState.value === 'saving'
-  || persistenceState.value === 'error'
-  || webmcpStatus.value !== 'registered'
-))
-
 const statusDockColor = computed(() => {
   if (persistenceState.value === 'error' || webmcpStatus.value === 'error') {
     return 'error'
@@ -352,7 +335,9 @@ function commitOperation(
 function selectElement(selection: WidgetSelection, options: { keepLayers?: boolean } = {}): void {
   closeContextualSurfaces(options)
   structureSize.value = selection.size
-  previewView.value = selection.size
+  if (previewView.value !== 'all') {
+    previewView.value = selection.size
+  }
 
   if (
     project.value.selection?.size === selection.size
@@ -970,6 +955,13 @@ onBeforeUnmount(() => {
             title="Projects"
             @click="openProjects"
           />
+          <UColorModeImage
+            light="/widgetr-logo-light.svg"
+            dark="/widgetr-logo-dark.svg"
+            alt="Widgetr"
+            class="topbar-brand-logo"
+            draggable="false"
+          />
         </div>
 
         <div class="topbar-trailing">
@@ -1263,7 +1255,6 @@ onBeforeUnmount(() => {
       <Teleport to="body">
         <div
           class="canvas-status-dock-shell"
-          :class="{ 'canvas-status-dock-shell-expanded': statusDockExpanded }"
         >
           <UPopover
             v-model:open="agentOpen"
@@ -1273,10 +1264,7 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="canvas-status-trigger"
-              :class="[
-                `canvas-status-trigger-${statusDockColor}`,
-                { 'canvas-status-trigger-expanded': statusDockExpanded }
-              ]"
+              :class="`canvas-status-trigger-${statusDockColor}`"
               :aria-label="agentStatusLabel"
               :title="agentStatusLabel"
             >
@@ -1284,12 +1272,11 @@ onBeforeUnmount(() => {
                 <UIcon name="i-lucide-bot" />
                 <span class="status-dock-dot" />
               </span>
-              <Transition name="status-dock-copy">
-                <span v-if="statusDockExpanded" class="status-dock-copy" aria-live="polite">
-                  <span class="status-dock-message">{{ statusDockMessage }}</span>
-                  <span v-if="statusDockDetail" class="status-dock-detail">{{ statusDockDetail }}</span>
-                </span>
-              </Transition>
+              <span class="status-dock-copy" aria-live="polite">
+                <Transition name="status-dock-message" mode="out-in">
+                  <span :key="statusDockMessage" class="status-dock-message">{{ statusDockMessage }}</span>
+                </Transition>
+              </span>
             </button>
             <template #content>
               <WidgetAgentToolsPanel
@@ -2908,6 +2895,13 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
+.topbar-leading :deep(.topbar-brand-logo) {
+  width: auto;
+  height: 1.35rem;
+  max-width: none;
+  flex: 0 0 auto;
+}
+
 .topbar-projects-trigger :deep([data-slot="leadingIcon"]),
 .topbar-export :deep([data-slot="leadingIcon"]) {
   width: 1.125rem;
@@ -3288,15 +3282,18 @@ onBeforeUnmount(() => {
 }
 
 .canvas-status-trigger {
+  --status-dock-width: min(22rem, calc(100vw - 2rem));
   box-sizing: border-box;
   display: inline-flex;
-  width: 3rem;
-  min-width: 3rem;
+  width: var(--status-dock-width);
+  min-width: var(--status-dock-width);
+  max-width: var(--status-dock-width);
   min-height: 2.65rem;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.55rem;
   padding: 0.4rem 0.55rem;
+  padding-left: 0.6rem;
   border: 1px solid color-mix(in srgb, var(--widgetr-ink) 15%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--widgetr-pane-solid) 76%, transparent);
@@ -3307,32 +3304,20 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(24px) saturate(1.25);
   -webkit-backdrop-filter: blur(24px) saturate(1.25);
   transition:
-    width 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    min-width 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 180ms cubic-bezier(0.22, 1, 0.36, 1),
     background-color 140ms ease,
     border-color 140ms ease,
-    transform 140ms ease;
+    box-shadow 140ms ease;
 }
 
 .canvas-status-trigger:hover {
   background: color-mix(in srgb, var(--widgetr-pane-solid) 88%, transparent);
   border-color: color-mix(in srgb, var(--widgetr-ink) 24%, transparent);
-  transform: translateY(-1px);
+  box-shadow: 0 16px 38px rgb(0 0 0 / 20%), 0 0 0 1px color-mix(in srgb, var(--widgetr-ink) 8%, transparent);
 }
 
 .canvas-status-trigger:focus-visible {
   outline: 2px solid var(--widgetr-accent);
   outline-offset: 3px;
-}
-
-.canvas-status-trigger-expanded {
-  width: min(22rem, calc(100vw - 2rem));
-  min-width: min(22rem, calc(100vw - 2rem));
-  max-width: min(22rem, calc(100vw - 2rem));
-  justify-content: flex-start;
-  padding-right: 0.7rem;
-  padding-left: 0.45rem;
 }
 
 .status-dock-icon {
@@ -3354,7 +3339,7 @@ onBeforeUnmount(() => {
 
 .status-dock-copy {
   display: grid;
-  width: 0;
+  width: auto;
   flex: 1 1 auto;
   min-width: 0;
   gap: 0.08rem;
@@ -3362,35 +3347,24 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
-.status-dock-copy-enter-active,
-.status-dock-copy-leave-active {
-  transition: opacity 160ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.status-dock-copy-enter-from,
-.status-dock-copy-leave-to {
-  opacity: 0;
-  transform: translateX(-0.35rem);
-}
-
-.status-dock-message,
-.status-dock-detail {
+.status-dock-message {
   min-width: 0;
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-.status-dock-message {
   color: var(--widgetr-ink);
   font-size: 0.7rem;
   font-weight: 600;
   line-height: 1.25;
 }
 
-.status-dock-detail {
-  color: var(--widgetr-muted);
-  font-size: 0.61rem;
-  line-height: 1.25;
+.status-dock-message-enter-active,
+.status-dock-message-leave-active {
+  transition: opacity 140ms ease;
+}
+
+.status-dock-message-enter-from,
+.status-dock-message-leave-to {
+  opacity: 0;
 }
 
 .status-dock-dot {
@@ -3418,9 +3392,12 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .canvas-status-trigger,
-  .status-dock-copy-enter-active,
-  .status-dock-copy-leave-active {
+  .canvas-status-trigger {
+    transition: none;
+  }
+
+  .status-dock-message-enter-active,
+  .status-dock-message-leave-active {
     transition: none;
   }
 
@@ -3464,6 +3441,10 @@ onBeforeUnmount(() => {
 
   .topbar-leading {
     max-width: calc(100vw - 10rem);
+  }
+
+  .topbar-leading :deep(.topbar-brand-logo) {
+    height: 1.2rem;
   }
 
   .wordmark {
@@ -3541,15 +3522,8 @@ onBeforeUnmount(() => {
   }
 
   .canvas-status-trigger {
-    width: var(--widgetr-touch-target);
-    min-width: var(--widgetr-touch-target);
+    --status-dock-width: min(22rem, calc(100vw - 1.5rem));
     min-height: var(--widgetr-touch-target);
-  }
-
-  .canvas-status-trigger-expanded {
-    width: min(22rem, calc(100vw - 1.5rem));
-    min-width: min(22rem, calc(100vw - 1.5rem));
-    max-width: min(22rem, calc(100vw - 1.5rem));
   }
 
   .studio-alert {
@@ -3582,18 +3556,8 @@ onBeforeUnmount(() => {
     padding-left: 0.4rem;
   }
 
-  .canvas-status-trigger-expanded {
-    width: min(22rem, calc(100vw - 1.5rem));
-    min-width: min(22rem, calc(100vw - 1.5rem));
-    max-width: min(22rem, calc(100vw - 1.5rem));
-  }
-
   .status-dock-message {
     font-size: 0.66rem;
-  }
-
-  .status-dock-detail {
-    font-size: 0.58rem;
   }
 
   .canvas-project-title h2 {
