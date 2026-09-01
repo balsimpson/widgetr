@@ -1230,7 +1230,6 @@ onBeforeUnmount(() => {
                   <UButton label="Layers" icon="i-lucide-layers-2" color="neutral" variant="ghost" block @click="openLayers" />
                   <UButton label="Reference" icon="i-lucide-image-plus" color="neutral" variant="ghost" block @click="openReference" />
                   <UButton label="Widget settings" icon="i-lucide-settings-2" color="neutral" variant="ghost" block @click="openWidgetSettings" />
-                  <UButton label="New project" icon="i-lucide-plus" color="neutral" variant="ghost" block @click="openNewProject" />
                 </div>
               </template>
             </UPopover>
@@ -3011,9 +3010,9 @@ onBeforeUnmount(() => {
 }
 
 .topbar-projects-trigger {
-  width: 2.875rem;
-  min-width: 2.875rem;
-  min-height: 2.875rem;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
   padding: 0;
   color: var(--widgetr-ink);
   background: transparent !important;
@@ -3021,8 +3020,8 @@ onBeforeUnmount(() => {
 }
 
 .topbar-projects-trigger :deep([data-slot="leadingIcon"]) {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 .topbar-projects-trigger :deep(span:not([class*="icon"])),
@@ -3613,9 +3612,9 @@ onBeforeUnmount(() => {
   }
 
   .topbar-projects-trigger {
-    width: 2.875rem;
-    min-width: 2.875rem;
-    min-height: 2.875rem;
+    width: var(--widgetr-touch-target);
+    min-width: var(--widgetr-touch-target);
+    min-height: var(--widgetr-touch-target);
   }
 
   .history-actions {
