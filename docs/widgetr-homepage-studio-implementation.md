@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented locally and ready for delivery.** The approved homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are now in place. Local browser verification is complete at the requested desktop and mobile sizes; tests, typecheck, production build, deployment, and real WebMCP invocation remain separate checkpoints.
+**Implemented and pushed.** The approved homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are now in place. Local browser verification is complete at the requested desktop and mobile sizes; tests, typecheck, production build, deployment, and real WebMCP invocation remain separate checkpoints.
 
 The user has explicitly reprioritized this homepage and Studio split. Do not reopen whether it belongs to a later phase. When implementation begins, record the reprioritization and current evidence in the canonical [phase implementation plan](./widgetr-phase-implementation-plan.md).
 
