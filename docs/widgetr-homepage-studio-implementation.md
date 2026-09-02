@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented in the working tree.** The approved homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are now in place. Local browser verification is complete at the requested desktop and mobile sizes; tests, typecheck, production build, deployment, and real WebMCP invocation remain separate checkpoints.
+**Implemented locally and ready for delivery.** The approved homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are now in place. Local browser verification is complete at the requested desktop and mobile sizes; tests, typecheck, production build, deployment, and real WebMCP invocation remain separate checkpoints.
 
 The user has explicitly reprioritized this homepage and Studio split. Do not reopen whether it belongs to a later phase. When implementation begins, record the reprioritization and current evidence in the canonical [phase implementation plan](./widgetr-phase-implementation-plan.md).
 
@@ -10,7 +10,7 @@ The user has explicitly reprioritized this homepage and Studio split. Do not reo
 
 Replace the current new-widget homepage with a short onboarding page that explains Widgetr, shows the Scriptable logo, makes the WebMCP requirement obvious, and gives the user one message to copy into a compatible AI assistant.
 
-Move the existing starter and editor experience to `/studio`. The Studio must show the existing starter choices, simple next-step text, and truthful WebMCP readiness without caring which assistant provider is present.
+Move the existing starter and editor experience to `/studio`. The Studio must show the existing starter choices in context, keep its simple next-step text, and expose truthful WebMCP readiness without caring which assistant provider is present.
 
 This document is the focused implementation handoff for that work. It supplements, but does not replace:
 
@@ -60,7 +60,7 @@ Before this document was added, the existing uncommitted work was:
 - `app/pages/index.vue`
 - `docs/widgetr-phase-implementation-plan.md`
 
-Those changes belong to the user. Preserve them. In particular, the current starter work makes `New project` reuse the shared starter chooser and adds `Back to project` and Escape cancellation.
+Those changes belong to the user. Preserve them. In particular, the current starter work makes `New project` reuse the shared starter chooser, opens it as a modal over the Studio shell, and keeps Cancel and Escape cancellation.
 
 Current implementation facts:
 
@@ -68,7 +68,7 @@ Current implementation facts:
 - `ProjectStarter.vue` owns the Weather, Cryptocurrency, Daily agenda, Own idea, Reference image, and Examples choices.
 - `app/domain/widget/starters.ts` is the only starter catalog. Do not create another catalog for the homepage.
 - `useWidgetWebMcp()` now exposes route-specific catalogs while retaining the existing active-project catalog and lifecycle.
-- The homepage registers only read-only onboarding; the starter screen registers onboarding plus validated project creation; the active no-selection catalog retains its existing mutation tools for a real project.
+- The homepage registers only read-only onboarding; the starter modal registers onboarding plus validated project creation; the active no-selection catalog retains its existing mutation tools for a real project.
 - `public/` contains the locally stored official Scriptable app icon alongside the Widgetr logos.
 
 ## Approved route behavior
@@ -80,7 +80,7 @@ The root route becomes a calm onboarding page. It must not show the starter grid
 It contains:
 
 - Widgetr branding
-- The Scriptable logo with a clear relationship label such as `Exports to Scriptable`
+- The Scriptable logo with a clear `Build for Scriptable` relationship link
 - A short explanation of Widgetr and WebMCP
 - A truthful WebMCP readiness indicator
 - One copyable message for the user's assistant
@@ -91,11 +91,12 @@ It contains:
 
 The current starter and editor experience moves here.
 
-- A first-time visitor with no saved projects sees the starter chooser.
+- A first-time visitor with no saved projects sees the Studio shell, neutral empty canvas, and starter chooser opened as a modal.
 - A direct visit with saved projects resumes the active project.
 - The homepage `Continue` button opens `/studio` and resumes the active saved project when one exists.
-- `Back to project` and Escape return a saved-project user to the active project.
+- Cancel and Escape dismiss the forced chooser and return a saved-project user to the active project.
 - Choosing a starter or cancelling the forced chooser removes `new=1` with history replacement so refresh and Back do not reopen it unexpectedly.
+- The starter modal currently exposes only Weather and Cryptocurrency templates plus a reference-image dropzone; Examples and other starter cards stay deferred from this visible flow.
 - Existing project persistence, history, previews, manual controls, export, and reference-image behavior remain unchanged.
 
 ## Homepage content
@@ -106,17 +107,17 @@ Use plain, provider-neutral copy. The first screen should be understandable with
 
 **Heading**
 
-> Build Scriptable widgets with your AI assistant
+> Build Scriptable widgets without writing JavaScript.
 
 **Description**
 
-> Describe the widget you want. A compatible assistant can start it here; you can keep editing the same widget on the canvas, then export it to Scriptable.
+> Connect your AI assistant, describe your idea using natural language, and shape it on the canvas.
 
 **Scriptable relationship**
 
-> Exports to Scriptable
+> Build for Scriptable
 >
-> Build here, then use it in Scriptable.
+> Design here, then run it in Scriptable.
 
 **Prompt label**
 
@@ -129,7 +130,7 @@ Use plain, provider-neutral copy. The first screen should be understandable with
 **Copied message**
 
 ```text
-Open Widgetr at {current Widgetr URL}. Ask me what I want to see in a Scriptable widget, then open the widget editor and start it with me. Keep working on that widget as I refine it.
+Open Widgetr at {current Widgetr URL} and help me build a Scriptable widget.
 ```
 
 Generate the URL from the current page at runtime. Do not hard-code production so the message also works in the local preview and future deployment domains.
@@ -137,11 +138,11 @@ Generate the URL from the current page at runtime. Do not hard-code production s
 **Actions**
 
 - `Copy message` copies the complete message and shows a short success or failure receipt.
-- `Continue` appears only when the browser has a saved project and opens `/studio` to resume it.
+- When saved projects exist, `You have saved widgets. Continue where you left off.` appears above the `Continue` button. The button opens `/studio` to resume the active project.
 
 ### Assistant choices
 
-Keep the compatibility guidance visible, compact, and assistant-only in the homepage intro, directly below the headline and description. `Assistant` is the section heading above one inline row of selectable names. The start area should stay focused on the message and primary action.
+Keep the compatibility guidance visible, compact, and assistant-only in its own full-width section below the headline and `Start here` content. `Assistant` is the section heading above one inline row of selectable names. The start area should stay focused on the message and primary action.
 
 - `ChatGPT desktop` — Recommended in a compact badge over the option. Site tools are not available on the Luna model; the selected explanation should tell the user to choose a model that supports them.
 - `Claude Desktop` — Setup required. Connect an MCP or browser bridge before asking it to control the page.
@@ -231,7 +232,8 @@ The homepage should match Widgetr's existing quiet graphite, silver, and restrai
 - Use one visual layer, not nested cards.
 - Keep native system typography.
 - Give the Scriptable logo supporting prominence, not co-brand dominance.
-- Pair the Scriptable logo with `Exports to Scriptable` so the relationship is clear.
+- Pair the Scriptable logo with `Build for Scriptable` so the relationship is clear. Make the relationship block link to `https://scriptable.app/` and open it in a new tab.
+- Use the existing restrained violet-indigo accent to emphasize `without writing JavaScript` in the homepage heading.
 - Use one compact readiness area and one copyable prompt area.
 - Keep the primary action singular and obvious.
 - Respect light mode, dark mode, keyboard focus, reduced motion, safe areas, and mobile width.
@@ -267,23 +269,24 @@ Use a legitimate Scriptable brand asset from an official or user-approved source
 
 - `/` no longer renders the new-widget starter screen.
 - The page explains Widgetr, Scriptable, and how page actions connect to a compatible assistant in the first viewport.
-- The Widgetr brand and Scriptable logo are visible with a clear `Exports to Scriptable` relationship.
-- The `Exports to Scriptable` relationship leads the intro with a brief explanation before the headline.
+- The Widgetr brand and Scriptable logo are visible with a clear `Build for Scriptable` relationship link that opens the official Scriptable site in a new tab.
+- The `Build for Scriptable` relationship link leads the intro with a brief explanation before the headline.
 - The assistant chooser lists `ChatGPT desktop`, `Claude Desktop`, `Hermes`, and `OpenClaw` without treating a browser as an assistant. `Recommended` appears as an overlay badge on ChatGPT desktop.
 - Selecting an assistant updates one concise status explanation.
 - The ChatGPT option carries the `Recommended` label, while its selected explanation notes that site tools are unavailable on the Luna model.
 - The copied message contains the current absolute Widgetr URL.
 - Copy success and failure are visible and accessible.
-- `Continue` appears only when saved projects exist and opens `/studio` to resume the active project.
+- When saved projects exist, the page explains that the user can continue where they left off, then `Continue` opens `/studio` to resume the active project.
 - No runtime path asks for, detects, or branches on assistant provider identity.
 
 ### Studio
 
-- `/studio` shows the same existing starter choices for a first-time visitor.
-- `/studio?new=1` shows the chooser for a returning user without deleting or replacing saved work.
+- `/studio` keeps the Studio shell visible and opens the same existing starter choices in a modal for a first-time visitor.
+- `/studio?new=1` opens that modal for a returning user without deleting or replacing saved work.
 - Direct `/studio` resumes the active saved project.
 - Starter, cancel, and Escape behavior remove the forced-new query correctly.
-- The starter screen displays the shared readiness status.
+- Weather and Cryptocurrency are the only visible template actions; reference-led creation starts with a dropzone, selected-image preview, and explicit confirmation.
+- The Studio keeps the shared readiness status in its assistant dock while the starter modal stays focused on creation choices.
 - Creating a starter produces a separate local project through the existing persistence path.
 - The active Studio retains existing preview, selection, history, reference, export, and assistant behavior.
 

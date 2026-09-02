@@ -140,7 +140,7 @@ describe('Widgetr WebMCP catalog', () => {
 
   it('builds the assistant message from the current Widgetr URL', () => {
     expect(createAssistantPrompt('http://127.0.0.1:3100/')).toBe(
-      'Open Widgetr at http://127.0.0.1:3100/. Ask me what I want to see in a Scriptable widget, then open the widget editor and start it with me. Keep working on that widget as I refine it.'
+      'Open Widgetr at http://127.0.0.1:3100/ and help me build a Scriptable widget.'
     )
   })
 

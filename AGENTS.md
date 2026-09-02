@@ -34,6 +34,13 @@ The identity gate is necessary but not sufficient authorization. Do not commit, 
 
 Do not duplicate phase status in this file. The canonical resume state is the **Current handoff** in [`docs/widgetr-phase-implementation-plan.md`](./docs/widgetr-phase-implementation-plan.md). If this file and the implementation plan disagree about status, pause implementation and reconcile the implementation plan against current Git, browser, deployment, and device evidence.
 
+## Public data API reference
+
+- When a task involves choosing, researching, adding, mocking, proxying, or debugging an external data source for a widget, read [`docs/widgetr-public-apis.md`](./docs/widgetr-public-apis.md) first. This includes weather, crypto, exchange rates, holidays, astronomy, NASA, rocket launches, space news, earthquakes, books, TV, and similar public feeds.
+- Use that document to avoid repeating the source shortlist, endpoint examples, access tiers, attribution notes, launch-date caveats, and Widgetr fallback rules. Recheck the linked official documentation before implementation or release because API availability, limits, hosts, and terms can change.
+- Keep no-key public sources separate from app-owned keyed sources and user-authenticated sources. Never add secrets to browser state, committed fixtures, exported Scriptable code, or `.env` files.
+- When adding a new source, update the reference with its official documentation URL, auth tier, attribution requirement, sample response, normalizer, cache policy, failure states, and documentation-check date.
+
 ## Provider-neutral WebMCP hard rule
 
 - Widgetr does not care which AI assistant provider is present. Never gate, branch, rank, or debate the product experience based on ChatGPT, Claude, or any other assistant brand.

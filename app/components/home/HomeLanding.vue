@@ -52,20 +52,24 @@ const copyReceipt = computed(() => {
 
       <div class="homepage-grid">
         <section class="homepage-intro">
-          <div class="scriptable-relationship" aria-label="Exports to Scriptable">
+          <a
+            class="scriptable-relationship"
+            href="https://scriptable.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Build for Scriptable. Open the Scriptable website in a new tab."
+          >
             <img src="/scriptable-app-icon.png" alt="Scriptable app icon" class="scriptable-relationship-icon">
             <span class="scriptable-relationship-copy">
-              <strong>Exports to Scriptable</strong>
-              <span>Build here, then use it in Scriptable.</span>
+              <strong>Build for Scriptable</strong>
+              <span>Design here, then run it in Scriptable.</span>
             </span>
-          </div>
+          </a>
 
-          <h1 id="homepage-heading">Build Scriptable widgets with your AI assistant</h1>
+          <h1 id="homepage-heading">Build Scriptable widgets <span class="homepage-heading-accent">without writing JavaScript</span>.</h1>
           <p class="homepage-description">
-            Describe the widget you want. A compatible assistant can start it here; you can keep editing the same widget on the canvas, then export it to Scriptable.
+            Connect your AI assistant, describe your idea using natural language, and shape it on the canvas.
           </p>
-
-          <AssistantChoiceGuideComponent />
         </section>
 
         <section class="homepage-start" aria-labelledby="homepage-start-heading">
@@ -102,6 +106,10 @@ const copyReceipt = computed(() => {
             </div>
           </section>
 
+          <p v-if="props.hasSavedProjects" class="homepage-continue-note">
+            You have saved widgets. Continue where you left off.
+          </p>
+
           <UButton
             v-if="props.hasSavedProjects"
             label="Continue"
@@ -113,6 +121,10 @@ const copyReceipt = computed(() => {
             class="homepage-continue-action"
           />
         </section>
+
+        <div class="homepage-assistant">
+          <AssistantChoiceGuideComponent />
+        </div>
       </div>
 
       <footer class="homepage-footer">
@@ -209,6 +221,10 @@ const copyReceipt = computed(() => {
   text-wrap: balance;
 }
 
+.homepage-heading-accent {
+  color: var(--widgetr-accent-strong);
+}
+
 .homepage-description {
   max-width: 48ch;
   margin: 1.6rem 0 0;
@@ -225,6 +241,19 @@ const copyReceipt = computed(() => {
   max-width: 100%;
   box-sizing: border-box;
   margin: 0 0 1.8rem;
+  color: inherit;
+  text-decoration: none;
+  transition: opacity 160ms ease;
+}
+
+.scriptable-relationship:hover {
+  opacity: 0.8;
+}
+
+.scriptable-relationship:focus-visible {
+  outline: 2px solid var(--widgetr-accent-strong);
+  outline-offset: 0.3rem;
+  border-radius: 0.85rem;
 }
 
 .scriptable-relationship-icon {
@@ -255,6 +284,16 @@ const copyReceipt = computed(() => {
   gap: 1.25rem;
   padding-left: clamp(1.5rem, 4vw, 3rem);
   border-left: 1px solid var(--widgetr-border);
+}
+
+.homepage-assistant {
+  grid-column: 1 / -1;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--widgetr-border);
+}
+
+:deep(.homepage-assistant .assistant-choice) {
+  margin-top: 0;
 }
 
 .homepage-section-heading {
@@ -322,6 +361,13 @@ const copyReceipt = computed(() => {
   font-size: 0.62rem;
   line-height: 1.4;
   text-align: right;
+}
+
+.homepage-continue-note {
+  margin: -0.2rem 0 -0.2rem;
+  color: var(--widgetr-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
 .homepage-continue-action {
