@@ -8,6 +8,7 @@
 - The active phase, task checklists, deployment gates, verification evidence, and exact next action live in [`docs/widgetr-phase-implementation-plan.md`](./docs/widgetr-phase-implementation-plan.md). Update its **Current handoff** after every session that changes implementation or verification state.
 - The user-facing product standard lives in [`docs/widgetr-product-principles.md`](./docs/widgetr-product-principles.md). Read it before planning or editing copy, onboarding, UI, UX, visual design, WebMCP handoff, examples, status messages, error states, support guidance, or agent-facing descriptions. Apply its review test as acceptance criteria. Its core rule is to make the easiest next step obvious, especially for beginners.
 - The current visual and interaction design contract lives in [`widgetr-design.md`](./widgetr-design.md). Read it when planning or editing the studio shell, canvas, preview sizes, selection, inspector, assistant handoff, responsive behavior, or related copy. Treat it as the design source of truth unless a newer user-approved design explicitly supersedes it.
+- The approved homepage and Studio split implementation handoff lives in [`docs/widgetr-homepage-studio-implementation.md`](./docs/widgetr-homepage-studio-implementation.md). Read it before implementing that focused change. It does not replace the canonical phase handoff or the broader product, UX, and visual contracts above.
 - User requests set the requested scope. Repository identity, safety, secret, and generated-file rules are non-negotiable. Use the product plan for system boundaries, the implementation plan for phase status and order, the design contract for UI decisions, and the browser runbook for rendered checks. If project documents conflict, pause and reconcile them instead of choosing silently.
 - Preserve unrelated changes in the worktree. Do not reset, clean, or delete files to make the checkout look tidy.
 
@@ -32,6 +33,18 @@ The identity gate is necessary but not sufficient authorization. Do not commit, 
 ## Status authority
 
 Do not duplicate phase status in this file. The canonical resume state is the **Current handoff** in [`docs/widgetr-phase-implementation-plan.md`](./docs/widgetr-phase-implementation-plan.md). If this file and the implementation plan disagree about status, pause implementation and reconcile the implementation plan against current Git, browser, deployment, and device evidence.
+
+## Provider-neutral WebMCP hard rule
+
+- Widgetr does not care which AI assistant provider is present. Never gate, branch, rank, or debate the product experience based on ChatGPT, Claude, or any other assistant brand.
+- Do not ask the user to choose a supported provider and do not reopen provider-compatibility research unless the user explicitly requests provider-specific behavior. A provider support list is not part of ordinary Widgetr implementation or review.
+- Runtime behavior may use only facts the page can observe:
+  1. **WebMCP enabled** means `document.modelContext?.registerTool` is available in the current page.
+  2. **WebMCP ready** means the required Widgetr tools registered successfully. Treat this as the product's ready or connected signal without attempting to identify the provider behind it.
+  3. **Your assistant is working** means Widgetr observed an actual registered-tool invocation.
+  4. **WebMCP unavailable** means the API is missing or required tool registration failed; show a useful next action.
+- Never infer a provider from user agent strings, globals, model names, prompt text, or browser chrome. Provider identity must not affect tool registration, status copy, UI branches, tests, or acceptance criteria.
+- Provider names may appear only as optional examples in setup help when useful. They must not become requirements, support promises, or runtime conditions.
 
 ## Resume checklist
 
@@ -59,6 +72,10 @@ Before opening or claiming the in-app browser preview is available:
 3. Open the exact URL for the verified Widgetr listener: `http://127.0.0.1:3100/` by default, or the explicitly reported port if an existing Widgetr session is intentionally using another port. Do not assume `http://localhost:3000/` is the current Widgetr preview.
 4. If there is no verified listener or the server is not ready, stop and report that the preview is unavailable instead of opening a browser tab or claiming that it is visible.
 
+## In-app browser inspection
+
+After every implementation change, open the exact local Widgetr preview in the Codex in-app browser, make the browser visible, and leave the changed route or state available for the user to inspect. For UI changes, verify the requested interaction at 1280 x 900 first and keep the browser tab available as the visual handoff. If a change has no meaningful visual surface, state that explicitly rather than silently treating source inspection as visual verification.
+
 ## Smallest-change routing map
 
 Start with the owning file below and search only that file (or the two files named for a cross-boundary change). Do not scan every component before making a focused UI change. Use `rg -n -C 5` with the exact visible copy, class, handler, or operation named in the request, then widen the search only when the owner is not present.
@@ -66,20 +83,20 @@ Start with the owning file below and search only that file (or the two files nam
 | Request area | First owner | Also inspect only when needed |
 | --- | --- | --- |
 | Tooling, dependencies, and runtime | `package.json`, `package-lock.json`, `.nvmrc` | `scripts/` for an existing command |
-| Studio shell, top bar, floating controls, canvas title/grid, sheets, responsive spacing | `app/pages/index.vue` | `widgetr-design.md` for an interaction or visual contract |
-| Preview caption, size scaling, whole-widget selection | `app/components/widget/WidgetPreview.vue` | `app/pages/index.vue` for selection state wiring |
+| Studio shell, top bar, floating controls, canvas title/grid, sheets, responsive spacing | `app/pages/studio.vue` | `widgetr-design.md` for an interaction or visual contract |
+| Preview caption, size scaling, whole-widget selection | `app/components/widget/WidgetPreview.vue` | `app/pages/studio.vue` for selection state wiring |
 | Rendered widget nodes and child hit targets | `app/components/widget/WidgetNodeRenderer.vue` | `app/domain/widget/tree.ts` for traversal or labels |
-| Layers/outline selection | `app/components/widget/WidgetStructureTree.vue` | `app/pages/index.vue` for selection state wiring |
+| Layers/outline selection | `app/components/widget/WidgetStructureTree.vue` | `app/pages/studio.vue` for selection state wiring |
 | Inspector fields and disclosure sections | `app/components/widget/WidgetInspector.vue` | `app/domain/widget/operations.ts` for the operation payload |
 | Projects and first-run choices | `app/components/widget/ProjectList.vue`, `app/components/widget/ProjectStarter.vue` | `app/composables/useWidgetProjects.ts` for persistence behavior |
 | Assistant status and tool details | `app/components/widget/AgentToolsPanel.vue` | `app/composables/useWidgetWebMcp.ts` for registration state |
 | Project persistence and restoration | `app/composables/useWidgetProjects.ts` | `app/domain/widget/projects.ts`, `app/domain/widget/storage.ts` |
 | Any document mutation or scope behavior | `app/domain/widget/operations.ts` | `app/types/widget.ts` and the caller that constructs the operation |
 | Element labels, lookup, and tree traversal | `app/domain/widget/tree.ts` | `app/types/widget.ts` for element shape |
-| Scriptable output or export formatting | `app/domain/widget/scriptable.ts` | `app/pages/index.vue` only for export-sheet wiring |
+| Scriptable output or export formatting | `app/domain/widget/scriptable.ts` | `app/pages/studio.vue` only for export-sheet wiring |
 | Unit verification | `tests/unit/`, `vitest.config.ts` | The relevant owner and its operation path |
 
-The current studio shell intentionally remains coordinated in `app/pages/index.vue`; do not extract a new shell component for a one-off visual adjustment. Keep a change in its first owner whenever possible, and only cross into a second owner when the behavior contract requires it. Update the implementation plan when the change alters the documented UI contract.
+The current studio shell intentionally remains coordinated in `app/pages/studio.vue`; do not extract a new shell component for a one-off visual adjustment. Keep a change in its first owner whenever possible, and only cross into a second owner when the behavior contract requires it. Update the implementation plan when the change alters the documented UI contract.
 
 ## Canonical widget invariants
 

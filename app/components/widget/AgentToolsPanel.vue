@@ -68,32 +68,6 @@ watch(() => props.history.length, (historyLength) => {
   }
 })
 
-const statusLabel = computed(() => {
-  switch (props.status) {
-    case 'registered':
-      return 'Ready for your assistant'
-    case 'registering':
-      return 'Preparing assistant tools'
-    case 'error':
-      return 'Assistant tools unavailable'
-    default:
-      return 'Assistant unavailable'
-  }
-})
-
-const statusColor = computed(() => {
-  switch (props.status) {
-    case 'registered':
-      return 'success'
-    case 'registering':
-      return 'warning'
-    case 'error':
-      return 'error'
-    default:
-      return 'neutral'
-  }
-})
-
 const contextLabel = computed(() => {
   switch (props.context) {
     case 'none':
@@ -117,8 +91,14 @@ const contextLabel = computed(() => {
       <UIcon name="i-lucide-bot" aria-hidden="true" />
     </div>
 
+    <WidgetWebMcpReadiness
+      class="agent-readiness"
+      :status="status"
+      :error="error"
+      compact
+    />
+
     <div class="agent-tools-meta">
-      <UBadge :color="statusColor" variant="soft" :label="statusLabel" />
       <span>{{ contextLabel }}</span>
     </div>
 
@@ -196,23 +176,6 @@ const contextLabel = computed(() => {
       aria-labelledby="agent-tools-tab"
       tabindex="0"
     >
-      <UAlert
-        v-if="status === 'unsupported'"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-plug-zap"
-        title="Assistant unavailable"
-        description="Continue building locally, or open this page in a WebMCP-enabled browser so your AI assistant can work with it."
-      />
-      <UAlert
-        v-else-if="error"
-        color="error"
-        variant="subtle"
-        icon="i-lucide-circle-alert"
-        title="Assistant tools could not be prepared"
-        :description="error"
-      />
-
       <div v-if="toolNames.length" class="agent-tools-list">
         <p class="agent-tools-label">Available now</p>
         <ul>
@@ -222,7 +185,7 @@ const contextLabel = computed(() => {
           </li>
         </ul>
       </div>
-      <p v-else-if="status === 'registering'" class="agent-tools-empty">
+      <p v-else-if="status === 'checking' || status === 'registering' || status === 'working'" class="agent-tools-empty">
         Updating the contextual tool set.
       </p>
       <p v-else-if="status === 'registered'" class="agent-tools-empty">

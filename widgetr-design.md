@@ -491,7 +491,7 @@ The canvas controls have a fixed priority order. The leading top-bar group is pr
 
 ### Component and state ownership
 
-Keep `app/pages/index.vue` as the page-level coordinator. It owns project loading, history, persistence, WebMCP registration, and event wiring. It should not own the detailed markup or styling for every region.
+Keep `app/pages/studio.vue` as the page-level coordinator. It owns project loading, history, persistence, WebMCP registration, and event wiring. It should not own the detailed markup or styling for every region.
 
 Create focused UI components under `app/components/studio/`:
 

@@ -1,9 +1,9 @@
-import type { OperationResult, WidgetOperation, WidgetProject, WidgetSize } from './widget'
+import type { OperationResult, WidgetOperation, WidgetProject, WidgetSize, WidgetStarterId } from './widget'
 import type { ScriptableExportResult } from '~/domain/widget/scriptable'
 
 export type WebMcpContext = 'none' | 'text' | 'image' | 'group' | 'unsupported'
 
-export type WebMcpStatus = 'unsupported' | 'registering' | 'registered' | 'error'
+export type WebMcpStatus = 'checking' | 'unsupported' | 'registering' | 'registered' | 'working' | 'error'
 
 export interface WebMcpJsonSchema {
   type?: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'null'
@@ -46,7 +46,7 @@ export interface WebMcpConfirmationRequest {
 export interface WebMcpRuntime {
   getProject: () => WidgetProject
   commitOperation: (operation: WidgetOperation) => OperationResult
-  createProject: (name: string) => Promise<WidgetProject>
+  createProject: (name: string, startingIntent?: WidgetStarterId) => Promise<WidgetProject>
   getExport: () => ScriptableExportResult
   requestConfirmation: (
     request: WebMcpConfirmationRequest,

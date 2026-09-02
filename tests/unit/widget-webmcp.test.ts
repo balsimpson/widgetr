@@ -5,12 +5,16 @@ import { createSampleWidgetProject } from '~/domain/widget/fixture'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
 import { registerWebMcpToolSet } from '~/composables/useWidgetWebMcp'
+import { createAssistantPrompt } from '~/domain/widget/onboarding'
 import {
+  createHomepageWebMcpToolCatalog,
+  createStarterWebMcpToolCatalog,
   createWebMcpToolCatalog,
   getWebMcpContext,
   getWebMcpToolNames,
   serializeWebMcpResult
 } from '~/domain/widget/webmcp'
+import { describeWebMcpStatus } from '~/domain/widget/webmcp-status'
 import type { WebMcpModelContext, WebMcpRuntime, WebMcpTool } from '~/types/webmcp'
 import type { WidgetOperation, WidgetProject } from '~/types/widget'
 
@@ -45,8 +49,8 @@ function createRuntime(initialProject: WidgetProject, confirmation = true) {
       }
       return result
     },
-    createProject: async name => {
-      state.project = createNewWidgetProject(fixedClock(), name)
+    createProject: async (name, startingIntent) => {
+      state.project = createNewWidgetProject(fixedClock(), name, startingIntent)
       return state.project
     },
     getExport: () => generateScriptableCode(state.project),
@@ -72,6 +76,83 @@ function signal(): AbortSignal {
 }
 
 describe('Widgetr WebMCP catalog', () => {
+  it('keeps the homepage catalog read-only and points to the Studio', async () => {
+    const project = createNeutralWidgetProject()
+    const { runtime } = createRuntime(project)
+    const catalog = createHomepageWebMcpToolCatalog('http://127.0.0.1:3100/studio')
+
+    expect(catalog.map(tool => tool.name)).toEqual(['widgetr_get_started'])
+    const result = await catalog[0]!.execute({}, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      studioUrl: 'http://127.0.0.1:3100/studio',
+      nextStep: expect.stringContaining('widgetr_create_widget')
+    })
+    expect(JSON.stringify(result)).toContain('Build a weather widget')
+    expect(JSON.stringify(result)).not.toContain('Kochi')
+  })
+
+  it('creates a neutral project from the chooser catalog with a validated starter', async () => {
+    const project = createNeutralWidgetProject()
+    const { runtime, state } = createRuntime(project)
+    const catalog = createStarterWebMcpToolCatalog('http://127.0.0.1:3100/studio')
+    const createTool = catalog.find(tool => tool.name === 'widgetr_create_widget')
+
+    expect(catalog.map(tool => tool.name)).toEqual([
+      'widgetr_get_started',
+      'widgetr_create_widget'
+    ])
+    expect(createTool).toBeDefined()
+
+    const result = await createTool!.execute({
+      name: 'Weather widget',
+      starterId: 'weather'
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      name: 'Weather widget',
+      startingIntent: 'weather'
+    })
+    expect(state.project.startingIntent).toBe('weather')
+    expect(state.project.dataSource.kind).toBe('none')
+    expect(JSON.stringify(state.project)).not.toContain('Kochi')
+  })
+
+  it('rejects an unlisted starter id before creating a project', async () => {
+    const project = createNeutralWidgetProject()
+    const { runtime, state } = createRuntime(project)
+    const createTool = createStarterWebMcpToolCatalog('http://127.0.0.1:3100/studio')
+      .find(tool => tool.name === 'widgetr_create_widget')
+
+    const result = await createTool!.execute({
+      name: 'Unexpected widget',
+      starterId: 'sample-project'
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'INVALID_INPUT'
+    })
+    expect(state.project.id).toBe(project.id)
+  })
+
+  it('builds the assistant message from the current Widgetr URL', () => {
+    expect(createAssistantPrompt('http://127.0.0.1:3100/')).toBe(
+      'Open Widgetr at http://127.0.0.1:3100/. Ask me what I want to see in a Scriptable widget, then open the widget editor and start it with me. Keep working on that widget as I refine it.'
+    )
+  })
+
+  it('keeps all WebMCP status labels provider-neutral and observable', () => {
+    expect(describeWebMcpStatus('checking').label).toBe('Checking for WebMCP...')
+    expect(describeWebMcpStatus('unsupported').label).toBe('Open Widgetr with a WebMCP-enabled assistant')
+    expect(describeWebMcpStatus('registering').label).toBe('Preparing Widgetr tools...')
+    expect(describeWebMcpStatus('registered').label).toBe('WebMCP ready')
+    expect(describeWebMcpStatus('working').label).toBe('Your assistant is working')
+    expect(describeWebMcpStatus('error').label).toBe('Widgetr tools could not start')
+  })
+
   it('exposes only the no-selection tools when nothing is selected', () => {
     const project = createSampleWidgetProject()
     project.selection = null

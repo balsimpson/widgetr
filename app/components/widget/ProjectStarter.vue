@@ -2,16 +2,22 @@
 import { computed, ref } from 'vue'
 import { createSampleWidgetProject } from '~/domain/widget/fixture'
 import { WIDGET_STARTERS } from '~/domain/widget/starters'
+import type { WebMcpStatus } from '~/types/webmcp'
 import type { WidgetStarterId } from '~/types/widget'
 
 const props = defineProps<{
   isLoading: boolean
   persistenceError: string | null
   disabled: boolean
+  canCancel: boolean
+  webmcpStatus: WebMcpStatus
+  webmcpError: string | null
 }>()
 
 const emit = defineEmits<{
   start: [starterId: WidgetStarterId]
+  cancel: []
+  retryWebmcp: []
 }>()
 
 const examplesOpen = ref(false)
@@ -44,8 +50,20 @@ function choose(starterId: WidgetStarterId): void {
 
       <template v-else>
         <header class="starter-header">
-          <div class="starter-mark" aria-hidden="true">
-            <UIcon name="i-lucide-panels-top-left" />
+          <div class="starter-header-toolbar">
+            <div class="starter-mark" aria-hidden="true">
+              <UIcon name="i-lucide-panels-top-left" />
+            </div>
+            <UButton
+              v-if="props.canCancel"
+              label="Back to project"
+              icon="i-lucide-arrow-left"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :disabled="props.disabled"
+              @click="emit('cancel')"
+            />
           </div>
           <h1 id="starter-heading">Start building a widget</h1>
           <p>
@@ -53,6 +71,14 @@ function choose(starterId: WidgetStarterId): void {
             Your preview and controls will stay here.
           </p>
         </header>
+
+        <WidgetWebMcpReadiness
+          class="starter-readiness"
+          :status="props.webmcpStatus"
+          :error="props.webmcpError"
+          compact
+          @retry="emit('retryWebmcp')"
+        />
 
         <UAlert
           v-if="props.persistenceError"
@@ -185,12 +211,19 @@ function choose(starterId: WidgetStarterId): void {
   max-width: 51rem;
 }
 
+.starter-header-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .starter-mark {
   display: grid;
   width: 2.6rem;
   height: 2.6rem;
   place-items: center;
-  margin-bottom: 1.5rem;
   border: 1px solid color-mix(in srgb, var(--widgetr-accent) 32%, var(--widgetr-border));
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--widgetr-accent) 12%, transparent);
@@ -221,6 +254,11 @@ function choose(starterId: WidgetStarterId): void {
 
 .starter-alert {
   margin-top: 1.75rem;
+}
+
+.starter-readiness {
+  max-width: 38rem;
+  margin-top: 1.5rem;
 }
 
 .starter-layout {

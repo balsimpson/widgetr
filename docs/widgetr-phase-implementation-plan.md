@@ -19,15 +19,15 @@ Update this section after every session that changes implementation, verificatio
 
 | Field | Current value |
 | --- | --- |
-| Last updated | 1 September 2026 |
+| Last updated | 2 September 2026 |
 | Active phase | Phase 4: close the deployed WebMCP and Scriptable vertical slice |
 | Phase state | In progress |
 | Phase 4 state | In progress; Phase 5 is complete locally, while the remaining WebMCP, export, README, and iPhone checks are resumed here |
 | Local branch | `main` |
-| Local and remote commit | `HEAD` (empty-canvas selection clearing committed and synchronized with `origin/main`) |
-| Latest verified UI commit | `HEAD` (empty canvas clicks clear element selection) |
+| Local and remote commit | `HEAD` (no commit created; working tree adds the homepage and `/studio` split, safe onboarding catalogs, shared readiness UI, and the official Scriptable asset while preserving the existing starter changes) |
+| Latest verified UI commit | Working tree (in-app browser checks at `1280 x 900` and `390 x 844` cover the assistant-led homepage handoff, the leading Scriptable relationship block, compact chooser with a separate `Assistant` heading and ChatGPT desktop `Recommended` overlay badge, no direct create action, conditional saved-project `Continue` button, `/studio`, `/studio?new=1`, starter creation, cancel/back, active assistant panel, and no horizontal overflow) |
 | Production URL | [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/) |
-| Next action | Resume the open Phase 4 WebMCP, export, README, and iPhone gates |
+| Next action | Ask before running focused tests or typecheck, then verify actual WebMCP tool invocation and continue the remaining Phase 4 deployment/export/README/iPhone gates |
 | Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
 | Next production checkpoint | Complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
 | Next phase | Phase 6: assistant handoff, truthful status, and fallback |
@@ -248,7 +248,7 @@ On the deployed page, an external assistant can read the current project, make a
 
 - `app/composables/useWidgetWebMcp.ts`
 - `app/domain/widget/webmcp.ts`
-- `app/pages/index.vue`
+- `app/pages/studio.vue`
 - `app/components/widget/AgentToolsPanel.vue`
 - `app/domain/widget/scriptable.ts`
 - `tests/unit/widget-webmcp.test.ts`
@@ -307,7 +307,7 @@ A new visitor sees a calm start screen, chooses a real outcome, and knows what t
 
 ### Likely files
 
-- `app/pages/index.vue`
+- `app/pages/studio.vue`
 - `app/composables/useWidgetProjects.ts`
 - `app/domain/widget/projects.ts`
 - `app/domain/widget/fixture.ts`
@@ -384,7 +384,7 @@ The person understands that the conversation happens in an external assistant, c
 
 - `app/composables/useWidgetWebMcp.ts`
 - `app/components/widget/AgentToolsPanel.vue`
-- `app/pages/index.vue`
+- `app/pages/studio.vue`
 - `app/domain/widget/webmcp.ts`
 - `app/types/webmcp.ts`
 - `tests/unit/widget-webmcp.test.ts`
@@ -765,6 +765,7 @@ Append concise evidence after material verification. Do not replace older eviden
 | 1 Sep 2026 | UI revision | Kept the assistant dock at a fixed centered width, removed its hover lift, and replaced abrupt status-copy swaps with a 140ms opacity-only crossfade that respects reduced-motion settings. The visible local browser check confirmed hover changes only shadow styling, selected copy replaces the idle message, Inspector close returns to the idle message, and the dock kept identical x/y/width/height through those transitions and Projects open/close; no browser warnings or errors appeared, `git diff --check`, `npm run repo:check`, and the Impeccable detector passed | Tests, typecheck, and production build remain separate verification checkpoints; production behavior, external assistant invocation, and Scriptable/iPhone execution remain unverified; this follow-up is currently uncommitted |
 
 | 1 Sep 2026 | UI revision | Preserved `All` preview mode when selecting an element in any of the Small, Medium, or Large previews, while keeping the clicked element selected and scoping the Inspector to its size. Local browser checks confirmed all three previews remained visible, the `All` control stayed pressed, selection copy identified the clicked size, and no warning or error logs appeared; `git diff --check` and `npm run repo:check` passed | Tests, typecheck, and production build remain separate verification checkpoints; production behavior, external assistant invocation, and Scriptable/iPhone execution remain unverified; this follow-up is currently uncommitted |
+| 2 Sep 2026 | Homepage and Studio implementation | Implemented the approved `/` onboarding page and moved the existing editor to `/studio`; added the dynamic assistant prompt and copy receipt, official Scriptable app icon from [scriptable.app](https://scriptable.app/), shared WebMCP readiness states, safe homepage/starter catalogs, optional validated starter creation, and `/studio?new=1` start/cancel cleanup. The visible local in-app browser at `1280 x 900` and `390 x 844` verified the homepage, prompt copy, CTA route, starter-to-Studio transition, cancel/back behavior, active assistant panel, and no horizontal overflow; `git diff --check` and `npm run repo:check` passed | Node 24 was unavailable, so the package-compatible Node 22.23.1 runtime served the preview; tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified |
 
 ## End-of-session update rule
 

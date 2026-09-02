@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { WIDGET_CONSTRAINTS } from './constraints'
+import { WIDGET_STARTERS } from './starters'
 import { findWidgetElement, widgetElementLabel } from './tree'
 import {
   designScopeSchema,
@@ -14,6 +15,7 @@ import type {
   WidgetElement,
   WidgetOperation,
   WidgetProject,
+  WidgetStarterId,
   WidgetSize
 } from '~/types/widget'
 import type {
@@ -257,8 +259,18 @@ const clearSelectionInputSchema = z.object({
 
 const emptyInputSchema = z.object({}).strict()
 
+const creatableStarterIds = WIDGET_STARTERS
+  .filter(starter => starter.action === 'create')
+  .map(starter => starter.id)
+
+const starterIdSchema = z.string().trim().refine(
+  value => WIDGET_STARTERS.some(starter => starter.action === 'create' && starter.id === value),
+  'Choose one of Widgetr\'s listed starting ideas.'
+).transform(value => value as WidgetStarterId)
+
 const createWidgetInputSchema = z.object({
-  name: z.string().trim().min(1).max(120)
+  name: z.string().trim().min(1).max(120),
+  starterId: starterIdSchema.optional()
 }).strict()
 
 const designScopeInputSchema = z.object({
@@ -689,43 +701,90 @@ function sharedTools(): WebMcpToolDescriptor[] {
   ]
 }
 
+function getStartedTool(studioUrl: string): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_get_started',
+    title: 'Get started with Widgetr',
+    description: 'Read what Widgetr does, where its widget editor is, and which starting paths are available before creating a widget.',
+    inputSchema: objectJsonSchema({}),
+    annotations: readOnlyAnnotations(),
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(emptyInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      return {
+        ok: true,
+        widgetr: 'Widgetr is a visual workspace for building Scriptable widgets with an AI assistant.',
+        studioUrl,
+        starters: WIDGET_STARTERS.map(starter => ({
+          id: starter.id,
+          label: starter.label,
+          action: starter.action
+        })),
+        nextStep: 'Ask the user what they want to create before using widgetr_create_widget. Open the widget editor URL to shape it together.',
+        message: 'Widgetr is ready. Ask what the user wants to build, then shape it together in the widget editor.'
+      }
+    }
+  })
+}
+
+function createWidgetTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_create_widget',
+    title: 'Create a Widgetr widget',
+    description: 'Create a new local Widgetr project from a listed starting idea. This never edits the neutral unsaved project.',
+    inputSchema: objectJsonSchema({
+      name: { type: 'string', minLength: 1, maxLength: 120, description: 'The new widget name.' },
+      starterId: {
+        type: 'string',
+        enum: creatableStarterIds,
+        description: 'Optional listed starting idea to record on the new project.'
+      }
+    }, ['name']),
+    annotations: mutationAnnotations(),
+    execute: async (_input, _context, runtime) => {
+      const parsed = parseOrError(createWidgetInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      try {
+        const project = await runtime.createProject(parsed.value.name, parsed.value.starterId)
+        return {
+          ok: true,
+          projectId: project.id,
+          name: project.name,
+          startingIntent: project.startingIntent,
+          revision: project.revision,
+          changedSizes: [],
+          warnings: [],
+          selection: project.selection,
+          message: `Created the local widget ${project.name}. Open the widget editor and review the starting canvas.`
+        }
+      } catch (error) {
+        return errorPayload(
+          runtime,
+          'CREATE_FAILED',
+          error instanceof Error ? error.message : 'The local widget could not be created.'
+        )
+      }
+    }
+  })
+}
+
+export function createHomepageWebMcpToolCatalog(studioUrl: string): WebMcpToolDescriptor[] {
+  return [getStartedTool(studioUrl)]
+}
+
+export function createStarterWebMcpToolCatalog(studioUrl: string): WebMcpToolDescriptor[] {
+  return [getStartedTool(studioUrl), createWidgetTool()]
+}
+
 function noSelectionTools(): WebMcpToolDescriptor[] {
   return [
-    descriptor({
-      name: 'widgetr_create_widget',
-      title: 'Create a Widgetr widget',
-      description: 'Create a new local Widgetr project from the editable starting template.',
-      inputSchema: objectJsonSchema({
-        name: { type: 'string', minLength: 1, maxLength: 120, description: 'The new widget name.' }
-      }, ['name']),
-      annotations: mutationAnnotations(),
-      execute: async (_input, _context, runtime) => {
-        const parsed = parseOrError(createWidgetInputSchema, _input, runtime)
-        if (!parsed.ok) {
-          return parsed.payload
-        }
-
-        try {
-          const project = await runtime.createProject(parsed.value.name)
-          return {
-            ok: true,
-            projectId: project.id,
-            name: project.name,
-            revision: project.revision,
-            changedSizes: [],
-            warnings: [],
-            selection: project.selection,
-            message: `Created the local widget ${project.name}.`
-          }
-        } catch (error) {
-          return errorPayload(
-            runtime,
-            'CREATE_FAILED',
-            error instanceof Error ? error.message : 'The local widget could not be created.'
-          )
-        }
-      }
-    }),
+    createWidgetTool(),
     descriptor({
       name: 'widgetr_set_design_scope',
       title: 'Set Widgetr design scope',
