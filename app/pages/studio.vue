@@ -37,6 +37,7 @@ const {
   project,
   projects,
   isLoading,
+  isHydrated,
   persistenceState,
   persistenceError,
   replaceProject,
@@ -125,6 +126,8 @@ const referenceUrl = ref<string | null>(null)
 const referenceError = ref<string | null>(null)
 const agentConfirmation = ref<WebMcpConfirmationRequest | null>(null)
 const starterBusy = ref(false)
+const starterModalOpen = ref(false)
+const starterModalDismissed = ref(false)
 let pendingAgentConfirmation: {
   resolve: (confirmed: boolean) => void
   cleanup: () => void
@@ -132,6 +135,8 @@ let pendingAgentConfirmation: {
 
 const activeSizes = computed(() => resolveDesignScope(project.value.designScope))
 const showStarter = computed(() => isLoading.value || projects.value.length === 0 || forcedNewProject.value)
+const isEmptyStudio = computed(() => isHydrated.value && projects.value.length === 0)
+const shouldShowStarterModal = computed(() => isHydrated.value && (projects.value.length === 0 || forcedNewProject.value))
 const exportResult = computed(() => generateScriptableCode(project.value))
 const generatedSource = computed(() => exportResult.value.code ?? '')
 const blockingIssues = computed(() => exportResult.value.issues.filter(issue => issue.severity === 'blocking'))
@@ -140,6 +145,19 @@ const exportReady = computed(() => generatedSource.value.length > 0)
 const previewPanStyle = computed(() => ({
   transform: `translate3d(${canvasPanX.value}px, ${canvasPanY.value}px, 0)`
 }))
+
+watch(
+  shouldShowStarterModal,
+  shouldShow => {
+    if (shouldShow && !starterModalDismissed.value) {
+      starterModalOpen.value = true
+    } else if (!shouldShow) {
+      starterModalOpen.value = false
+      starterModalDismissed.value = false
+    }
+  },
+  { immediate: true }
+)
 
 const scopeLabel = computed(() => {
   if (activeSizes.value.length === WIDGET_SIZES.length) {
@@ -369,6 +387,10 @@ function commitOperation(
 }
 
 function selectElement(selection: WidgetSelection, options: { keepLayers?: boolean } = {}): void {
+  if (isEmptyStudio.value) {
+    return
+  }
+
   closeContextualSurfaces(options)
   structureSize.value = selection.size
   if (previewView.value !== 'all') {
@@ -499,6 +521,11 @@ function handleCanvasClickCapture(event: MouseEvent): void {
 }
 
 function selectNavigationMode(mode: NavigationMode): void {
+  if (isEmptyStudio.value && mode !== 'projects') {
+    openNewProject()
+    return
+  }
+
   navigationMode.value = mode
   closeContextualSurfaces()
   if (mode === 'projects') {
@@ -519,6 +546,11 @@ function openLayers(): void {
 }
 
 function openWidgetSettings(): void {
+  if (isEmptyStudio.value) {
+    openNewProject()
+    return
+  }
+
   closeContextualSurfaces()
   const keepPinnedInspector = inspectorPinned.value
   clearSelection()
@@ -532,11 +564,19 @@ function openReference(): void {
 }
 
 function openExport(): void {
+  if (isEmptyStudio.value) {
+    return
+  }
+
   closeContextualSurfaces()
   exportOpen.value = true
 }
 
 function focusPreview(size: WidgetSize): void {
+  if (isEmptyStudio.value) {
+    return
+  }
+
   structureSize.value = size
   previewView.value = size
 
@@ -562,6 +602,10 @@ function focusPreview(size: WidgetSize): void {
 }
 
 function setPreviewView(value: WidgetSize | 'all'): void {
+  if (isEmptyStudio.value) {
+    return
+  }
+
   previewView.value = value
   if (value !== 'all') {
     structureSize.value = value
@@ -655,6 +699,8 @@ async function selectProject(projectId: string): Promise<void> {
 
 function openNewProject(): void {
   closeContextualSurfaces()
+  starterModalDismissed.value = false
+  starterModalOpen.value = true
   void router.push({
     path: '/studio',
     query: { ...route.query, new: '1' }
@@ -665,7 +711,19 @@ function cancelNewProject(): void {
   if (starterBusy.value) {
     return
   }
+  starterModalDismissed.value = true
+  starterModalOpen.value = false
   clearForcedNewQuery()
+}
+
+function updateStarterModal(open: boolean): void {
+  if (open) {
+    starterModalDismissed.value = false
+    starterModalOpen.value = true
+    return
+  }
+
+  cancelNewProject()
 }
 
 async function createAgentProject(name: string, startingIntent?: WidgetStarterId): Promise<WidgetProject> {
@@ -679,7 +737,7 @@ async function createAgentProject(name: string, startingIntent?: WidgetStarterId
   return created
 }
 
-async function startFromStarter(starterId: WidgetStarterId): Promise<void> {
+async function startFromStarter(starterId: WidgetStarterId, referenceFile?: File): Promise<void> {
   if (starterBusy.value) {
     return
   }
@@ -700,7 +758,11 @@ async function startFromStarter(starterId: WidgetStarterId): Promise<void> {
     historyFuture.value = []
     lastResult.value = null
     referenceError.value = null
-    await loadReferenceImage()
+    if (starter.action === 'reference' && referenceFile) {
+      await handleReferenceUpload(referenceFile)
+    } else {
+      await loadReferenceImage()
+    }
     clearForcedNewQuery()
 
     if (starter.action === 'reference') {
@@ -709,6 +771,10 @@ async function startFromStarter(starterId: WidgetStarterId): Promise<void> {
   } finally {
     starterBusy.value = false
   }
+}
+
+async function startFromReference(file: File): Promise<void> {
+  await startFromStarter('reference-image', file)
 }
 
 function openRenameProject(target: WidgetProject): void {
@@ -750,14 +816,15 @@ function openDeleteProject(target: WidgetProject): void {
 }
 
 async function confirmDeleteProject(): Promise<void> {
-  if (!deleteTarget.value) {
+  const target = deleteTarget.value
+  if (!target) {
     return
   }
-  await deleteProject(deleteTarget.value)
+  deleteProjectOpen.value = false
+  await deleteProject(target)
   historyPast.value = []
   historyFuture.value = []
   lastResult.value = null
-  deleteProjectOpen.value = false
   deleteTarget.value = null
   await loadReferenceImage()
 }
@@ -937,7 +1004,7 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 
   if (event.key === 'Escape') {
-    if (forcedNewProject.value) {
+    if (starterModalOpen.value || forcedNewProject.value) {
       cancelNewProject()
       return
     }
@@ -975,21 +1042,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="studio-shell" :class="{ 'studio-shell-starter': showStarter }">
-    <WidgetProjectStarter
-      v-if="showStarter"
-      :is-loading="isLoading"
-      :persistence-error="persistenceError"
-      :disabled="starterBusy"
-      :can-cancel="projects.length > 0"
-      :webmcp-status="webmcpStatus"
-      :webmcp-error="webmcpError"
-      @start="startFromStarter"
-      @cancel="cancelNewProject"
-      @retry-webmcp="refreshWebMcp"
-    />
-
-    <template v-else>
+  <main class="studio-shell">
       <header class="studio-topbar">
         <div class="topbar-leading">
           <UButton
@@ -1040,6 +1093,7 @@ onBeforeUnmount(() => {
             class="topbar-export"
             aria-label="Export"
             title="Export"
+            :disabled="isLoading || isEmptyStudio"
             @click="openExport"
           />
         </div>
@@ -1171,7 +1225,7 @@ onBeforeUnmount(() => {
 
           <div class="canvas-control-stack">
             <div class="canvas-project-title" aria-label="Current project">
-              <h2 id="canvas-project-title-heading">{{ project.name }}</h2>
+              <h2 id="canvas-project-title-heading">{{ isLoading ? 'Loading workspace…' : isEmptyStudio ? 'No widget yet' : project.name }}</h2>
             </div>
 
             <div class="canvas-floating-controls" aria-label="Canvas controls">
@@ -1186,6 +1240,7 @@ onBeforeUnmount(() => {
                 class="size-control"
                 :class="{ 'size-control-active': previewView === size }"
                 :aria-pressed="previewView === size"
+                :disabled="isLoading || isEmptyStudio"
                 @click="focusPreview(size)"
               />
               <UButton
@@ -1198,6 +1253,7 @@ onBeforeUnmount(() => {
                 aria-label="All sizes"
                 title="All sizes"
                 :aria-pressed="previewView === 'all'"
+                :disabled="isLoading || isEmptyStudio"
                 @click="setPreviewView('all')"
               />
             </div>
@@ -1239,7 +1295,28 @@ onBeforeUnmount(() => {
               :description="lastResult.message"
             />
 
+            <div v-if="isLoading" class="canvas-empty-state canvas-empty-state-loading" aria-live="polite">
+              <USkeleton class="canvas-empty-icon-skeleton" />
+              <USkeleton class="canvas-empty-heading-skeleton" />
+              <USkeleton class="canvas-empty-copy-skeleton" />
+            </div>
+
+            <div v-else-if="isEmptyStudio" class="canvas-empty-state">
+              <span class="canvas-empty-icon" aria-hidden="true">
+                <UIcon name="i-lucide-panels-top-left" />
+              </span>
+              <h2>No widgets yet</h2>
+              <p>Choose a starting point to begin designing.</p>
+              <UButton
+                label="Create new widget"
+                icon="i-lucide-plus"
+                color="primary"
+                @click="openNewProject"
+              />
+            </div>
+
             <div
+              v-else
               ref="previewScrollRef"
               class="preview-scroll"
               :class="{ 'is-panning': isCanvasPanning }"
@@ -1287,7 +1364,12 @@ onBeforeUnmount(() => {
             <UIcon name="i-lucide-chevron-right" aria-hidden="true" />
             <strong>{{ selectedElementTitle }}</strong>
           </div>
+          <div v-if="isLoading || isEmptyStudio" class="empty-inspector-state">
+            <UIcon name="i-lucide-panels-top-left" aria-hidden="true" />
+            <p>{{ isLoading ? 'Loading your workspace.' : 'Create a widget to edit its settings.' }}</p>
+          </div>
           <WidgetInspector
+            v-else
             class="studio-inspector-content"
             :mode="project.selection ? 'element' : 'widget'"
             embedded
@@ -1338,7 +1420,6 @@ onBeforeUnmount(() => {
           </UPopover>
         </div>
       </Teleport>
-    </template>
 
     <USlideover
       v-model:open="projectsOpen"
@@ -1702,6 +1783,26 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </UModal>
+
+    <UModal
+      :open="starterModalOpen"
+      class="starter-modal-content"
+      title="Start a widget"
+      description="Choose a template or bring a visual reference."
+      :ui="{ body: 'p-0 sm:p-0' }"
+      @update:open="updateStarterModal"
+    >
+      <template #body>
+        <WidgetProjectStarter
+          :is-loading="isLoading"
+          :persistence-error="persistenceError"
+          :disabled="starterBusy"
+          :open="starterModalOpen"
+          @start="startFromStarter"
+          @reference="startFromReference"
+        />
+      </template>
+    </UModal>
   </main>
 </template>
 
@@ -1715,10 +1816,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: var(--widgetr-app);
   color: var(--widgetr-ink);
-}
-
-.studio-shell-starter {
-  overflow: auto;
 }
 
 .studio-topbar {
@@ -2070,6 +2167,72 @@ onBeforeUnmount(() => {
   border: 1px solid var(--widgetr-border);
   border-radius: var(--widgetr-radius-stage);
   background: color-mix(in srgb, var(--widgetr-stage) 88%, var(--widgetr-pane-solid));
+}
+
+.canvas-empty-state {
+  display: grid;
+  min-height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 2rem;
+  color: var(--widgetr-muted);
+  text-align: center;
+}
+
+.canvas-empty-icon {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--widgetr-accent) 30%, var(--widgetr-border));
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--widgetr-accent) 9%, transparent);
+  color: var(--widgetr-accent);
+}
+
+.canvas-empty-icon .i-lucide {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.canvas-empty-state h2 {
+  margin: 0;
+  color: var(--widgetr-ink);
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.canvas-empty-state p {
+  max-width: 34ch;
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.empty-inspector-state {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.65rem;
+  min-height: 12rem;
+  padding: 1rem;
+  color: var(--widgetr-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.empty-inspector-state .i-lucide {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: var(--widgetr-accent);
+}
+
+.empty-inspector-state p {
+  max-width: 22ch;
+  margin: 0;
 }
 
 .operation-result {
@@ -2511,6 +2674,29 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
+:global(body > [data-slot="content"].starter-modal-content) {
+  width: min(34rem, calc(100vw - 2rem)) !important;
+  max-width: none !important;
+  max-height: min(calc(100dvh - 2rem), 48rem) !important;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--widgetr-ink) 14%, transparent);
+  border-radius: 1.5rem;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 92%, transparent);
+  box-shadow: 0 28px 90px rgb(0 0 0 / 25%), 0 0 0 1px color-mix(in srgb, var(--widgetr-ink) 5%, transparent);
+  backdrop-filter: blur(28px) saturate(1.2);
+  -webkit-backdrop-filter: blur(28px) saturate(1.2);
+}
+
+:global(body > [data-slot="content"].starter-modal-content > [data-slot="header"]) {
+  padding: 1.15rem 1.25rem 0.9rem;
+  border-bottom: 1px solid var(--widgetr-border);
+  background: transparent;
+}
+
+:global(body > [data-slot="content"].starter-modal-content > [data-slot="body"]) {
+  overflow: hidden;
+}
+
 .export-actions {
   justify-content: flex-end;
   width: 100%;
@@ -2785,6 +2971,16 @@ onBeforeUnmount(() => {
   .topbar-export :deep(svg) {
     width: 1rem;
     height: 1rem;
+  }
+
+  :global(body > [data-slot="content"].starter-modal-content) {
+    width: calc(100vw - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    border-radius: 1.25rem;
+  }
+
+  :global(body > [data-slot="content"].starter-modal-content > [data-slot="header"]) {
+    padding: 1rem 1rem 0.8rem;
   }
 
   .topbar-center {
