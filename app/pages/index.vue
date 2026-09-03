@@ -13,26 +13,38 @@ import type {
 } from '~/types/widget'
 import type { WebMcpConfirmationRequest } from '~/types/webmcp'
 
-useHead({
-  title: 'Widgetr',
-  meta: [
-    {
-      name: 'description',
-      content: 'Build Scriptable widgets with your AI assistant in the Widgetr widget editor.'
-    }
-  ]
-})
-
 const homepageProject = ref(createNeutralWidgetProject())
 const homepageEnabled = ref(true)
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 const requestUrl = useRequestURL()
+const canonicalUrl = computed(() => new URL('/', requestUrl.origin).toString())
+
+useSeoMeta({
+  title: 'Widgetr | Build Scriptable widgets',
+  description: 'Build a Scriptable widget with a visual editor and your AI assistant, then export it to your iPhone.',
+  ogTitle: 'Widgetr | Build Scriptable widgets',
+  ogDescription: 'Build a Scriptable widget with a visual editor and your AI assistant, then export it to your iPhone.',
+  ogType: 'website',
+  ogUrl: () => canonicalUrl.value,
+  ogSiteName: 'Widgetr',
+  twitterCard: 'summary',
+  twitterTitle: 'Widgetr | Build Scriptable widgets',
+  twitterDescription: 'Build a Scriptable widget with a visual editor and your AI assistant, then export it to your iPhone.'
+})
+
+useHead({
+  link: [
+    {
+      rel: 'canonical',
+      href: canonicalUrl
+    }
+  ]
+})
+
 const { projects: savedProjects } = useWidgetProjects()
 const hasSavedProjects = computed(() => savedProjects.value.length > 0)
 
-const widgetrUrl = computed(() => (
-  new URL('/', requestUrl.origin).toString()
-))
+const widgetrUrl = canonicalUrl
 const assistantMessage = computed(() => createAssistantPrompt(widgetrUrl.value))
 
 function currentStudioUrl(): string {

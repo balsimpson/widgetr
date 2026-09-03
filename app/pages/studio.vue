@@ -30,16 +30,6 @@ import type {
 } from '~/types/widget'
 import type { WebMcpConfirmationRequest } from '~/types/webmcp'
 
-useHead({
-  title: 'Widgetr widget editor',
-  meta: [
-    {
-      name: 'description',
-      content: 'A local-first widget editor for building Scriptable widgets.'
-    }
-  ]
-})
-
 const {
   project,
   projects,
@@ -64,6 +54,30 @@ const {
 
 const route = useRoute()
 const router = useRouter()
+const requestUrl = useRequestURL()
+const canonicalUrl = computed(() => new URL('/studio', requestUrl.origin).toString())
+
+useSeoMeta({
+  title: 'Widgetr Studio | Build a Scriptable widget',
+  description: 'Design, review, and export your Scriptable widget in Widgetr.',
+  ogTitle: 'Widgetr Studio | Build a Scriptable widget',
+  ogDescription: 'Design, review, and export your Scriptable widget in Widgetr.',
+  ogType: 'website',
+  ogUrl: () => canonicalUrl.value,
+  ogSiteName: 'Widgetr',
+  twitterCard: 'summary',
+  twitterTitle: 'Widgetr Studio | Build a Scriptable widget',
+  twitterDescription: 'Design, review, and export your Scriptable widget in Widgetr.'
+})
+
+useHead({
+  link: [
+    {
+      rel: 'canonical',
+      href: canonicalUrl
+    }
+  ]
+})
 
 const forcedNewProject = computed(() => route.query.new === '1')
 

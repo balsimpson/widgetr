@@ -161,7 +161,9 @@ export function textStyle(style: TextStyle): StyleRecord {
       : style.alignment === 'trailing'
         ? 'right'
         : 'center',
-    overflowWrap: 'anywhere',
+    whiteSpace: style.lineLimit === 1 ? 'nowrap' : 'normal',
+    overflowWrap: style.lineLimit === 1 ? 'normal' : 'anywhere',
+    textOverflow: 'clip',
     '-webkit-box-orient': 'vertical',
     '-webkit-line-clamp': style.lineLimit
   }

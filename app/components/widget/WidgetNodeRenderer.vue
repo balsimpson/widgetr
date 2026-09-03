@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useWidgetTextFit } from '~/composables/useWidgetTextFit'
 import {
   elementStyle,
   groupStyle,
@@ -106,6 +107,34 @@ const renderedDate = computed(() => {
   return formatDateValue(renderedText.value, props.element.format)
 })
 
+const renderedDisplayText = computed(() => (
+  props.element.type === 'date' ? renderedDate.value : renderedText.value
+))
+
+const textElement = computed(() => (
+  props.element.type === 'text' || props.element.type === 'date'
+    ? props.element
+    : null
+))
+
+const textBoxStyle = computed(() => ({
+  ...boxStyle.value,
+  ...(textElement.value?.style.width === 'fit'
+    ? { minWidth: 'max-content', flexShrink: 0 }
+    : {})
+}))
+
+const {
+  containerRef: textContainerRef,
+  contentRef: textContentRef,
+  style: textFitStyle
+} = useWidgetTextFit({
+  text: renderedDisplayText,
+  fontSize: computed(() => textElement.value?.textStyle.fontSize ?? 14),
+  lineLimit: computed(() => textElement.value?.textStyle.lineLimit ?? 1),
+  width: computed(() => textElement.value?.style.width ?? 'fit')
+})
+
 const repeatItems = computed(() => {
   if (props.element.type !== 'repeat') {
     return []
@@ -201,9 +230,10 @@ const visualDataElement = computed(() => (
 
     <span
       v-else-if="element.type === 'text'"
+      ref="textContainerRef"
       class="widget-node"
       :class="{ 'element-selected': isSelected }"
-      :style="{ ...boxStyle, ...textStyle(element.textStyle) }"
+      :style="{ ...textBoxStyle, ...textStyle(element.textStyle), ...textFitStyle }"
       :data-element-id="element.id"
       role="button"
       tabindex="0"
@@ -211,14 +241,15 @@ const visualDataElement = computed(() => (
       :aria-pressed="isSelected"
       @click.stop="selectElement"
       @keydown="handleKeydown"
-    >{{ renderedText }}</span>
+    ><span ref="textContentRef" class="widget-text-content">{{ renderedText }}</span></span>
 
     <time
       v-else-if="element.type === 'date'"
+      ref="textContainerRef"
       class="widget-node"
       :class="{ 'element-selected': isSelected }"
       :datetime="renderedText"
-      :style="{ ...boxStyle, ...textStyle(element.textStyle) }"
+      :style="{ ...textBoxStyle, ...textStyle(element.textStyle), ...textFitStyle }"
       :data-element-id="element.id"
       role="button"
       tabindex="0"
@@ -226,7 +257,7 @@ const visualDataElement = computed(() => (
       :aria-pressed="isSelected"
       @click.stop="selectElement"
       @keydown="handleKeydown"
-    >{{ renderedDate }}</time>
+    ><span ref="textContentRef" class="widget-text-content">{{ renderedDate }}</span></time>
 
     <img
       v-else-if="element.type === 'image'"
@@ -333,6 +364,12 @@ const visualDataElement = computed(() => (
   outline: 1px solid transparent;
   outline-offset: 2px;
   transition: outline-color 120ms ease, box-shadow 120ms ease;
+}
+
+.widget-text-content {
+  display: inline-block;
+  max-width: none;
+  white-space: nowrap;
 }
 
 .widget-node:focus-visible {

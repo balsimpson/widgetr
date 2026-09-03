@@ -84,11 +84,11 @@ export function resolveValueText(
 
 function formatWeekday(value: string): string {
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Date(`${value}T00:00:00Z`)
+    ? new Date(`${value}T12:00:00`)
     : new Date(value)
   return Number.isNaN(parsed.getTime())
     ? value
-    : new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' }).format(parsed)
+    : new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(parsed)
 }
 
 function formatLocalTime(value: string): string {
@@ -155,7 +155,7 @@ export function formatDateValue(value: string, format: 'date' | 'time' | 'date-t
 
   if (format === 'relative') {
     const diffMinutes = Math.round((parsed.getTime() - Date.now()) / 60000)
-    const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+    const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
     if (Math.abs(diffMinutes) < 60) {
       return formatter.format(diffMinutes, 'minute')
     }
@@ -167,17 +167,16 @@ export function formatDateValue(value: string, format: 'date' | 'time' | 'date-t
   }
 
   const options: Intl.DateTimeFormatOptions = format === 'date'
-    ? { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }
+    ? { weekday: 'short', month: 'short', day: 'numeric' }
     : format === 'time'
-      ? { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }
+      ? { hour: 'numeric', minute: '2-digit' }
       : {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
           hour: 'numeric',
-          minute: '2-digit',
-          timeZone: 'UTC'
+          minute: '2-digit'
         }
 
-  return new Intl.DateTimeFormat('en', options).format(parsed)
+  return new Intl.DateTimeFormat(undefined, options).format(parsed)
 }
