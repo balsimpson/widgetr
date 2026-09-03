@@ -1,6 +1,7 @@
 import { createContext, Script, runInContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { createSampleWidgetProject } from '~/domain/widget/fixture'
+import { createCryptoWidgetProject } from '~/domain/widget/crypto-fixture'
 import {
   generateScriptableCode,
   getScriptableExportIssues,
@@ -30,6 +31,19 @@ describe('deterministic Scriptable export', () => {
     expect(first.code).toContain('Keychain.contains')
     expect(first.code).toContain('FileManager.local()')
     expect(first.code).toContain('applyFillingContentMode')
+  })
+
+  it('exports the Bitcoin adapter and moving seven-day history window', () => {
+    const result = generateScriptableCode(createCryptoWidgetProject())
+
+    expect(result.code).toBeTruthy()
+    if (!result.code) {
+      return
+    }
+    expect(result.code).toContain('coingecko-bitcoin-usd')
+    expect(result.code).toContain('normalizedCryptoResponse')
+    expect(result.code).toContain('market_chart?vs_currency=usd&days=7')
+    expect(result.code).toContain('simple/price?ids=bitcoin&vs_currencies=usd')
   })
 
   it('runs each generated widget family through a Scriptable API harness', async () => {

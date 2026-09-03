@@ -436,6 +436,7 @@ const dataSourceConfigSchema = z.object({
   refreshMinutes: z.number().int()
     .min(WIDGET_CONSTRAINTS.refreshMinutes.min)
     .max(WIDGET_CONSTRAINTS.refreshMinutes.max),
+  adapter: z.enum(['coingecko-bitcoin-usd', 'coinbase-btc-usd']).optional(),
   secretPlaceholders: z.array(z.object({
     name: z.string().trim().min(1).max(80).regex(/^[A-Z][A-Z0-9_]*$/),
     label: labelSchema,

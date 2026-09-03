@@ -255,6 +255,8 @@ export interface WidgetLayout {
 
 export type WidgetLayouts = Record<WidgetSize, WidgetLayout>
 
+export type DataSourceAdapter = 'coingecko-bitcoin-usd' | 'coinbase-btc-usd'
+
 export interface DataSourceConfig {
   kind: 'none' | 'sample' | 'pasted' | 'public-api'
   url: string | null
@@ -262,6 +264,7 @@ export interface DataSourceConfig {
   parameters: Array<{ key: string, value: string }>
   headers: Array<{ key: string, value: string }>
   refreshMinutes: number
+  adapter?: DataSourceAdapter
   secretPlaceholders: Array<{
     name: string
     label: string

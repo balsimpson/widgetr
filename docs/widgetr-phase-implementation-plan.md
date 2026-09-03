@@ -24,14 +24,14 @@ Update this section after every session that changes implementation, verificatio
 | Phase state | In progress |
 | Phase 4 state | In progress; Phase 5 is complete locally, while the remaining WebMCP, export, README, and iPhone checks are resumed here |
 | Local branch | `main` |
-| Local and remote commit | `7d224dd = origin/main` (the previous homepage and `/studio` handoff is committed and pushed; the current working tree adds the homepage assistant handoff revision, prompt simplification, homepage chrome reduction, and the local Phase 9 visual-data implementation) |
+| Local and remote commit | `7d224dd = origin/main` (the previous homepage and `/studio` handoff is committed and pushed; the current working tree adds the homepage assistant handoff revision, prompt simplification, homepage chrome reduction, the local Phase 9 visual-data implementation, and the Bitcoin live-data starter) |
 | Latest verified UI commit | `348bac6` (the pushed homepage and `/studio` implementation); the current working-tree revision is browser-verified at `1280 x 900` and `390 x 844`, including the selected-element → Export → close transition at `1280 x 900` (one export backdrop, inspector suspended then restored), but remains uncommitted |
 | Production URL | [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/) |
-| Next action | Run the pending focused visual-data tests and typecheck, then verify the browser, deployed WebMCP, export, and iPhone gates |
+| Next action | Run the pending focused visual-data and Bitcoin adapter tests and typecheck, then verify the browser, deployed WebMCP, export, and iPhone gates |
 | Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
 | Next production checkpoint | Complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
-| Reprioritized work | The first Phase 7 general public-data onboarding slice is implemented locally for the Weather starter. It supports bounded public HTTPS GET JSON sources, field bindings, browser fetch diagnostics, Scriptable refresh configuration, locale-aware day/time/whole-number display transforms, WMO weather-code labels, and columnar five-day forecast normalization for Open-Meteo-style responses. A user-selected location remains project data rather than a starter constant. Secrets and authenticated sources remain deferred. |
-| Latest local browser evidence | At `1280 x 900`, an Open-Meteo five-day Ladakh document rendered all values without overflow; source-local `Asia/Kolkata` time appeared in Small and Large; an agent-style Large-element selection preserved the person's `All` preview view. Typecheck, tests, production, and iPhone execution remain unverified. |
+| Reprioritized work | The first Phase 7 general public-data onboarding slice is implemented locally for the Weather starter. It supports bounded public HTTPS GET JSON sources, field bindings, browser fetch diagnostics, Scriptable refresh configuration, locale-aware day/time/whole-number display transforms, WMO weather-code labels, and columnar five-day forecast normalization for Open-Meteo-style responses. The Bitcoin starter now adds a fixed CoinGecko keyless public price-plus-history adapter, normalized seven-day history, live browser refresh, and matching Scriptable refresh behavior. User-selected locations and crypto assets remain project data/integration work rather than starter constants. Secrets and authenticated sources remain deferred. |
+| Latest local browser evidence | At `1280 x 900`, the Bitcoin starter created from the modal loaded a live CoinGecko BTC / USD price and seven-point seven-day sparkline; Small, Medium, and Large all rendered the live values, the Tools refresh action completed successfully, and the generated Export modal contained the CoinGecko endpoints with no blocking export state. The earlier Open-Meteo five-day Ladakh document still rendered without overflow with source-local `Asia/Kolkata` time in Small and Large, and an agent-style Large-element selection preserved the person's `All` preview view. Typecheck, tests, production, and iPhone execution remain unverified. |
 | Next phase | Phase 6: assistant handoff, truthful status, and fallback |
 | Visual-data phase | Phase 9: constrained progress and chart elements is implemented locally; verification gates remain |
 
@@ -287,7 +287,7 @@ A new visitor sees a calm start screen, chooses a real outcome, and knows what t
 - Widgetr does not show or persist the finished Kochi sample as the visitor's unexplained project.
 - Starting choices include weather, cryptocurrency, daily agenda, reference image, own idea, and examples.
 - Each choice explains what the assistant will ask and where the conversation continues.
-- Outcome choices create a neutral canonical project with a recorded starting intent.
+- Weather, daily agenda, and own-idea choices create a neutral or source-ready canonical project with a recorded starting intent; the Bitcoin choice creates a Bitcoin layout with a CoinGecko public source, sample fallback data, and a live refresh attempt.
 - Reference-image choice creates the project, opens upload on the Widgetr page, and explains that upload alone does not generate the widget.
 - The returning workspace provides a clear `New project` action that creates another neutral project without replacing the current one.
 - `Explore examples` shows complete examples only after the person asks. Choosing one creates a separate project.
@@ -323,7 +323,7 @@ A new visitor sees a calm start screen, chooses a real outcome, and knows what t
 ### Verification
 
 - [x] A clean local browser origin starts with choices, not the Kochi preview.
-- [x] Weather, cryptocurrency, agenda, and own-idea choices create valid neutral projects through the tested starter creation paths.
+- [x] Weather, agenda, and own-idea choices create valid neutral projects through the tested starter creation paths; the Bitcoin starter has its own complete public-source and sparkline fixture.
 - [x] The existing reference panel opens on Widgetr and shows the external-assistant next step; the first-run reference path is wired to it.
 - [x] A returning user can choose `New project`, name it, and keep the current project in the library.
 - [ ] Exploring or choosing an example never replaces another project.
@@ -779,6 +779,7 @@ Append concise evidence after material verification. Do not replace older eviden
 | 3 Sep 2026 | 9 boundary hardening | Added selected-type validation before visual configuration commits so unsupported properties, invalid progress-bar ranges, and nullable progress-bar fills return actionable input errors without mutating project state; aligned progress-ring size changes with its rendered width and height; kept multi-size visual source payloads isolated per layout; `npm run repo:check` and `git diff --check` passed | Focused visual-data tests remain deferred for the next verification session |
 | 3 Sep 2026 | 9 source and contrast hardening | Restricted repeat-item source choices in the visual inspector to active scopes where the selected element is inside a repeat, and aligned browser progress-ring label contrast with the white Scriptable export label; `npm run repo:check` and `git diff --check` passed | Tests, typecheck, browser rendering, deployed WebMCP, and Scriptable/iPhone execution remain deferred |
 | 3 Sep 2026 | 9 export parity hardening | Added the bounded percentage label to the Scriptable progress-bar image so its output matches the browser preview; added a deferred generator regression assertion for that label; invalid values continue to use the existing `No data` diagnostic path; `npm run repo:check` and `git diff --check` passed | Tests, typecheck, browser rendering, deployed WebMCP, and Scriptable/iPhone execution remain deferred |
+| 3 Sep 2026 | Bitcoin live-data starter | Added a fixed Bitcoin starter with CoinGecko keyless public price and seven-day market-chart history, normalized price/change/range/history fields, a subject-specific sparkline layout for all widget sizes, browser refresh/recovery behavior, and matching Scriptable refresh logic. `npm run repo:check` and `git diff --check` passed; local browser verification at `1280 x 900` confirmed live values and seven-point charts in all three sizes, a successful refresh action, and export source parity | Focused adapter/starter tests, typecheck, production build, deployed WebMCP, and Scriptable/iPhone execution remain deferred |
 
 ## End-of-session update rule
 

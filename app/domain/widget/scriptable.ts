@@ -24,6 +24,14 @@ const REMOTE_IMAGE_PATTERN = /^https?:\/\//i
 const SECRET_TOKEN_PATTERN = /\{\{([A-Z][A-Z0-9_]*)\}\}/g
 const SCRIPTABLE_RUNTIME_SOURCE = String.raw`const SECRET_TOKEN_PATTERN = /\{\{([A-Z][A-Z0-9_]*)\}\}/g;
 const REMOTE_IMAGE_PATTERN = /^https?:\/\//i;
+const CRYPTO_DATA_ADAPTER = "coingecko-bitcoin-usd";
+const LEGACY_CRYPTO_DATA_ADAPTER = "coinbase-btc-usd";
+const CRYPTO_TICKER_URL = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
+const CRYPTO_CANDLES_URL = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7";
+
+function isCryptoAdapter(adapter) {
+  return adapter === CRYPTO_DATA_ADAPTER || adapter === LEGACY_CRYPTO_DATA_ADAPTER;
+}
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -842,8 +850,142 @@ function addQuery(url, key, value) {
   return url + separator + encodeURIComponent(key) + "=" + encodeURIComponent(value);
 }
 
-function requestData() {
+function finiteCryptoNumber(value) {
+  var parsed = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function cryptoTimestamp(value) {
+  var numeric = finiteCryptoNumber(value);
+  if (numeric !== null) {
+    return numeric < 10000000000 ? numeric * 1000 : numeric;
+  }
+  if (typeof value === "string") {
+    var parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function cryptoCurrentPrice(payload) {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  if (!isRecord(payload.bitcoin)) {
+    return null;
+  }
+  return finiteCryptoNumber(payload.bitcoin.usd);
+}
+
+function cryptoPriceRows(payload) {
+  if (!isRecord(payload) || !Array.isArray(payload.prices)) {
+    return [];
+  }
+  var parsed = [];
+  for (var index = 0; index < payload.prices.length; index += 1) {
+    var row = payload.prices[index];
+    if (!Array.isArray(row)) {
+      continue;
+    }
+    var timestamp = cryptoTimestamp(row[0]);
+    var price = finiteCryptoNumber(row[1]);
+    if (timestamp !== null && timestamp !== undefined && price !== null && price !== undefined) {
+      parsed.push({ timestamp: timestamp, price: price });
+    }
+  }
+  parsed.sort(function (left, right) {
+    return left.timestamp - right.timestamp;
+  });
+  return parsed;
+}
+
+function cryptoDailyPrices(rows) {
+  var byDay = {};
+  for (var index = 0; index < rows.length; index += 1) {
+    var day = String(Math.floor(rows[index].timestamp / (24 * 60 * 60 * 1000)));
+    byDay[day] = rows[index].price;
+  }
+  return Object.keys(byDay)
+    .sort(function (left, right) {
+      return Number(left) - Number(right);
+    })
+    .slice(-7)
+    .map(function (day) {
+      return byDay[day];
+    });
+}
+
+function formatCryptoUsd(value) {
+  var fixed = Number(value).toFixed(2).split(".");
+  var whole = fixed[0];
+  var grouped = "";
+  while (whole.length > 3) {
+    grouped = "," + whole.slice(-3) + grouped;
+    whole = whole.slice(0, -3);
+  }
+  return "$" + whole + grouped + "." + fixed[1];
+}
+
+function formatCryptoPercentage(value) {
+  return (value >= 0 ? "+" : "") + Number(value).toFixed(1) + "%";
+}
+
+function normalizedCryptoResponse(payload) {
+  var price = cryptoCurrentPrice(payload.price);
+  var rows = cryptoPriceRows(payload.history);
+  var history = cryptoDailyPrices(rows);
+  if (price === null) {
+    throw new Error("CoinGecko returned no current BTC price.");
+  }
+  if (history.length < 2) {
+    throw new Error("CoinGecko returned fewer than two days of BTC history.");
+  }
+  history[history.length - 1] = price;
+  var low = price;
+  var high = price;
+  for (var index = 0; index < rows.length; index += 1) {
+    low = Math.min(low, rows[index].price);
+    high = Math.max(high, rows[index].price);
+  }
+  var change = (price - history[0]) / history[0] * 100;
+  return {
+    asset: "Bitcoin",
+    symbol: "BTC",
+    pair: "BTC-USD",
+    quoteCurrency: "USD",
+    price: price,
+    priceDisplay: formatCryptoUsd(price),
+    change7dPercent: change,
+    change7dDisplay: formatCryptoPercentage(change),
+    low7d: low,
+    low7dDisplay: formatCryptoUsd(low),
+    high7d: high,
+    high7dDisplay: formatCryptoUsd(high),
+    history: history,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function requestJson(url) {
+  var request = new Request(url);
+  request.method = "GET";
+  request.headers = { "Cache-Control": "no-cache" };
+  return request.loadJSON();
+}
+
+async function requestData() {
   var source = PROJECT.dataSource;
+  if (isCryptoAdapter(source.adapter)) {
+    var cryptoResponses = await Promise.all([
+      requestJson(CRYPTO_TICKER_URL),
+      requestJson(CRYPTO_CANDLES_URL)
+    ]);
+    return { price: cryptoResponses[0], history: cryptoResponses[1] };
+  }
   var url = replaceSecretTokens(source.url);
   var headers = recordValues(source.headers);
   var body = recordValues(source.parameters);
@@ -910,7 +1052,10 @@ async function loadWidgetData() {
     return { value: SAMPLE_DATA, state: "sample" };
   }
   try {
-    var live = normalizedResponse(await requestData());
+    var response = await requestData();
+    var live = isCryptoAdapter(PROJECT.dataSource.adapter)
+      ? normalizedCryptoResponse(response)
+      : normalizedResponse(response);
     writeCachedData(live);
     return { value: live, state: "live" };
   } catch (_) {

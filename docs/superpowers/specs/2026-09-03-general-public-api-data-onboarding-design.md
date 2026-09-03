@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Widgetr will let a person and their connected AI assistant turn a public JSON API into a Scriptable widget without adding a separate chat interface or a source-specific integration for every starter. The Weather starter is the first use of this flow. It asks for the location in the assistant chat, then connects a weather API through the same general public-data path that a future cryptocurrency starter can use.
+Widgetr will let a person and their connected AI assistant turn a public JSON API into a Scriptable widget without adding a separate chat interface or a source-specific integration for every starter. The Weather starter is the first open-ended use of this flow, and the Bitcoin starter is the first bounded source adapter. Weather asks for a location in the assistant chat; Bitcoin loads a live BTC / USD snapshot and seven-day history through CoinGecko's keyless public endpoints.
 
 This moves the first slice of the planned data-onboarding work ahead of the remaining Phase 4 verification gates. It does not mark Phase 7 complete.
 
 ## User flow
 
 1. The person copies the homepage message, opens Widgetr in the assistant's in-app browser, and opens the new-project flow.
-2. The person chooses Weather in Widgetr's starter modal. Widgetr creates a weather layout with labelled starter data. It does not ask for a location in the page.
-3. The assistant sees that the project started as Weather and asks for the location in its own chat.
-4. The assistant connects a public HTTPS GET JSON source. Open-Meteo is a suggested first source, not a hard dependency or a special-only path.
-5. Widgetr reports the result, exposes safe field information, and the assistant maps the response to the visible widget fields through revision-checked operations.
+2. The person chooses Weather or Bitcoin in Widgetr's starter modal. Weather creates a weather layout with labelled starter data; Bitcoin creates a Bitcoin layout with a public CoinGecko source and sample data while its live request starts.
+3. The assistant sees the starting intent. For Weather it asks for the location in its own chat; for Bitcoin it can shape the already-loaded live fields without asking the person to paste JSON.
+4. Weather uses a public HTTPS GET JSON source through the general onboarding path. Bitcoin uses its explicit public price-plus-history adapter. Open-Meteo remains the suggested first weather source, not a hard dependency or a special-only path.
+5. Widgetr reports the result, exposes safe field information where the general source path is used, and the assistant maps responses to visible widget fields through revision-checked operations.
 6. The canvas shows the same normalized state that the Scriptable export uses. The export includes the request and a deterministic transformation needed to refresh it on-device.
 
 ## Scope of the first slice
@@ -37,11 +37,11 @@ The public-data operation records a source declaration and an outcome. A source 
 
 Field discovery converts successful JSON into a bounded list of paths, display labels, example values, and value types. The assistant uses this list to select field bindings. Widgetr does not execute assistant-provided JavaScript, JSONPath expressions, or transformation snippets.
 
-The Weather starter supplies the visual layout and intended fields. Once the assistant connects a source, it binds those intended fields through the general binding path. A future crypto starter adds its own layout and field suggestions but relies on the same source connection, discovery, binding, preview, and export behavior.
+The Weather starter supplies the visual layout and intended fields. Once the assistant connects a source, it binds those intended fields through the general binding path. The Bitcoin starter supplies its own layout and an explicit CoinGecko adapter that normalizes a current price plus seven daily history points into the same binding, preview, and export model. User-selected crypto assets remain deferred.
 
 ## Browser and export behavior
 
-Widgetr fetches the public source from the browser only. It does not proxy arbitrary URLs through a server. A successful browser response updates the visible preview and produces export-ready source configuration.
+Widgetr fetches the public source from the browser only. It does not proxy arbitrary URLs through a server. A successful browser response updates the visible preview and produces export-ready source configuration. The Bitcoin adapter makes two bounded public GET requests in parallel: a current simple price and a seven-day market-chart window.
 
 The generated Scriptable file requests the saved source directly, validates the response, and renders using the same bindings. It refreshes according to the saved interval. It caches the most recent successful response on-device and reports a specific fallback state when the source cannot be reached.
 
@@ -79,9 +79,9 @@ The source action accepts only the bounded public request shape. It returns an o
 ## Verification plan
 
 - Unit coverage for source validation, source-state transitions, field discovery limits, binding validation, stale revisions, generated-request parity, and secret rejection.
-- One public CORS-friendly JSON API path, beginning with the Weather starter.
+- One public CORS-friendly JSON API path, beginning with the Weather starter, plus the Bitcoin price-and-history adapter.
 - One CORS-blocked endpoint, one HTTP error, one timeout, one non-JSON response, and one authentication-required request.
-- In-app browser verification at 1280 x 900 for the Weather starter, successful connection, and each visible recovery state.
+- In-app browser verification at 1280 x 900 for the Weather and Bitcoin starters, successful connection/refresh, and each visible recovery state.
 - A WebMCP invocation that asks for a location in chat, connects the source, binds its fields, and preserves a manual interleaved edit.
 - Export inspection and a real Scriptable iPhone run, recorded separately from browser success.
 
@@ -91,4 +91,4 @@ The source action accepts only the bounded public request shape. It returns an o
 - OAuth and cookie-authenticated requests.
 - Server-side arbitrary URL proxies.
 - Arbitrary request methods, headers, bodies, redirects, and custom transformation code.
-- Automatic provider selection, background synchronization, and all non-weather starter integrations.
+- Automatic provider selection, background synchronization, user-selected crypto assets, and all other non-weather starter integrations.

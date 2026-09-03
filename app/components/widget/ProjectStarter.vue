@@ -28,7 +28,7 @@ function starterLabel(starterId: WidgetStarterId): string {
     return 'Weather'
   }
   if (starterId === 'cryptocurrency') {
-    return 'Cryptocurrency'
+    return 'Bitcoin'
   }
   return 'Start a widget'
 }
@@ -38,7 +38,7 @@ function starterDescription(starterId: WidgetStarterId): string {
     return 'Forecast at a glance.'
   }
   if (starterId === 'cryptocurrency') {
-    return 'Prices at a glance.'
+    return 'Live price and seven-day trend.'
   }
   return ''
 }

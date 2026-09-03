@@ -45,7 +45,7 @@ Suggested starting copy:
 The first screen can offer actions such as:
 
 - Build a weather widget
-- Track a cryptocurrency
+- Track Bitcoin
 - Build a daily agenda
 - Start from a reference image
 - Describe my own idea
@@ -78,7 +78,7 @@ Starting points should describe an outcome in plain language. Each one should te
 | Starting point | Clear expectation |
 | --- | --- |
 | Build a weather widget | The assistant will ask for a location, units, and the weather information to show. |
-| Track a cryptocurrency | The assistant will ask which asset and price information the person wants to display. |
+| Track Bitcoin | Widgetr loads live BTC / USD data and a seven-day trend; the assistant can help shape what stays in view. |
 | Build a daily agenda | The assistant will ask which parts of the day, tasks, or events matter most. |
 | Start from a reference image | The person adds the image on the Widgetr page. The assistant uses it as a visual guide where the current tools support that workflow. |
 | Describe my own idea | The assistant will ask focused questions until it has enough information to begin. |

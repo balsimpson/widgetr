@@ -1,6 +1,6 @@
 # Widgetr public API reference
 
-Research snapshot: 2 September 2026.
+Research snapshot: 3 September 2026.
 
 This is a curated starting point for external data in Widgetr. It covers
 weather, crypto, exchange rates, astronomy, spaceflight, news, books, TV, and
@@ -61,24 +61,42 @@ Widgetr recommendation: make this the first weather source. Ask for a place
 and units, resolve the place to coordinates, then bind the normalized forecast
 to all three widget sizes.
 
-### Coinbase Prices API
+### CoinGecko Keyless Public API
 
-Use it for a simple BTC or ETH price card. The spot price endpoint requires no
-authentication and accepts a currency pair such as `BTC-USD`. The response is
-small and has a clear amount and currency value.
+Use it for a focused Bitcoin price-and-trend widget. CoinGecko's Keyless Public
+API exposes a current simple price and a bounded market-chart response without
+an API key. The `days=7` market-chart query gives Widgetr a moving seven-day
+history. Widgetr's Bitcoin starter requests the current price and history
+directly from the browser, then repeats the same public requests in generated
+Scriptable code.
 
-Official documentation: [Coinbase Data API prices](https://docs.cdp.coinbase.com/coinbase-business/track-apis/prices)
+Official documentation:
+
+- [Keyless Public API](https://docs.coingecko.com/docs/keyless-public-api)
+- [Simple price](https://docs.coingecko.com/reference/simple-price)
+- [Coin market chart](https://docs.coingecko.com/reference/coins-id-market-chart)
 
 ```text
-https://api.coinbase.com/v2/prices/BTC-USD/spot
+https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd
+
+https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7
 ```
 
-Good widget fields include the asset pair, price, currency, and last refresh
-time. Treat this as an exchange-specific spot price. Use another source for a
-multi-exchange market view, broad asset coverage, or a chart.
+The simple-price response supplies the current USD price. The market-chart
+response supplies timestamped price samples. Widgetr groups those samples into
+the latest seven UTC daily closes, then normalizes the pair, current price,
+seven-day percentage change, seven-day low/high, last updated time, and a
+numeric history binding.
 
-Widgetr recommendation: use this for the first cryptocurrency starter. Keep
-the first version focused on one asset and one quote currency.
+This is a public market-data aggregate, not an exchange-specific order book.
+Keyless does not mean unlimited: browser CORS, HTTP errors, usage terms, and
+rate limits still need an honest recovery state. Widgetr keeps the last saved
+preview when a refresh fails and does not collect a CoinGecko secret.
+
+Widgetr recommendation: keep the first cryptocurrency starter fixed to Bitcoin
+and USD. The keyless public path is appropriate for this low-volume starter;
+add user-selected assets or higher-volume refreshes only after the adapter,
+usage terms, and export contracts have a clear multi-product design.
 
 ### Frankfurter
 
@@ -280,7 +298,7 @@ adapter when Launch Library 2 is available.
 
 | Source | Use | Widgetr position |
 | --- | --- | --- |
-| [CoinGecko](https://www.coingecko.com/en/api) | Multi-asset prices, market cap, change, and charts | Good second crypto source. The current free Demo plan uses an API key, has a 10,000-call monthly cap, and lists a 100-call-per-minute limit. Keep the key in an app-owned proxy. |
+| [CoinGecko Keyless Public API](https://docs.coingecko.com/docs/keyless-public-api) | Multi-asset prices, market cap, change, and charts | Good fixed Bitcoin starter source for low-volume public use. Follow the current usage terms and limits; use a server-owned key/proxy for higher-volume or authenticated paths. |
 | [NASA APIs](https://api.nasa.gov/assets/html/authentication.html) | APOD, asteroids, and other space data | Good space imagery source. `DEMO_KEY` is for exploration only. |
 | [RocketLaunch.Live](https://www.rocketlaunch.live/api) | Detailed launch records | Good advanced launch source when a server key is available. |
 | [GitHub REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api) | Public repository releases, stars, and issue counts | Useful for developer widgets. Unauthenticated requests currently have a 60-request-per-hour limit, so cache aggressively. |
@@ -297,7 +315,7 @@ adapter when Launch Library 2 is available.
 
 ### Normalize before binding
 
-The layout should not know whether the data came from Open-Meteo, Coinbase, or
+The layout should not know whether the data came from Open-Meteo, CoinGecko, or
 Launch Library 2. Each adapter should return a small normalized object with
 stable field names, for example:
 
@@ -345,7 +363,7 @@ launch only within the source's rate limits and cache policy.
 Start with these examples:
 
 1. Weather, using Open-Meteo and its geocoder.
-2. Bitcoin, using Coinbase spot prices.
+2. Bitcoin, using CoinGecko public prices.
 3. Currency conversion, using Frankfurter.
 4. Daylight, using Sunrise-Sunset.
 5. Next rocket launch, using a cached Launch Library 2 adapter.

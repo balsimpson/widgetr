@@ -317,7 +317,7 @@ const visualDataElement = computed(() => (
       @click.stop="selectElement"
       @keydown="handleKeydown"
     >
-      <VisualDataRenderer
+      <WidgetVisualDataRenderer
         :element="visualDataElement"
         :project="project"
         :size="size"

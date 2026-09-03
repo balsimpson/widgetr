@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cloneWidgetProject } from '~/domain/widget/clone'
+import { isBitcoinDataAdapter } from '~/domain/widget/crypto'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { resolveDesignScope } from '~/domain/widget/schema'
 import { getWidgetStarter } from '~/domain/widget/starters'
@@ -46,8 +47,11 @@ const {
   isHydrated,
   persistenceState,
   persistenceError,
+  dataRefreshState,
+  dataRefreshError,
   replaceProject,
   persistProject,
+  refreshProjectData,
   openProject,
   createProject,
   createExampleProject,
@@ -146,6 +150,7 @@ const activeSizes = computed(() => resolveDesignScope(project.value.designScope)
 const showStarter = computed(() => isLoading.value || projects.value.length === 0 || forcedNewProject.value)
 const isEmptyStudio = computed(() => isHydrated.value && projects.value.length === 0)
 const shouldShowStarterModal = computed(() => isHydrated.value && (projects.value.length === 0 || forcedNewProject.value))
+const isCryptoProject = computed(() => isBitcoinDataAdapter(project.value.dataSource.adapter))
 const exportResult = computed(() => generateScriptableCode(project.value))
 const generatedSource = computed(() => exportResult.value.code ?? '')
 const blockingIssues = computed(() => exportResult.value.issues.filter(issue => issue.severity === 'blocking'))
@@ -339,6 +344,12 @@ const agentStatusLabel = computed(() => {
 })
 
 const statusDockMessage = computed(() => {
+  if (dataRefreshState.value === 'error') {
+    return 'Bitcoin data unavailable'
+  }
+  if (dataRefreshState.value === 'refreshing') {
+    return 'Refreshing Bitcoin data…'
+  }
   if (persistenceState.value === 'error') {
     return 'Could not save locally'
   }
@@ -355,10 +366,10 @@ const statusDockMessage = computed(() => {
 })
 
 const statusDockColor = computed(() => {
-  if (persistenceState.value === 'error' || webmcpStatus.value === 'error') {
+  if (dataRefreshState.value === 'error' || persistenceState.value === 'error' || webmcpStatus.value === 'error') {
     return 'error'
   }
-  if (persistenceState.value === 'saving' || webmcpStatus.value === 'registering' || webmcpStatus.value === 'working') {
+  if (dataRefreshState.value === 'refreshing' || persistenceState.value === 'saving' || webmcpStatus.value === 'registering' || webmcpStatus.value === 'working') {
     return 'warning'
   }
   if (webmcpStatus.value === 'registered') {
@@ -492,6 +503,15 @@ function addVisualDataElement(type: VisualDataElementType): void {
     parentId: parent?.id ?? root.id,
     element
   })
+}
+
+async function refreshLiveData(): Promise<void> {
+  if (!isCryptoProject.value || dataRefreshState.value === 'refreshing') {
+    return
+  }
+
+  closeContextualSurfaces()
+  await refreshProjectData()
 }
 
 const removeElementLabel = computed(() => {
@@ -1386,6 +1406,16 @@ onBeforeUnmount(() => {
                   <UButton label="Layers" icon="i-lucide-layers-2" color="neutral" variant="ghost" block @click="openLayers" />
                   <UButton label="Reference" icon="i-lucide-image-plus" color="neutral" variant="ghost" block @click="openReference" />
                   <UButton label="Widget settings" icon="i-lucide-settings-2" color="neutral" variant="ghost" block @click="openWidgetSettings" />
+                  <UButton
+                    v-if="isCryptoProject"
+                    :label="dataRefreshState === 'refreshing' ? 'Refreshing Bitcoin data…' : 'Refresh live data'"
+                    icon="i-lucide-refresh-cw"
+                    color="neutral"
+                    variant="ghost"
+                    block
+                    :disabled="dataRefreshState === 'refreshing'"
+                    @click="refreshLiveData"
+                  />
                   <div class="tools-menu-divider" aria-hidden="true" />
                   <span class="tools-menu-label">Add visual data</span>
                   <UButton
@@ -1405,6 +1435,23 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="canvas-stage">
+            <div v-if="isCryptoProject && dataRefreshState === 'error'" class="crypto-data-recovery">
+              <UAlert
+                color="warning"
+                variant="subtle"
+                icon="i-lucide-wifi-off"
+                title="Bitcoin live data unavailable"
+                :description="dataRefreshError ?? 'The saved preview is still available.'"
+              />
+              <UButton
+                label="Try again"
+                icon="i-lucide-refresh-cw"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                @click="refreshLiveData"
+              />
+            </div>
             <UAlert
               v-if="lastResult && !lastResult.ok"
               class="operation-result"
@@ -2389,6 +2436,22 @@ onBeforeUnmount(() => {
   margin: 0.75rem 0.9rem 0;
 }
 
+.crypto-data-recovery {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0.75rem 0.9rem 0;
+}
+
+.crypto-data-recovery > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.crypto-data-recovery > :last-child {
+  flex: 0 0 auto;
+}
+
 .change-receipt {
   display: flex;
   min-height: 2.6rem;
@@ -3089,6 +3152,11 @@ onBeforeUnmount(() => {
   .studio-alert {
     margin-right: 0.6rem;
     margin-left: 0.6rem;
+  }
+
+  .crypto-data-recovery {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

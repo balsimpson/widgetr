@@ -1,4 +1,10 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { applyWidgetOperation } from '~/domain/widget/operations'
+import {
+  createBitcoinDataSource,
+  fetchBitcoinMarketData,
+  isBitcoinDataAdapter
+} from '~/domain/widget/crypto'
 import {
   createExampleWidgetProject,
   createNewWidgetProject,
@@ -15,6 +21,7 @@ import type { WidgetStarterId } from '~/types/widget'
 import type { WidgetProjectRepository } from '~/domain/widget/storage'
 
 export type PersistenceState = 'idle' | 'saving' | 'saved' | 'error'
+export type DataRefreshState = 'idle' | 'refreshing' | 'error'
 
 function sortProjects(projects: WidgetProject[]): WidgetProject[] {
   return [...projects].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
@@ -27,6 +34,8 @@ export function useWidgetProjects() {
   const isHydrated = ref(false)
   const persistenceState = ref<PersistenceState>('idle')
   const persistenceError = ref<string | null>(null)
+  const dataRefreshState = ref<DataRefreshState>('idle')
+  const dataRefreshError = ref<string | null>(null)
 
   let repository: WidgetProjectRepository = createWidgetProjectRepository()
   let saveQueue: Promise<void> = Promise.resolve()
@@ -65,12 +74,16 @@ export function useWidgetProjects() {
         project.value = cloneWidgetProject(activeProject)
         await repository.setActiveProjectId(activeProject.id)
       }
+      dataRefreshState.value = 'idle'
+      dataRefreshError.value = null
       persistenceState.value = 'saved'
       persistenceError.value = null
     } catch (error) {
       useMemoryFallback(error)
       projects.value = []
       project.value = createNeutralWidgetProject()
+      dataRefreshState.value = 'idle'
+      dataRefreshError.value = null
       try {
         await repository.setActiveProjectId(null)
       } catch (fallbackError) {
@@ -112,6 +125,8 @@ export function useWidgetProjects() {
       return
     }
     project.value = cloneWidgetProject(nextProject)
+    dataRefreshState.value = 'idle'
+    dataRefreshError.value = null
     try {
       await repository.setActiveProjectId(nextProject.id)
     } catch (error) {
@@ -123,13 +138,20 @@ export function useWidgetProjects() {
     name: string,
     startingIntent?: WidgetStarterId
   ): Promise<WidgetProject> {
+    dataRefreshState.value = 'idle'
+    dataRefreshError.value = null
     const nextProject = createNewWidgetProject(undefined, name, startingIntent)
     replaceProject(nextProject)
     await persistProject(nextProject)
+    if (startingIntent === 'cryptocurrency') {
+      return refreshProjectData(nextProject)
+    }
     return nextProject
   }
 
   async function createExampleProject(): Promise<WidgetProject> {
+    dataRefreshState.value = 'idle'
+    dataRefreshError.value = null
     const nextProject = createExampleWidgetProject()
     replaceProject(nextProject)
     await persistProject(nextProject)
@@ -137,6 +159,8 @@ export function useWidgetProjects() {
   }
 
   async function duplicateProject(source: WidgetProject): Promise<WidgetProject> {
+    dataRefreshState.value = 'idle'
+    dataRefreshError.value = null
     const nextProject = duplicateWidgetProject(source)
     replaceProject(nextProject)
     await persistProject(nextProject)
@@ -161,6 +185,8 @@ export function useWidgetProjects() {
           await repository.setActiveProjectId(null)
         }
       }
+      dataRefreshState.value = 'idle'
+      dataRefreshError.value = null
       persistenceState.value = 'saved'
       persistenceError.value = null
     } catch (error) {
@@ -180,6 +206,44 @@ export function useWidgetProjects() {
     await repository.deleteReference(storageKey)
   }
 
+  async function refreshProjectData(target = project.value): Promise<WidgetProject> {
+    if (!isBitcoinDataAdapter(target.dataSource.adapter)) {
+      return target
+    }
+
+    dataRefreshState.value = 'refreshing'
+    dataRefreshError.value = null
+    const response = await fetchBitcoinMarketData()
+    if (!response.ok) {
+      dataRefreshState.value = 'error'
+      dataRefreshError.value = `${response.message} ${response.recovery}`
+      return target
+    }
+
+    const result = applyWidgetOperation(target, {
+      type: 'set-public-data-source',
+      expectedRevision: target.revision,
+      source: createBitcoinDataSource(),
+      data: {
+        kind: 'live',
+        label: 'Live Bitcoin data from CoinGecko',
+        capturedAt: response.capturedAt,
+        value: response.data
+      }
+    })
+    if (!result.ok) {
+      dataRefreshState.value = 'error'
+      dataRefreshError.value = result.message
+      return target
+    }
+
+    replaceProject(result.state)
+    await persistProject(result.state)
+    dataRefreshState.value = 'idle'
+    dataRefreshError.value = null
+    return result.state
+  }
+
   onMounted(() => {
     void hydrate()
   })
@@ -195,8 +259,11 @@ export function useWidgetProjects() {
     isHydrated,
     persistenceState,
     persistenceError,
+    dataRefreshState,
+    dataRefreshError,
     replaceProject,
     persistProject,
+    refreshProjectData,
     openProject,
     createProject,
     createExampleProject,

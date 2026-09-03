@@ -34,7 +34,24 @@ describe('Widgetr starting paths', () => {
     expect(validateWidgetProject(project).ok).toBe(true)
   })
 
-  it.each(['cryptocurrency', 'daily-agenda', 'own-idea'] as const)(
+  it('creates a complete Bitcoin starter with a live source and seven-day chart', () => {
+    const project = createNewWidgetProject(fixedTimestamp, 'Bitcoin tracker', 'cryptocurrency')
+
+    expect(project.startingIntent).toBe('cryptocurrency')
+    expect(project.dataSource.kind).toBe('public-api')
+    expect(project.dataSource.adapter).toBe('coingecko-bitcoin-usd')
+    expect(project.dataSource.url).toContain('/coins/bitcoin/market_chart')
+    expect(project.bindings.map(binding => binding.id)).toEqual(expect.arrayContaining([
+      'price-display',
+      'change-7d-display',
+      'history'
+    ]))
+    expect(project.data.value.history).toHaveLength(7)
+    expect(JSON.stringify(project.layouts)).toContain('"type":"sparkline"')
+    expect(validateWidgetProject(project).ok).toBe(true)
+  })
+
+  it.each(['daily-agenda', 'own-idea'] as const)(
     'creates a valid neutral project for the %s starting path',
     (starterId) => {
       const starter = getWidgetStarter(starterId)

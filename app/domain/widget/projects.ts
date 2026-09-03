@@ -1,4 +1,5 @@
 import { createNeutralWidgetProject, createSampleWidgetProject } from './fixture'
+import { createCryptoWidgetProject } from './crypto-fixture'
 import { cloneWidgetProject } from './clone'
 import { parseWidgetProject } from './schema'
 import type { WidgetProject, WidgetStarterId } from '~/types/widget'
@@ -47,7 +48,9 @@ export function createNewWidgetProject(
 ): WidgetProject {
   const template = startingIntent === 'weather'
     ? createSampleWidgetProject()
-    : createNeutralWidgetProject()
+    : startingIntent === 'cryptocurrency'
+      ? createCryptoWidgetProject()
+      : createNeutralWidgetProject()
   return createProjectFromTemplate(template, {
     now,
     name,

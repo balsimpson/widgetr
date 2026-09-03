@@ -25,11 +25,11 @@ export const WIDGET_STARTERS: readonly WidgetStarterDefinition[] = [
   {
     id: 'cryptocurrency',
     action: 'create',
-    label: 'Track a cryptocurrency',
-    description: 'Keep the asset and price details you want in view.',
-    nextStep: 'Your assistant will ask which asset and price information to display.',
+    label: 'Track Bitcoin',
+    description: 'See the live price and seven-day trend.',
+    nextStep: 'Widgetr loads live BTC / USD data now. Your assistant can help shape what stays in view.',
     icon: 'i-lucide-coins',
-    projectName: 'Cryptocurrency tracker'
+    projectName: 'Bitcoin tracker'
   },
   {
     id: 'daily-agenda',
