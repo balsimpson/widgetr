@@ -18,6 +18,7 @@ const homepageEnabled = ref(true)
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
 const requestUrl = useRequestURL()
 const canonicalUrl = computed(() => new URL('/', requestUrl.origin).toString())
+const socialImageUrl = computed(() => new URL('/widgetr-social-preview.png', requestUrl.origin).toString())
 
 useSeoMeta({
   title: 'Widgetr | Build Scriptable widgets',
@@ -27,9 +28,11 @@ useSeoMeta({
   ogType: 'website',
   ogUrl: () => canonicalUrl.value,
   ogSiteName: 'Widgetr',
-  twitterCard: 'summary',
+  ogImage: () => socialImageUrl.value,
+  twitterCard: 'summary_large_image',
   twitterTitle: 'Widgetr | Build Scriptable widgets',
-  twitterDescription: 'Build a Scriptable widget with a visual editor and your AI assistant, then export it to your iPhone.'
+  twitterDescription: 'Build a Scriptable widget with a visual editor and your AI assistant, then export it to your iPhone.',
+  twitterImage: () => socialImageUrl.value
 })
 
 useHead({

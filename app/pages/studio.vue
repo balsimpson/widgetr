@@ -56,6 +56,7 @@ const route = useRoute()
 const router = useRouter()
 const requestUrl = useRequestURL()
 const canonicalUrl = computed(() => new URL('/studio', requestUrl.origin).toString())
+const socialImageUrl = computed(() => new URL('/widgetr-social-preview.png', requestUrl.origin).toString())
 
 useSeoMeta({
   title: 'Widgetr Studio | Build a Scriptable widget',
@@ -65,9 +66,11 @@ useSeoMeta({
   ogType: 'website',
   ogUrl: () => canonicalUrl.value,
   ogSiteName: 'Widgetr',
-  twitterCard: 'summary',
+  ogImage: () => socialImageUrl.value,
+  twitterCard: 'summary_large_image',
   twitterTitle: 'Widgetr Studio | Build a Scriptable widget',
-  twitterDescription: 'Design, review, and export your Scriptable widget in Widgetr.'
+  twitterDescription: 'Design, review, and export your Scriptable widget in Widgetr.',
+  twitterImage: () => socialImageUrl.value
 })
 
 useHead({
