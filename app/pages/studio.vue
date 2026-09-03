@@ -108,6 +108,7 @@ const layersOpen = ref(false)
 const settingsOpen = ref(false)
 const referenceOpen = ref(false)
 const exportOpen = ref(false)
+const inspectorWasOpenBeforeExport = ref(false)
 const agentOpen = ref(false)
 const inspectorPinned = ref(false)
 const previewScrollRef = ref<HTMLElement | null>(null)
@@ -280,7 +281,10 @@ const changeReceiptMessage = computed(() => (
 ))
 
 const inspectorOpen = computed({
-  get: () => inspectorPinned.value || project.value.selection !== null,
+  get: () => !(
+    exportOpen.value
+    && inspectorWasOpenBeforeExport.value
+  ) && (inspectorPinned.value || project.value.selection !== null),
   set: (open: boolean) => {
     if (!open) {
       inspectorPinned.value = false
@@ -669,6 +673,7 @@ function openExport(): void {
     return
   }
 
+  inspectorWasOpenBeforeExport.value = inspectorOpen.value
   closeContextualSurfaces()
   exportOpen.value = true
 }
@@ -1682,6 +1687,7 @@ onBeforeUnmount(() => {
 
     <UModal
       v-model:open="exportOpen"
+      :overlay="true"
       class="export-modal-content"
       title="Export your widget"
       description="Take this generated Scriptable file to your iPhone or iPad."
@@ -3107,7 +3113,7 @@ onBeforeUnmount(() => {
   .topbar-export {
     padding-right: 0.45rem;
     padding-left: 0.45rem;
-    font-size: 0;
+    font-size: 0.75rem;
   }
 
   .topbar-export :deep(svg) {
@@ -3215,12 +3221,23 @@ onBeforeUnmount(() => {
 .topbar-projects-trigger,
 .history-actions :deep(button),
 .topbar-export {
+  min-height: 2.25rem;
+}
+
+.topbar-projects-trigger,
+.history-actions :deep(button) {
   width: 2.25rem;
   min-width: 2.25rem;
   min-height: 2.25rem;
   padding: 0;
   border-radius: 999px;
   justify-content: center;
+}
+
+.topbar-export {
+  min-width: 0;
+  padding: 0 0.75rem;
+  border-radius: 999px;
 }
 
 .assistant-status-button {
@@ -3256,8 +3273,7 @@ onBeforeUnmount(() => {
   height: 1.125rem;
 }
 
-.topbar-projects-trigger :deep(span:not([class*="icon"])),
-.topbar-export :deep(span:not([class*="icon"])) {
+.topbar-projects-trigger :deep(span:not([class*="icon"])) {
   display: none;
 }
 
@@ -3821,7 +3837,6 @@ onBeforeUnmount(() => {
   }
 
   .topbar-projects-trigger,
-  .topbar-export,
   .history-actions :deep(button) {
     width: var(--widgetr-touch-target);
     min-width: var(--widgetr-touch-target);
