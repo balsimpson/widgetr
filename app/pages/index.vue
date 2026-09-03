@@ -59,11 +59,7 @@ async function unavailableCreateProject(
   throw new Error('Project creation is available in the widget editor.')
 }
 
-const {
-  status: webmcpStatus,
-  error: webmcpError,
-  refresh: refreshWebMcp
-} = useWidgetWebMcp({
+useWidgetWebMcp({
   enabled: homepageEnabled,
   project: homepageProject,
   commitOperation: homepageOperationFailure,
@@ -95,12 +91,9 @@ async function copyAssistantMessage(): Promise<void> {
 
 <template>
   <HomeLanding
-    :status="webmcpStatus"
-    :error="webmcpError"
     :assistant-message="assistantMessage"
     :copy-state="copyState"
     :has-saved-projects="hasSavedProjects"
     @copy="copyAssistantMessage"
-    @retry="refreshWebMcp"
   />
 </template>

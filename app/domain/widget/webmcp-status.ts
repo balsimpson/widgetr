@@ -25,7 +25,7 @@ export function describeWebMcpStatus(status: WebMcpStatus): WebMcpStatusDescript
       }
     case 'registered':
       return {
-        label: 'Page actions ready',
+        label: 'WebMCP ready',
         description: 'This page has registered actions for a compatible assistant. Ask what to build, then shape it together on the canvas.',
         color: 'success',
         icon: 'i-lucide-check-circle-2'
@@ -47,8 +47,8 @@ export function describeWebMcpStatus(status: WebMcpStatus): WebMcpStatusDescript
     case 'unsupported':
     default:
       return {
-        label: 'Page actions unavailable',
-        description: 'The editor still works by itself. Use a browser and assistant that support page actions to control it.',
+        label: 'WebMCP unavailable',
+        description: 'This page needs an AI assistant with page actions to build and shape the widget on the canvas.',
         color: 'error',
         icon: 'i-lucide-plug-zap'
       }

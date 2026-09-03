@@ -1,5 +1,11 @@
 import { resolveValueSource } from './values'
 import { validateWidgetProject } from './schema'
+import {
+  resolveNumericSourceDetails,
+  resolveSeriesSourceDetails,
+  visualDataPointLimit
+} from './visual-data'
+import { WIDGET_DIMENSIONS } from '~/types/widget'
 import type {
   ValueSource,
   WidgetBackground,
@@ -67,7 +73,7 @@ function bindingFor(bindingId) {
   return null;
 }
 
-function resolveSource(source, data, item) {
+function resolveRawSource(source, data, item) {
   var value;
   if (source.kind === "literal") {
     value = source.value;
@@ -77,6 +83,11 @@ function resolveSource(source, data, item) {
   } else {
     value = resolvePath(item, source.path);
   }
+  return value;
+}
+
+function resolveSource(source, data, item) {
+  var value = resolveRawSource(source, data, item);
   if (value === undefined || value === null || typeof value === "object") {
     return source.fallback;
   }
@@ -90,6 +101,53 @@ function sourceText(source, data, item) {
     return text;
   }
   return source.format.prefix + text + source.format.suffix;
+}
+
+function numberSourceValue(source, data, item) {
+  var raw = resolveRawSource(source, data, item);
+  var value = typeof raw === "number"
+    ? raw
+    : typeof raw === "string" && raw.trim() !== ""
+      ? Number(raw)
+      : NaN;
+  if (Number.isFinite(value)) {
+    return value;
+  }
+  return source.kind === "literal" ? null : source.fallback;
+}
+
+function seriesSourceValues(source, data, item) {
+  var raw = resolveRawSource(source, data, item);
+  var values = Array.isArray(raw)
+    ? raw
+    : source.kind === "literal"
+      ? []
+      : source.fallback;
+  return values.map(function (value) {
+    return typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : NaN;
+  }).filter(function (value) {
+    return Number.isFinite(value);
+  });
+}
+
+function visualPointLimit(density) {
+  var family = config.widgetFamily === "small" || config.widgetFamily === "large"
+    ? config.widgetFamily
+    : "medium";
+  var limits = {
+    compact: { small: 6, medium: 10, large: 14 },
+    balanced: { small: 8, medium: 16, large: 24 },
+    detailed: { small: 10, medium: 20, large: 28 }
+  };
+  return limits[density][family];
+}
+
+function limitedSeries(values, density) {
+  return values.slice(-visualPointLimit(density));
 }
 
 function repeatItems(data, bindingId) {
@@ -418,6 +476,230 @@ async function renderRepeat(parent, element, data, item) {
   }
 }
 
+function drawNoData(context, width, height) {
+  context.setFont(Font.semiboldSystemFont(10));
+  context.setTextColor(color("#8C8A99"));
+  context.setTextAlignedCenter();
+  context.drawTextInRect("No data", new Rect(0, 0, width, height));
+}
+
+function drawRoundedRect(context, rect, radius) {
+  var path = new Path();
+  path.addRoundedRect(rect, radius, radius);
+  context.addPath(path);
+  context.fillPath();
+}
+
+function drawArc(context, centerX, centerY, radius, ratio, strokeColor, strokeWidth) {
+  if (ratio <= 0) {
+    return;
+  }
+  var start = -Math.PI / 2;
+  var end = start + Math.PI * 2 * ratio;
+  var segments = Math.max(12, Math.ceil(48 * ratio));
+  var points = [];
+  for (var index = 0; index <= segments; index += 1) {
+    var angle = start + (end - start) * index / segments;
+    points.push(new Point(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius));
+  }
+  var path = new Path();
+  path.addLines(points);
+  context.setStrokeColor(color(strokeColor));
+  context.setLineWidth(strokeWidth);
+  context.addPath(path);
+  context.strokePath();
+}
+
+function drawProgressRing(context, element, data, item, width, height) {
+  var dimension = Math.min(width, height);
+  var centerX = width / 2;
+  var centerY = height / 2;
+  var scale = dimension / 100;
+  var outerRadius = dimension * 0.42;
+  var minimumRadius = Math.max(8 * scale, (element.thickness / 2 + 2) * scale);
+  var step = element.rings.length > 1
+    ? Math.min(dimension * 0.18, (outerRadius - minimumRadius) / (element.rings.length - 1))
+    : 0;
+
+  for (var index = 0; index < element.rings.length; index += 1) {
+    var ring = element.rings[index];
+    var radius = Math.max(minimumRadius, outerRadius - index * step);
+    var strokeWidth = Math.min(element.thickness * scale, radius * 0.75);
+    var value = numberSourceValue(ring.value, data, item);
+    var ratio = value === null || ring.max <= ring.min
+      ? null
+      : Math.min(1, Math.max(0, (value - ring.min) / (ring.max - ring.min)));
+    context.setStrokeColor(color(ring.trackColor));
+    context.setLineWidth(strokeWidth);
+    context.strokeEllipse(new Rect(centerX - radius, centerY - radius, radius * 2, radius * 2));
+    if (ratio !== null) {
+      drawArc(context, centerX, centerY, radius, ratio, ring.fillColor, strokeWidth);
+    }
+  }
+
+  if (element.centerLabel) {
+    context.setFont(Font.boldSystemFont(Math.max(10, Math.min(18, dimension * 0.18))));
+    context.setTextColor(color("#FFFFFF"));
+    context.setTextAlignedCenter();
+    context.drawTextInRect(sourceText(element.centerLabel, data, item), new Rect(0, centerY - 10, width, 20));
+  }
+}
+
+function drawProgressBar(context, element, data, item, width, height) {
+  var barHeight = Math.min(height * 0.62, Math.max(6, element.thickness));
+  var y = (height - barHeight) / 2;
+  context.setFillColor(color(element.trackColor));
+  drawRoundedRect(context, new Rect(0, y, width, barHeight), barHeight / 2);
+  var value = numberSourceValue(element.value, data, item);
+  if (value === null || element.max <= element.min) {
+    drawNoData(context, width, height);
+    return;
+  }
+  var ratio = Math.min(1, Math.max(0, (value - element.min) / (element.max - element.min)));
+  if (ratio > 0) {
+    context.setFillColor(color(element.fillColor));
+    drawRoundedRect(context, new Rect(0, y, width * ratio, barHeight), barHeight / 2);
+  }
+  context.setFont(Font.semiboldSystemFont(9));
+  context.setTextColor(color("#FFFFFF"));
+  context.setTextAlignedCenter();
+  context.drawTextInRect(Math.round(ratio * 100) + "%", new Rect(0, 0, width, height));
+}
+
+function seriesChartPoints(values, width, height) {
+  if (values.length === 0) {
+    return [];
+  }
+  var min = Math.min.apply(Math, values);
+  var max = Math.max.apply(Math, values);
+  var range = max - min;
+  if (values.length === 1) {
+    return [new Point(width / 2, height / 2)];
+  }
+  return values.map(function (value, index) {
+    return new Point(
+      index / (values.length - 1) * width,
+      range === 0 ? height / 2 : height - (value - min) / range * height
+    );
+  });
+}
+
+function drawSparkline(context, element, data, item, width, height) {
+  var values = limitedSeries(seriesSourceValues(element.values, data, item), element.density);
+  if (values.length === 0) {
+    drawNoData(context, width, height);
+    return;
+  }
+  var points = seriesChartPoints(values, width, height - 6);
+  if (element.fillColor && points.length > 1) {
+    var fillPath = new Path();
+    fillPath.addLines(points);
+    fillPath.addLine(new Point(width, height));
+    fillPath.addLine(new Point(0, height));
+    fillPath.closeSubpath();
+    context.setFillColor(color(element.fillColor, 0.14));
+    context.addPath(fillPath);
+    context.fillPath();
+  }
+  if (points.length === 1) {
+    context.setFillColor(color(element.lineColor));
+    context.fillEllipse(new Rect(points[0].x - element.thickness, points[0].y - element.thickness, element.thickness * 2, element.thickness * 2));
+    return;
+  }
+  var path = new Path();
+  path.addLines(points);
+  context.setStrokeColor(color(element.lineColor));
+  context.setLineWidth(element.thickness);
+  context.addPath(path);
+  context.strokePath();
+}
+
+function drawBarChart(context, element, data, item, width, height) {
+  var values = limitedSeries(seriesSourceValues(element.values, data, item), element.density);
+  if (values.length === 0) {
+    drawNoData(context, width, height);
+    return;
+  }
+  var min = Math.min.apply(Math, values);
+  var max = Math.max.apply(Math, values);
+  var range = max - min;
+  var gap = values.length <= 1
+    ? 0
+    : Math.min(element.gap, Math.max(0, (width - values.length) / (values.length - 1)));
+  var barWidth = Math.max(0.5, (width - gap * Math.max(0, values.length - 1)) / values.length);
+  var valueY = function (value) {
+    return range === 0 ? height / 2 : height - (value - min) / range * height;
+  };
+  var baseline = min < 0 && max > 0 ? valueY(0) : min >= 0 ? height : 0;
+  context.setFillColor(color(element.barColor));
+  for (var index = 0; index < values.length; index += 1) {
+    var y = valueY(values[index]);
+    drawRoundedRect(
+      context,
+      new Rect(index * (barWidth + gap), Math.min(y, baseline), barWidth, Math.max(1, Math.abs(baseline - y))),
+      Math.min(2, barWidth / 2)
+    );
+  }
+}
+
+function visualDataImageSize(element) {
+  var width = typeof element.style.width === "number" ? Math.max(1, element.style.width) : 160;
+  var height = typeof element.style.height === "number"
+    ? Math.max(1, element.style.height)
+    : element.type === "progress-ring"
+      ? element.size
+      : element.type === "progress-bar"
+        ? 28
+        : 56;
+  if (element.type === "progress-ring") {
+    width = typeof element.style.width === "number" ? Math.max(1, element.style.width) : element.size;
+    height = typeof element.style.height === "number" ? Math.max(1, element.style.height) : element.size;
+  }
+  return { width: width, height: height };
+}
+
+function drawVisualData(element, data, item) {
+  var imageSize = visualDataImageSize(element);
+  var width = imageSize.width;
+  var height = imageSize.height;
+  var context = new DrawContext();
+  context.size = new Size(width, height);
+  context.opaque = false;
+  if (element.type === "progress-ring") {
+    drawProgressRing(context, element, data, item, width, height);
+  } else if (element.type === "progress-bar") {
+    drawProgressBar(context, element, data, item, width, height);
+  } else if (element.type === "sparkline") {
+    drawSparkline(context, element, data, item, width, height);
+  } else {
+    drawBarChart(context, element, data, item, width, height);
+  }
+  return context.getImage();
+}
+
+async function renderVisualData(parent, element, data, item) {
+  var target = parent.addStack();
+  await applyContainerStyle(target, element.style, data, item);
+  var image = drawVisualData(element, data, item);
+  var imageWidget = target.addImage(image);
+  imageWidget.resizable = true;
+  imageWidget.imageOpacity = element.style.opacity;
+  if (typeof element.style.width === "number" || typeof element.style.height === "number") {
+    var imageSize = visualDataImageSize(element);
+    imageWidget.imageSize = new Size(
+      imageSize.width,
+      imageSize.height
+    );
+  }
+  if (element.style.alignSelf === "center") {
+    imageWidget.centerAlignImage();
+  } else if (element.style.alignSelf === "trailing") {
+    imageWidget.rightAlignImage();
+  } else {
+    imageWidget.leftAlignImage();
+  }
+}
+
 async function renderElementInto(parent, element, data, item) {
   if (element.type === "group") {
     await renderGroup(parent, element, data, item);
@@ -437,6 +719,8 @@ async function renderElementInto(parent, element, data, item) {
     } else {
       parent.addSpacer(element.length);
     }
+  } else if (element.type === "progress-ring" || element.type === "progress-bar" || element.type === "sparkline" || element.type === "bar-chart") {
+    await renderVisualData(parent, element, data, item);
   }
 }
 
@@ -767,6 +1051,118 @@ function inspectBackground(
   }
 }
 
+function inspectVisualData(
+  element: WidgetElement,
+  project: WidgetProject,
+  issues: WidgetDiagnostic[],
+  size: WidgetSize
+): void {
+  const bounds = WIDGET_DIMENSIONS[size]
+  if (
+    (typeof element.style.width === 'number' && element.style.width > bounds.width)
+    || (typeof element.style.height === 'number' && element.style.height > bounds.height)
+  ) {
+    issues.push(diagnostic(
+      `${size}-${element.id}-dimensions`,
+      'warning',
+      'VISUAL_DATA_DIMENSION_EXCEEDS_WIDGET',
+      `The ${element.type} has fixed dimensions larger than the ${size} widget bounds and may be clipped in Scriptable.`,
+      'Reduce the fixed width or height, or use a fill/fit dimension for this widget size.',
+      size,
+      element.id
+    ))
+  }
+
+  if (element.type === 'progress-ring') {
+    element.rings.forEach((ring, index) => {
+      const resolution = resolveNumericSourceDetails(ring.value, project)
+      if (ring.value.kind === 'binding' && resolution.usedFallback) {
+        issues.push(diagnostic(
+          `${size}-${element.id}-ring-${index}-fallback`,
+          'warning',
+          'VISUAL_DATA_SOURCE_FALLBACK',
+          `Progress ring ${index + 1} is using its configured fallback value because its source did not resolve in the current data.`,
+          'Verify the binding path or keep the fallback intentional.',
+          size,
+          element.id
+        ))
+      }
+    })
+    return
+  }
+
+  if (element.type === 'progress-bar') {
+    const resolution = resolveNumericSourceDetails(element.value, project)
+    if (element.value.kind === 'binding' && resolution.usedFallback) {
+      issues.push(diagnostic(
+        `${size}-${element.id}-fallback`,
+        'warning',
+        'VISUAL_DATA_SOURCE_FALLBACK',
+        'The progress bar is using its configured fallback value because its source did not resolve in the current data.',
+        'Verify the binding path or keep the fallback intentional.',
+        size,
+        element.id
+      ))
+    }
+    return
+  }
+
+  if (element.type !== 'sparkline' && element.type !== 'bar-chart') {
+    return
+  }
+
+  if (element.values.kind === 'item') {
+    return
+  }
+
+  const resolution = resolveSeriesSourceDetails(element.values, project)
+  if (element.values.kind === 'binding' && resolution.usedFallback) {
+    issues.push(diagnostic(
+      `${size}-${element.id}-fallback`,
+      'warning',
+      'VISUAL_DATA_SOURCE_FALLBACK',
+      `The ${element.type} is using its configured fallback series because its source did not resolve to a list in the current data.`,
+      'Verify the binding path or keep the fallback intentional.',
+      size,
+      element.id
+    ))
+  }
+  if (resolution.values.length === 0) {
+    issues.push(diagnostic(
+      `${size}-${element.id}-empty`,
+      'warning',
+      'VISUAL_DATA_NO_POINTS',
+      `The ${element.type} has no numeric points to render.`,
+      'Bind it to a numeric list or add at least one finite value.',
+      size,
+      element.id
+    ))
+  }
+  if (resolution.invalidCount > 0) {
+    issues.push(diagnostic(
+      `${size}-${element.id}-invalid`,
+      'warning',
+      'VISUAL_DATA_INVALID_POINTS',
+      `The ${element.type} source contains ${resolution.invalidCount} value${resolution.invalidCount === 1 ? '' : 's'} that will be ignored.`,
+      'Keep the series numeric so the exported chart remains predictable.',
+      size,
+      element.id
+    ))
+  }
+  const pointLimit = visualDataPointLimit(size, element.density)
+  if (resolution.rawLength > pointLimit) {
+    issues.push(diagnostic(
+      `${size}-${element.id}-bounded`,
+      'warning',
+      'VISUAL_DATA_POINTS_BOUNDED',
+      `The ${element.type} contains ${resolution.rawLength} points, so Scriptable will render the latest ${pointLimit} for the ${size} widget.`,
+      'Use a lower-density chart or provide a shorter series when every point must remain visible.',
+      size,
+      element.id
+    ))
+  }
+}
+
 function inspectElement(
   element: WidgetElement,
   project: WidgetProject,
@@ -816,6 +1212,10 @@ function inspectElement(
         element.id
       ))
     }
+  }
+
+  if (element.type === 'progress-ring' || element.type === 'progress-bar' || element.type === 'sparkline' || element.type === 'bar-chart') {
+    inspectVisualData(element, project, issues, size)
   }
 
   if ((element.type === 'text' || element.type === 'date') && element.textStyle.italic) {

@@ -78,6 +78,8 @@ const contextLabel = computed(() => {
       return 'Image selected'
     case 'group':
       return 'Group selected'
+    case 'visual-data':
+      return 'Visual data selected'
     default:
       return 'Selection type not supported'
   }

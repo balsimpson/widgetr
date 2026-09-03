@@ -19,19 +19,19 @@ Update this section after every session that changes implementation, verificatio
 
 | Field | Current value |
 | --- | --- |
-| Last updated | 2 September 2026 |
+| Last updated | 3 September 2026 |
 | Active phase | Phase 4: close the deployed WebMCP and Scriptable vertical slice |
 | Phase state | In progress |
 | Phase 4 state | In progress; Phase 5 is complete locally, while the remaining WebMCP, export, README, and iPhone checks are resumed here |
 | Local branch | `main` |
-| Local and remote commit | `HEAD = origin/main` (the homepage and `/studio` handoff is committed and pushed; remote synchronization was verified against GitHub) |
-| Latest verified UI commit | `348bac6` (in-app browser checks at `1280 x 900` and `390 x 844` cover the pain-point-led homepage headline, shorter assistant collaboration line, leading `Build for Scriptable` relationship link to the official site in a new tab, two-column headline and `Start here` content, full-width `Assistant` chooser below both sections, ChatGPT desktop `Recommended` overlay badge, no direct create action, conditional saved-project `Continue` button, the Studio shell with its empty-canvas state, two-option modal starter chooser, reference-image dropzone, `/studio?new=1`, starter creation, cancel/Escape, active assistant panel, and no horizontal overflow) |
+| Local and remote commit | `7d224dd = origin/main` (the previous homepage and `/studio` handoff is committed and pushed; the current working tree adds the homepage assistant handoff revision, prompt simplification, homepage chrome reduction, and the local Phase 9 visual-data implementation) |
+| Latest verified UI commit | `348bac6` (the pushed homepage and `/studio` implementation); the current working-tree revision is also browser-verified at `1280 x 900` and `390 x 844` but remains uncommitted |
 | Production URL | [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/) |
-| Next action | Ask before running focused tests or typecheck, then verify actual WebMCP tool invocation and continue the remaining Phase 4 deployment/export/README/iPhone gates |
+| Next action | Run the pending focused visual-data tests and typecheck, then verify the browser, deployed WebMCP, export, and iPhone gates |
 | Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
 | Next production checkpoint | Complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
 | Next phase | Phase 6: assistant handoff, truthful status, and fallback |
-| Planned visual-data phase | Phase 9: constrained progress and chart elements after the core data and export path |
+| Visual-data phase | Phase 9: constrained progress and chart elements is implemented locally; verification gates remain |
 
 Phase 5 is closed as `Complete locally` after the authorized test, typecheck, build, and desktop browser checks. Phase 4 remains `In progress`; its remaining deployment, WebMCP, export, README, and iPhone checks are now the active work.
 
@@ -81,7 +81,7 @@ Historical phases 0 through 4 keep their numbers. Phases 5 through 12 divide the
 | 6 | The page gives a truthful assistant handoff and useful fallback | Not started |
 | 7 | A person can configure data without a JSON-first or secret-collection flow | Not started |
 | 8 | Review, recovery, export, and iPhone installation form one clear finish path | Not started |
-| 9 | Bound progress and compact chart elements render and export reliably | Not started |
+| 9 | Bound progress and compact chart elements render and export reliably | In progress |
 | 10 | The owner can privately curate approved design families | Not started |
 | 11 | Public projects can use approved styles without losing their data | Not started |
 | 12 | The complete product passes accessibility, privacy, production, and device checks | Not started |
@@ -511,7 +511,7 @@ The person can review the current result, resolve warnings, export one file, ins
 
 ## Phase 9: constrained progress and chart elements
 
-State: Not started
+State: In progress — local implementation added; focused tests, browser checks, deployed WebMCP, and Scriptable/iPhone verification remain pending.
 
 ### Outcome
 
@@ -530,17 +530,17 @@ A person can add and bind progress rings, progress bars, sparklines, and compact
 
 ### Implementation tasks
 
-- [ ] Add revision-checked insert-element and remove-element operations before adding new visual types. Route manual controls, history, persistence, and WebMCP through them.
-- [ ] Add canonical `progress-ring`, `progress-bar`, `sparkline`, and `bar-chart` element types with bounded defaults, schemas, constraints, and migrations.
-- [ ] Define numeric-source, range, color, thickness, point-limit, and empty-data behavior without adding arbitrary path data to project state.
-- [ ] Add deterministic geometry helpers shared by the browser preview and Scriptable generator where practical.
-- [ ] Render progress and chart elements in the browser with accessible labels and visible empty or invalid-data states.
-- [ ] Generate static images for these elements in Scriptable through bounded `DrawContext` and `Path` helpers, then place those images through the normal widget tree.
-- [ ] Add inspector controls for bindings, ranges, colors, thickness, size, and chart density.
-- [ ] Add WebMCP tools for inserting, selecting, configuring, and removing the new elements through the shared operation path.
-- [ ] Update capability results so the assistant advertises the new elements only after the implementation is available.
-- [ ] Add export diagnostics for non-numeric values, empty series, invalid ranges, excessive points, and dimensions that cannot fit the selected widget size.
-- [ ] Add schema, migration, operation, renderer, generator, WebMCP, and diagnostic tests.
+- [x] Add revision-checked insert-element and remove-element operations before adding new visual types. Route manual controls, history, persistence, and WebMCP through them.
+- [x] Add canonical `progress-ring`, `progress-bar`, `sparkline`, and `bar-chart` element types with bounded defaults, schemas, constraints, and migration-safe loading.
+- [x] Define numeric-source, range, color, thickness, point-limit, and empty-data behavior without adding arbitrary path data to project state.
+- [x] Add deterministic geometry helpers shared by the browser preview and Scriptable generator where practical.
+- [x] Render progress and chart elements in the browser with accessible labels and visible empty or invalid-data states.
+- [x] Generate static images for these elements in Scriptable through bounded `DrawContext` and `Path` helpers, then place those images through the normal widget tree.
+- [x] Add inspector controls for bindings, ranges, colors, thickness, size, and chart density.
+- [x] Add WebMCP tools for inserting, selecting, configuring, and removing the new elements through the shared operation path.
+- [x] Update capability results so the assistant advertises the new elements only after the implementation is available.
+- [x] Add export diagnostics for non-numeric values, empty series, invalid ranges, excessive points, and dimensions that cannot fit the selected widget size.
+- [x] Add schema, migration-safe loading, operation, renderer, generator, WebMCP, and diagnostic test coverage; test execution remains pending.
 
 ### Likely files
 
@@ -770,6 +770,13 @@ Append concise evidence after material verification. Do not replace older eviden
 | 2 Sep 2026 | Studio modal simplification | Reduced the visible chooser to Weather and Cryptocurrency, removed Examples from the modal, and replaced the reference-image button with a real dropzone that previews a selected image before explicit confirmation. The refreshed local in-app browser at `1280 x 900` confirmed the concise title, two template rows, `or` divider, image dropzone, absence of Examples and Cancel footer, and no Vite overlay; `git diff --check` and the Impeccable detector passed. Targeted ESLint was unavailable because the checkout has no local ESLint binary and npm could not reach the registry; tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified; this follow-up is currently uncommitted |
 | 2 Sep 2026 | Studio modal copy | Replaced the standalone reference-image explanation with clearer dropzone copy: `Drop a screenshot or image to guide your widget` and `Drag it here, or click to browse`. The visible local in-app browser confirmed the copy appears inside the dropzone while the two-choice modal remains intact; `git diff --check`, `npm run repo:check`, and the Impeccable detector passed. Tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified; this follow-up is currently uncommitted |
 | 2 Sep 2026 | Homepage Scriptable link | Replaced the homepage relationship copy with `Build for Scriptable` and `Design here, then run it in Scriptable.`; made the complete relationship block a keyboard-focusable external link to `https://scriptable.app/` that opens in a new tab. The visible local in-app browser confirmed the link attributes, updated copy, responsive layout, and no horizontal overflow; `git diff --check` and the Impeccable detector passed. Commit `348bac6` was pushed to `origin/main`, and the remote ref matched the local commit. Tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified |
+| 2 Sep 2026 | Homepage assistant handoff | Removed the homepage `Page actions unavailable` readiness card and placed the `Assistant` chooser in the `Start here` area. Added direct guidance: `Choose an assistant below, then connect it to Widgetr. It needs page actions to build and shape the widget here.`; changed the section heading to `Connect an assistant to start`; and corrected the shared unavailable-state copy so it no longer claims the editor works by itself. Local in-app browser checks at `1280 x 900` and `390 x 844` confirmed the assistant placement, no homepage readiness card, the updated guidance, and no horizontal overflow; `git diff --check` and the Impeccable detector passed. Tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified; this follow-up remains uncommitted |
+| 2 Sep 2026 | Homepage prompt simplification | Removed the unnecessary `One message` label from the prompt header while retaining `Start with this message` and the copy action. Desktop and mobile in-app browser checks at `1280 x 900` and `390 x 844` confirmed the simplified header and no horizontal overflow; `git diff --check` and the Impeccable detector passed. Tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified; this follow-up remains uncommitted |
+| 2 Sep 2026 | Homepage chrome reduction | Removed the footer note bar and the redundant `Start here` eyebrow, leaving the assistant heading, guidance, and prompt as the homepage's direct next step. Desktop and mobile in-app browser checks at `1280 x 900` and `390 x 844` confirmed both elements are absent and no horizontal overflow; `git diff --check` and the Impeccable detector passed. Tests, typecheck, production build, deployment, real external WebMCP tool invocation, and Scriptable/iPhone execution remain unverified; this follow-up remains uncommitted |
+| 3 Sep 2026 | 9 local implementation | Added typed progress rings, progress bars, sparklines, and bar charts with bounded sources, shared operations, browser rendering, Scriptable `DrawContext` export, inspector controls, WebMCP tools, and focused test coverage. `npm run repo:check` and `git diff --check` passed; tests, typecheck, build, browser rendering, deployed WebMCP, and Scriptable/iPhone execution remain unverified | Local implementation only; verification gates remain |
+| 3 Sep 2026 | 9 boundary hardening | Added selected-type validation before visual configuration commits so unsupported properties, invalid progress-bar ranges, and nullable progress-bar fills return actionable input errors without mutating project state; aligned progress-ring size changes with its rendered width and height; kept multi-size visual source payloads isolated per layout; `npm run repo:check` and `git diff --check` passed | Focused visual-data tests remain deferred for the next verification session |
+| 3 Sep 2026 | 9 source and contrast hardening | Restricted repeat-item source choices in the visual inspector to active scopes where the selected element is inside a repeat, and aligned browser progress-ring label contrast with the white Scriptable export label; `npm run repo:check` and `git diff --check` passed | Tests, typecheck, browser rendering, deployed WebMCP, and Scriptable/iPhone execution remain deferred |
+| 3 Sep 2026 | 9 export parity hardening | Added the bounded percentage label to the Scriptable progress-bar image so its output matches the browser preview; added a deferred generator regression assertion for that label; invalid values continue to use the existing `No data` diagnostic path; `npm run repo:check` and `git diff --check` passed | Tests, typecheck, browser rendering, deployed WebMCP, and Scriptable/iPhone execution remain deferred |
 
 ## End-of-session update rule
 

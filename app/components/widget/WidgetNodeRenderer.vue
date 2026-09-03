@@ -12,6 +12,7 @@ import {
   resolveRepeatItems,
   resolveValueText
 } from '~/domain/widget/values'
+import { isVisualDataElement } from '~/domain/widget/visual-data'
 import type {
   GroupDirection,
   JsonObject,
@@ -165,6 +166,10 @@ const repeatItemStyle = computed(() => {
     ? { display: 'flex', flex: '1 1 0', minWidth: 0 }
     : { display: 'flex', width: '100%', minHeight: 0 }
 })
+
+const visualDataElement = computed(() => (
+  isVisualDataElement(props.element) ? props.element : null
+))
 </script>
 
 <template>
@@ -297,6 +302,27 @@ const repeatItemStyle = computed(() => {
           @select="emit('select', $event)"
         />
       </div>
+    </div>
+
+    <div
+      v-else-if="visualDataElement"
+      class="widget-node"
+      :class="{ 'element-selected': isSelected }"
+      :style="boxStyle"
+      :data-element-id="element.id"
+      role="button"
+      tabindex="0"
+      :aria-label="`${widgetElementLabel(element)} ${element.type}`"
+      :aria-pressed="isSelected"
+      @click.stop="selectElement"
+      @keydown="handleKeydown"
+    >
+      <VisualDataRenderer
+        :element="visualDataElement"
+        :project="project"
+        :size="size"
+        :item="item"
+      />
     </div>
   </template>
 </template>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createSampleWidgetProject } from '~/domain/widget/fixture'
 import { validateWidgetProject } from '~/domain/widget/schema'
+import { createVisualDataElement } from '~/domain/widget/visual-data'
 import type { WidgetElement } from '~/types/widget'
 
 function collectTypes(element: WidgetElement, types = new Set<string>()): Set<string> {
@@ -75,6 +76,60 @@ describe('canonical widget schema', () => {
       throw new Error('Small temperature fixture is missing')
     }
     temperature.textStyle.fontSize = 57
+
+    const result = validateWidgetProject(project)
+
+    expect(result.ok).toBe(false)
+  })
+
+  it('accepts all four bounded visual-data element types', () => {
+    const project = createSampleWidgetProject()
+    const visualTypes = ['progress-ring', 'progress-bar', 'sparkline', 'bar-chart'] as const
+
+    visualTypes.forEach((type, index) => {
+      project.layouts.small.root.children.push(
+        createVisualDataElement(type, `schema-${type}-${index}`)
+      )
+    })
+
+    const result = validateWidgetProject(project)
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('requires numeric and series bindings to use the matching data types', () => {
+    const project = createSampleWidgetProject()
+    const progressBar = createVisualDataElement('progress-bar', 'schema-progress-bar')
+    if (progressBar.type !== 'progress-bar') {
+      throw new Error('Progress bar fixture was not created')
+    }
+    progressBar.value = {
+      kind: 'binding',
+      bindingId: 'condition',
+      fallback: 0.5
+    }
+    project.layouts.small.root.children.push(progressBar)
+
+    const result = validateWidgetProject(project)
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.issues.some(issue => issue.message.includes('value type "number"'))).toBe(true)
+    }
+  })
+
+  it('caps nested progress rings at three', () => {
+    const project = createSampleWidgetProject()
+    const ring = createVisualDataElement('progress-ring', 'schema-progress-ring')
+    if (ring.type !== 'progress-ring') {
+      throw new Error('Progress ring fixture was not created')
+    }
+    ring.rings.push(
+      { ...ring.rings[0]!, id: 'ring-2' },
+      { ...ring.rings[0]!, id: 'ring-3' },
+      { ...ring.rings[0]!, id: 'ring-4' }
+    )
+    project.layouts.small.root.children.push(ring)
 
     const result = validateWidgetProject(project)
 

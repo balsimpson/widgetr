@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { shallowRef } from 'vue'
 import { createNewWidgetProject } from '~/domain/widget/projects'
-import { createSampleWidgetProject } from '~/domain/widget/fixture'
+import { createNeutralWidgetProject, createSampleWidgetProject } from '~/domain/widget/fixture'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
+import { createVisualDataElement } from '~/domain/widget/visual-data'
 import { registerWebMcpToolSet } from '~/composables/useWidgetWebMcp'
 import { createAssistantPrompt } from '~/domain/widget/onboarding'
 import {
@@ -26,6 +27,24 @@ function selectedProject(size: 'small' | 'medium' | 'large', elementId: string):
     type: 'set-selection',
     expectedRevision: 0,
     selection: { size, elementId }
+  }, { now: fixedClock })
+
+  if (!result.ok) {
+    throw new Error(result.message)
+  }
+  return result.state
+}
+
+function selectedVisualProject(type: 'progress-ring' | 'progress-bar' | 'sparkline' | 'bar-chart'): WidgetProject {
+  const project = createSampleWidgetProject()
+  const elementId = `webmcp-${type}`
+  for (const size of ['small', 'medium', 'large'] as const) {
+    project.layouts[size].root.children.push(createVisualDataElement(type, elementId))
+  }
+  const result = applyWidgetOperation(project, {
+    type: 'set-selection',
+    expectedRevision: 0,
+    selection: { size: 'medium', elementId }
   }, { now: fixedClock })
 
   if (!result.ok) {
@@ -145,12 +164,12 @@ describe('Widgetr WebMCP catalog', () => {
   })
 
   it('keeps all WebMCP status labels provider-neutral and observable', () => {
-    expect(describeWebMcpStatus('checking').label).toBe('Checking for WebMCP...')
-    expect(describeWebMcpStatus('unsupported').label).toBe('Open Widgetr with a WebMCP-enabled assistant')
-    expect(describeWebMcpStatus('registering').label).toBe('Preparing Widgetr tools...')
+    expect(describeWebMcpStatus('checking').label).toBe('Checking page actions...')
+    expect(describeWebMcpStatus('unsupported').label).toBe('WebMCP unavailable')
+    expect(describeWebMcpStatus('registering').label).toBe('Preparing page actions...')
     expect(describeWebMcpStatus('registered').label).toBe('WebMCP ready')
     expect(describeWebMcpStatus('working').label).toBe('Your assistant is working')
-    expect(describeWebMcpStatus('error').label).toBe('Widgetr tools could not start')
+    expect(describeWebMcpStatus('error').label).toBe('Page actions could not start')
   })
 
   it('exposes only the no-selection tools when nothing is selected', () => {
@@ -165,7 +184,8 @@ describe('Widgetr WebMCP catalog', () => {
       'widgetr_clear_selection',
       'widgetr_create_widget',
       'widgetr_set_design_scope',
-      'widgetr_change_overall_style'
+      'widgetr_change_overall_style',
+      'widgetr_insert_visual_data'
     ])
   })
 
@@ -185,6 +205,101 @@ describe('Widgetr WebMCP catalog', () => {
     expect(getWebMcpContext(groupProject)).toBe('group')
     expect(getWebMcpToolNames(groupProject)).toContain('widgetr_reorder_group')
     expect(getWebMcpToolNames(groupProject)).not.toContain('widgetr_replace_image')
+
+    const visualProject = selectedVisualProject('sparkline')
+    expect(getWebMcpContext(visualProject)).toBe('visual-data')
+    expect(getWebMcpToolNames(visualProject)).toContain('widgetr_configure_visual_data')
+    expect(getWebMcpToolNames(visualProject)).toContain('widgetr_remove_visual_data')
+    expect(getWebMcpToolNames(visualProject)).not.toContain('widgetr_change_typography')
+  })
+
+  it('inserts a visual-data element from the no-selection context', async () => {
+    const project = createSampleWidgetProject()
+    project.selection = null
+    const { runtime, state, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_insert_visual_data').execute({
+      expectedRevision: 0,
+      scope: { kind: 'all' },
+      type: 'bar-chart'
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      revision: 1,
+      changedSizes: ['small', 'medium', 'large']
+    })
+    expect(operations[0]).toMatchObject({
+      type: 'insert-element',
+      parentId: 'root',
+      element: { type: 'bar-chart' }
+    })
+    expect(state.project.selection?.elementId).toMatch(/^visual-bar-chart-/)
+  })
+
+  it('configures a selected visual-data element through the shared operation', async () => {
+    const project = selectedVisualProject('sparkline')
+    const { runtime, state, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_configure_visual_data').execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'medium' },
+      series: { kind: 'literal', value: [1, 3, 2, 5] },
+      density: 'detailed'
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      revision: 2,
+      changedSizes: ['medium']
+    })
+    expect(operations[0]).toMatchObject({
+      type: 'update-element-content',
+      elementId: 'webmcp-sparkline',
+      patch: {
+        series: { kind: 'literal', value: [1, 3, 2, 5] },
+        density: 'detailed'
+      }
+    })
+    const element = state.project.layouts.medium.root.children.find(item => item.id === 'webmcp-sparkline')
+    expect(element?.type).toBe('sparkline')
+    if (element?.type === 'sparkline') {
+      expect(element.values).toEqual({ kind: 'literal', value: [1, 3, 2, 5] })
+    }
+  })
+
+  it('rejects visual properties that do not belong to the selected element', async () => {
+    const project = selectedVisualProject('bar-chart')
+    const { runtime, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_configure_visual_data').execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'medium' },
+      thickness: 3
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'INVALID_INPUT',
+      revision: 1
+    })
+    expect(result.message).toContain('does not support thickness')
+    expect(operations).toHaveLength(0)
+  })
+
+  it('rejects a progress-bar range that would become invalid', async () => {
+    const project = selectedVisualProject('progress-bar')
+    const { runtime, operations } = createRuntime(project)
+    const result = await toolFor(project, 'widgetr_configure_visual_data').execute({
+      expectedRevision: 1,
+      scope: { kind: 'one', size: 'medium' },
+      min: 2
+    }, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: 'INVALID_INPUT',
+      revision: 1
+    })
+    expect(result.message).toContain('max must be greater than min')
+    expect(operations).toHaveLength(0)
   })
 
   it('clears selection through the canonical selection operation', async () => {

@@ -2,13 +2,13 @@
 
 ## Status
 
-**Implemented and pushed.** The approved homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are now in place. Local browser verification is complete at the requested desktop and mobile sizes; tests, typecheck, production build, deployment, and real WebMCP invocation remain separate checkpoints.
+**The current homepage revision is in the working tree.** The approved homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are now in place. The homepage directs people to connect an assistant before building; local browser verification is complete at the requested desktop and mobile sizes; tests, typecheck, production build, deployment, and real WebMCP invocation remain separate checkpoints.
 
 The user has explicitly reprioritized this homepage and Studio split. Do not reopen whether it belongs to a later phase. When implementation begins, record the reprioritization and current evidence in the canonical [phase implementation plan](./widgetr-phase-implementation-plan.md).
 
 ## Purpose
 
-Replace the current new-widget homepage with a short onboarding page that explains Widgetr, shows the Scriptable logo, makes the WebMCP requirement obvious, and gives the user one message to copy into a compatible AI assistant.
+Replace the current new-widget homepage with a short onboarding page that explains Widgetr, shows the Scriptable logo, makes it clear that a connected AI assistant with page actions is required to build, and gives the user one message to copy into that assistant.
 
 Move the existing starter and editor experience to `/studio`. The Studio must show the existing starter choices in context, keep its simple next-step text, and expose truthful WebMCP readiness without caring which assistant provider is present.
 
@@ -82,7 +82,7 @@ It contains:
 - Widgetr branding
 - The Scriptable logo with a clear `Build for Scriptable` relationship link
 - A short explanation of Widgetr and WebMCP
-- A truthful WebMCP readiness indicator
+- A clear instruction to connect an AI assistant with page actions before building
 - One copyable message for the user's assistant
 - One clear copy action for the assistant handoff
 - A `Continue` button only when saved projects exist in this browser
@@ -125,7 +125,11 @@ Use plain, provider-neutral copy. The first screen should be understandable with
 
 **Start section heading**
 
-> Tell your assistant what to build
+> Connect an assistant to start
+
+**Assistant guidance**
+
+> Choose an assistant below, then connect it to Widgetr. It needs page actions to build and shape the widget here.
 
 **Copied message**
 
@@ -142,7 +146,7 @@ Generate the URL from the current page at runtime. Do not hard-code production s
 
 ### Assistant choices
 
-Keep the compatibility guidance visible, compact, and assistant-only in its own full-width section below the headline and `Start here` content. `Assistant` is the section heading above one inline row of selectable names. The start area should stay focused on the message and primary action.
+Keep the compatibility guidance visible, compact, and assistant-only in its own full-width section below the headline and start-area heading. `Assistant` is the section heading above one inline row of selectable names. The start area should stay focused on the message and primary action.
 
 - `ChatGPT desktop` — Recommended in a compact badge over the option. Site tools are not available on the Luna model; the selected explanation should tell the user to choose a model that supports them.
 - `Claude Desktop` — Setup required. Connect an MCP or browser bridge before asking it to control the page.
@@ -153,14 +157,14 @@ Use one compact row of selectable assistant names. The selected assistant reveal
 
 ## Readiness state model
 
-Keep status copy in one reusable component so the homepage and Studio starter cannot drift.
+Keep status copy in one reusable component for the Studio assistant handoff. The homepage should use direct assistant guidance instead of a standalone readiness card.
 
 | State | Evidence | User-facing copy | Next action |
 | --- | --- | --- | --- |
 | Checking | Client has mounted but capability has not been resolved | `Checking page actions...` | None |
-| Unavailable | `document.modelContext?.registerTool` is missing | `Page actions unavailable` | Copy the assistant message |
+| Unavailable | `document.modelContext?.registerTool` is missing | `WebMCP unavailable` | Connect an assistant with page actions or copy the assistant message |
 | Registering | Registration has started | `Preparing page actions...` | Wait |
-| Ready | Every required tool for the current route registered | `Page actions ready` | Ask what to build, then shape it together on the canvas |
+| Ready | Every required tool for the current route registered | `WebMCP ready` | Ask what to build, then shape it together on the canvas |
 | Working | A registered tool is executing | `Your assistant is working` | Watch the page update |
 | Error | Required registration failed | `Page actions could not start` | Retry registration or copy the assistant message |
 
@@ -233,8 +237,9 @@ The homepage should match Widgetr's existing quiet graphite, silver, and restrai
 - Keep native system typography.
 - Give the Scriptable logo supporting prominence, not co-brand dominance.
 - Pair the Scriptable logo with `Build for Scriptable` so the relationship is clear. Make the relationship block link to `https://scriptable.app/` and open it in a new tab.
+- Put the assistant chooser in the start area, and explain that a connected assistant with page actions is required to build on the canvas.
 - Use the existing restrained violet-indigo accent to emphasize `without writing JavaScript` in the homepage heading.
-- Use one compact readiness area and one copyable prompt area.
+- Keep assistant guidance compact, and reserve readiness status for the Studio assistant handoff.
 - Keep the primary action singular and obvious.
 - Respect light mode, dark mode, keyboard focus, reduced motion, safe areas, and mobile width.
 - Do not use gradients, neon glow, colored shadows, marketing-dashboard metrics, or literal Apple interface chrome.
@@ -268,7 +273,8 @@ Use a legitimate Scriptable brand asset from an official or user-approved source
 ### Homepage
 
 - `/` no longer renders the new-widget starter screen.
-- The page explains Widgetr, Scriptable, and how page actions connect to a compatible assistant in the first viewport.
+- The page explains Widgetr, Scriptable, and that a connected assistant with page actions is required to build the widget in the first viewport.
+- The start area leads with the Assistant chooser and clear connection guidance instead of a standalone WebMCP readiness card.
 - The Widgetr brand and Scriptable logo are visible with a clear `Build for Scriptable` relationship link that opens the official Scriptable site in a new tab.
 - The `Build for Scriptable` relationship link leads the intro with a brief explanation before the headline.
 - The assistant chooser lists `ChatGPT desktop`, `Claude Desktop`, `Hermes`, and `OpenClaw` without treating a browser as an assistant. `Recommended` appears as an overlay badge on ChatGPT desktop.

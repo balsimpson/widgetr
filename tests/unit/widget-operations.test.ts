@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createSampleWidgetProject } from '~/domain/widget/fixture'
 import { applyWidgetOperation } from '~/domain/widget/operations'
+import { createVisualDataElement } from '~/domain/widget/visual-data'
 import type { WidgetElement, WidgetProject, WidgetSize } from '~/types/widget'
 
 const fixedClock = () => '2026-08-28T06:00:00.000Z'
@@ -277,6 +278,109 @@ describe('shared widget operations', () => {
     if (!result.ok) {
       expect(result.code).toBe('INVALID_OPERATION')
       expect(result.revision).toBe(0)
+      expect(result.state).toBe(project)
+    }
+  })
+
+  it('inserts, updates, and removes visual-data elements through canonical operations', () => {
+    const project = createSampleWidgetProject()
+    const element = createVisualDataElement('progress-bar', 'daily-progress')
+
+    const inserted = applyWidgetOperation(project, {
+      type: 'insert-element',
+      expectedRevision: 0,
+      scope: { kind: 'all' },
+      parentId: 'root',
+      element
+    }, { now: fixedClock })
+
+    expect(inserted.ok).toBe(true)
+    if (!inserted.ok) {
+      return
+    }
+    expect(inserted.changedSizes).toEqual(['small', 'medium', 'large'])
+    expect(inserted.selection).toEqual({ size: 'small', elementId: 'daily-progress' })
+
+    const updated = applyWidgetOperation(inserted.state, {
+      type: 'update-element-content',
+      expectedRevision: 1,
+      scope: { kind: 'all' },
+      elementId: 'daily-progress',
+      patch: {
+        numericValue: { kind: 'literal', value: 0.92 },
+        min: 0,
+        max: 1
+      }
+    }, { now: fixedClock })
+
+    expect(updated.ok).toBe(true)
+    if (!updated.ok) {
+      return
+    }
+    const progress = findElement(updated.state, 'medium', 'daily-progress')
+    expect(progress.type).toBe('progress-bar')
+    if (progress.type === 'progress-bar') {
+      expect(progress.value).toEqual({ kind: 'literal', value: 0.92 })
+    }
+    const smallProgress = findElement(updated.state, 'small', 'daily-progress')
+    const mediumProgress = findElement(updated.state, 'medium', 'daily-progress')
+    if (smallProgress.type === 'progress-bar' && mediumProgress.type === 'progress-bar') {
+      expect(smallProgress.value).not.toBe(mediumProgress.value)
+    }
+
+    const removed = applyWidgetOperation(updated.state, {
+      type: 'remove-element',
+      expectedRevision: 2,
+      scope: { kind: 'all' },
+      elementId: 'daily-progress'
+    }, { now: fixedClock })
+
+    expect(removed.ok).toBe(true)
+    if (!removed.ok) {
+      return
+    }
+    expect(removed.selection).toBeNull()
+    expect(() => findElement(removed.state, 'small', 'daily-progress')).toThrow()
+  })
+
+  it('keeps progress-ring size changes aligned with rendered dimensions', () => {
+    const project = createSampleWidgetProject()
+    const element = createVisualDataElement('progress-ring', 'daily-ring')
+    project.layouts.small.root.children.push(element)
+
+    const result = applyWidgetOperation(project, {
+      type: 'update-element-content',
+      expectedRevision: 0,
+      scope: { kind: 'one', size: 'small' },
+      elementId: 'daily-ring',
+      patch: { size: 112 }
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+    const ring = findElement(result.state, 'small', 'daily-ring')
+    expect(ring.type).toBe('progress-ring')
+    if (ring.type === 'progress-ring') {
+      expect(ring.size).toBe(112)
+      expect(ring.style.width).toBe(112)
+      expect(ring.style.height).toBe(112)
+    }
+  })
+
+  it('does not remove a layout root', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'remove-element',
+      expectedRevision: 0,
+      scope: { kind: 'one', size: 'small' },
+      elementId: 'root'
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('TARGET_TYPE_MISMATCH')
       expect(result.state).toBe(project)
     }
   })

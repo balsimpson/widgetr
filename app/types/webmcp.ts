@@ -1,7 +1,7 @@
 import type { OperationResult, WidgetOperation, WidgetProject, WidgetSize, WidgetStarterId } from './widget'
 import type { ScriptableExportResult } from '~/domain/widget/scriptable'
 
-export type WebMcpContext = 'none' | 'text' | 'image' | 'group' | 'unsupported'
+export type WebMcpContext = 'none' | 'text' | 'image' | 'group' | 'visual-data' | 'unsupported'
 
 export type WebMcpStatus = 'checking' | 'unsupported' | 'registering' | 'registered' | 'working' | 'error'
 

@@ -66,6 +66,32 @@ function findElement(root: WidgetElement, elementId: string): WidgetElement | nu
   return null
 }
 
+function findParent(
+  root: WidgetElement,
+  elementId: string
+): Extract<WidgetElement, { type: 'group' | 'repeat' }> | null {
+  if (root.type !== 'group' && root.type !== 'repeat') {
+    return null
+  }
+
+  if (root.children.some(child => child.id === elementId)) {
+    return root
+  }
+
+  for (const child of root.children) {
+    const parent = findParent(child, elementId)
+    if (parent) {
+      return parent
+    }
+  }
+
+  return null
+}
+
+function isContainer(element: WidgetElement): element is Extract<WidgetElement, { type: 'group' | 'repeat' }> {
+  return element.type === 'group' || element.type === 'repeat'
+}
+
 function operationScope(state: WidgetProject, operation: WidgetOperation): DesignScope {
   if ('scope' in operation && operation.scope) {
     return operation.scope
@@ -91,9 +117,21 @@ function applyElementContentPatch(
             ? ['direction', 'spacing', 'horizontalAlignment', 'verticalAlignment', 'distribution']
             : target.type === 'repeat'
               ? ['limit', 'direction', 'spacing', 'horizontalAlignment', 'verticalAlignment', 'distribution']
-              : ['length']
+              : target.type === 'spacer'
+                ? ['length']
+                : target.type === 'progress-ring'
+                  ? ['rings', 'size', 'thickness', 'centerLabel']
+                  : target.type === 'progress-bar'
+                    ? ['numericValue', 'min', 'max', 'trackColor', 'fillColor', 'thickness']
+                    : target.type === 'sparkline'
+                      ? ['series', 'lineColor', 'fillColor', 'thickness', 'density']
+                      : ['series', 'barColor', 'gap', 'density']
 
   if (specificKeys.some(key => !supportedKeys.includes(key))) {
+    return false
+  }
+
+  if (target.type === 'progress-bar' && patch.fillColor === null) {
     return false
   }
 
@@ -160,6 +198,80 @@ function applyElementContentPatch(
 
   if (target.type === 'spacer' && patch.length !== undefined) {
     target.length = patch.length
+  }
+
+  if (target.type === 'progress-ring') {
+    if (patch.rings !== undefined) {
+      target.rings = structuredClone(patch.rings)
+    }
+    if (patch.size !== undefined) {
+      target.size = patch.size
+      target.style = {
+        ...target.style,
+        width: patch.size,
+        height: patch.size
+      }
+    }
+    if (patch.thickness !== undefined) {
+      target.thickness = patch.thickness
+    }
+    if (patch.centerLabel !== undefined) {
+      target.centerLabel = structuredClone(patch.centerLabel)
+    }
+  }
+
+  if (target.type === 'progress-bar') {
+    if (patch.numericValue !== undefined) {
+      target.value = structuredClone(patch.numericValue)
+    }
+    if (patch.min !== undefined) {
+      target.min = patch.min
+    }
+    if (patch.max !== undefined) {
+      target.max = patch.max
+    }
+    if (patch.trackColor !== undefined) {
+      target.trackColor = patch.trackColor
+    }
+    if (patch.fillColor !== undefined && patch.fillColor !== null) {
+      target.fillColor = patch.fillColor
+    }
+    if (patch.thickness !== undefined) {
+      target.thickness = patch.thickness
+    }
+  }
+
+  if (target.type === 'sparkline') {
+    if (patch.series !== undefined) {
+      target.values = structuredClone(patch.series)
+    }
+    if (patch.lineColor !== undefined) {
+      target.lineColor = patch.lineColor
+    }
+    if (patch.fillColor !== undefined) {
+      target.fillColor = patch.fillColor
+    }
+    if (patch.thickness !== undefined) {
+      target.thickness = patch.thickness
+    }
+    if (patch.density !== undefined) {
+      target.density = patch.density
+    }
+  }
+
+  if (target.type === 'bar-chart') {
+    if (patch.series !== undefined) {
+      target.values = structuredClone(patch.series)
+    }
+    if (patch.barColor !== undefined) {
+      target.barColor = patch.barColor
+    }
+    if (patch.gap !== undefined) {
+      target.gap = patch.gap
+    }
+    if (patch.density !== undefined) {
+      target.density = patch.density
+    }
   }
 
   return true
@@ -379,6 +491,143 @@ export function applyWidgetOperation(
       changedSizes,
       warnings,
       `Moved ${operation.childId} in ${operation.elementId} for ${formatSizes(changedSizes)}.`,
+      now
+    )
+  }
+
+  if (operation.type === 'insert-element') {
+    const changedSizes: WidgetSize[] = []
+    const warnings: string[] = []
+    let foundParent = false
+    let foundWrongType = false
+    let invalidIndex = false
+
+    for (const size of sizes) {
+      const parentCandidate = findElement(nextState.layouts[size].root, operation.parentId)
+      if (!parentCandidate) {
+        warnings.push(`${operation.parentId} does not exist in the ${size} layout.`)
+        continue
+      }
+
+      foundParent = true
+      if (!isContainer(parentCandidate)) {
+        foundWrongType = true
+        warnings.push(`${operation.parentId} is not a group or repeat in the ${size} layout.`)
+        continue
+      }
+
+      const index = operation.index ?? parentCandidate.children.length
+      if (index > parentCandidate.children.length) {
+        invalidIndex = true
+        warnings.push(`The target child position ${index} is outside the ${size} layout group.`)
+        continue
+      }
+
+      parentCandidate.children.splice(index, 0, structuredClone(operation.element))
+      changedSizes.push(size)
+    }
+
+    if (changedSizes.length === 0) {
+      if (invalidIndex) {
+        return failure(
+          state,
+          'INVALID_OPERATION',
+          `The child position ${operation.index} is outside the requested group.`,
+          warnings
+        )
+      }
+      if (foundParent && foundWrongType) {
+        return failure(
+          state,
+          'TARGET_TYPE_MISMATCH',
+          `${operation.parentId} cannot contain child elements.`,
+          warnings
+        )
+      }
+      return failure(
+        state,
+        'TARGET_NOT_FOUND',
+        `${operation.parentId} was not found in the requested layouts.`,
+        warnings
+      )
+    }
+
+    nextState.selection = {
+      size: changedSizes[0]!,
+      elementId: operation.element.id
+    }
+    return finish(
+      state,
+      nextState,
+      changedSizes,
+      warnings,
+      `Inserted ${widgetElementLabel(operation.element)} in ${formatSizes(changedSizes)}.`,
+      now
+    )
+  }
+
+  if (operation.type === 'remove-element') {
+    const changedSizes: WidgetSize[] = []
+    const warnings: string[] = []
+    let foundTarget = false
+    let foundWrongType = false
+
+    for (const size of sizes) {
+      const root = nextState.layouts[size].root
+      const target = findElement(root, operation.elementId)
+      if (!target) {
+        warnings.push(`${operation.elementId} does not exist in the ${size} layout.`)
+        continue
+      }
+
+      foundTarget = true
+      const parent = findParent(root, operation.elementId)
+      if (!parent) {
+        foundWrongType = true
+        warnings.push(`The ${size} layout root cannot be removed.`)
+        continue
+      }
+
+      const childIndex = parent.children.findIndex(child => child.id === operation.elementId)
+      if (childIndex < 0) {
+        warnings.push(`${operation.elementId} could not be removed from the ${size} layout.`)
+        continue
+      }
+
+      parent.children.splice(childIndex, 1)
+      changedSizes.push(size)
+    }
+
+    if (nextState.selection && !findElement(
+      nextState.layouts[nextState.selection.size].root,
+      nextState.selection.elementId
+    )) {
+      nextState.selection = null
+    }
+
+    if (changedSizes.length === 0) {
+      if (foundTarget && foundWrongType) {
+        return failure(
+          state,
+          'TARGET_TYPE_MISMATCH',
+          `${operation.elementId} is a layout root and cannot be removed.`,
+          warnings
+        )
+      }
+      return failure(
+        state,
+        'TARGET_NOT_FOUND',
+        `${operation.elementId} was not found in the requested layouts.`,
+        warnings
+      )
+    }
+
+    return finish(
+      state,
+      nextState,
+      changedSizes,
+      warnings,
+      `Removed ${operation.elementId} from ${formatSizes(changedSizes)}.`,
       now
     )
   }

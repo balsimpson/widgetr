@@ -50,10 +50,21 @@ export type ValueSource =
     format?: { prefix: string, suffix: string }
   }
 
+export type NumericSource =
+  | { kind: 'literal', value: number }
+  | { kind: 'binding', bindingId: string, fallback: number }
+  | { kind: 'item', path: DataPath, fallback: number }
+
+export type SeriesSource =
+  | { kind: 'literal', value: number[] }
+  | { kind: 'binding', bindingId: string, fallback: number[] }
+  | { kind: 'item', path: DataPath, fallback: number[] }
+
 export type HorizontalAlignment = 'leading' | 'center' | 'trailing'
 export type VerticalAlignment = 'top' | 'center' | 'bottom'
 export type GroupDistribution = 'start' | 'center' | 'end' | 'space-between'
 export type GroupDirection = 'horizontal' | 'vertical'
+export type VisualDataDensity = 'compact' | 'balanced' | 'detailed'
 
 export interface EdgeInsets {
   top: number
@@ -169,6 +180,50 @@ export interface RepeatElement extends BaseWidgetElement {
   children: WidgetElement[]
 }
 
+export interface ProgressRingDatum {
+  id: string
+  value: NumericSource
+  min: number
+  max: number
+  trackColor: string
+  fillColor: string
+}
+
+export interface ProgressRingElement extends BaseWidgetElement {
+  type: 'progress-ring'
+  rings: ProgressRingDatum[]
+  size: number
+  thickness: number
+  centerLabel: ValueSource | null
+}
+
+export interface ProgressBarElement extends BaseWidgetElement {
+  type: 'progress-bar'
+  value: NumericSource
+  min: number
+  max: number
+  trackColor: string
+  fillColor: string
+  thickness: number
+}
+
+export interface SparklineElement extends BaseWidgetElement {
+  type: 'sparkline'
+  values: SeriesSource
+  lineColor: string
+  fillColor: string | null
+  thickness: number
+  density: VisualDataDensity
+}
+
+export interface BarChartElement extends BaseWidgetElement {
+  type: 'bar-chart'
+  values: SeriesSource
+  barColor: string
+  gap: number
+  density: VisualDataDensity
+}
+
 export type WidgetElement =
   | TextElement
   | DateElement
@@ -177,6 +232,18 @@ export type WidgetElement =
   | GroupElement
   | SpacerElement
   | RepeatElement
+  | ProgressRingElement
+  | ProgressBarElement
+  | SparklineElement
+  | BarChartElement
+
+export type VisualDataElement =
+  | ProgressRingElement
+  | ProgressBarElement
+  | SparklineElement
+  | BarChartElement
+
+export type VisualDataElementType = VisualDataElement['type']
 
 export interface WidgetLayout {
   size: WidgetSize
@@ -314,6 +381,19 @@ export interface UpdateElementContentOperation extends OperationBase {
     distribution?: GroupDistribution
     length?: SpacerElement['length']
     limit?: number
+    numericValue?: NumericSource
+    series?: SeriesSource
+    rings?: ProgressRingDatum[]
+    min?: number
+    max?: number
+    trackColor?: string
+    fillColor?: string | null
+    thickness?: number
+    centerLabel?: ValueSource | null
+    density?: VisualDataDensity
+    lineColor?: string
+    barColor?: string
+    gap?: number
   }
 }
 
@@ -339,6 +419,20 @@ export interface ReorderChildrenOperation extends OperationBase {
   scope?: DesignScope
 }
 
+export interface InsertElementOperation extends OperationBase {
+  type: 'insert-element'
+  parentId: string
+  element: WidgetElement
+  index?: number
+  scope?: DesignScope
+}
+
+export interface RemoveElementOperation extends OperationBase {
+  type: 'remove-element'
+  elementId: string
+  scope?: DesignScope
+}
+
 export interface RestoreSnapshotOperation extends OperationBase {
   type: 'restore-snapshot'
   snapshot: WidgetProject
@@ -353,6 +447,8 @@ export type WidgetOperation =
   | UpdateProjectMetadataOperation
   | SetLayoutBackgroundOperation
   | ReorderChildrenOperation
+  | InsertElementOperation
+  | RemoveElementOperation
   | RestoreSnapshotOperation
 
 export type OperationFailureCode =

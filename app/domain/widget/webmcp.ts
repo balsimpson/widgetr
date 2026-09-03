@@ -3,12 +3,21 @@ import { WIDGET_CONSTRAINTS } from './constraints'
 import { WIDGET_STARTERS } from './starters'
 import { findWidgetElement, widgetElementLabel } from './tree'
 import {
+  VISUAL_DATA_ELEMENT_TYPES,
+  createVisualDataElement,
+  isVisualDataElement
+} from './visual-data'
+import {
   designScopeSchema,
+  numericSourceSchema,
+  progressRingDatumSchema,
+  seriesSourceSchema,
   valueSourceSchema,
   widgetBackgroundSchema
 } from './schema'
 import type {
   DesignScope,
+  VisualDataElementType,
   OperationResult,
   UpdateElementContentOperation,
   ValueSource,
@@ -18,6 +27,7 @@ import type {
   WidgetStarterId,
   WidgetSize
 } from '~/types/widget'
+import { WIDGET_SIZES } from '~/types/widget'
 import type {
   WebMcpContext,
   WebMcpJsonSchema,
@@ -166,6 +176,120 @@ const valueSourceJsonSchema: WebMcpJsonSchema = {
     }
   ]
 }
+
+const numericSourceJsonSchema: WebMcpJsonSchema = {
+  type: 'object',
+  oneOf: [
+    {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'literal' },
+        value: { type: 'number' }
+      },
+      required: ['kind', 'value'],
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'binding' },
+        bindingId: { type: 'string', minLength: 1, maxLength: 80 },
+        fallback: { type: 'number' }
+      },
+      required: ['kind', 'bindingId', 'fallback'],
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'item' },
+        path: {
+          type: 'array',
+          items: {
+            oneOf: [
+              { type: 'string', minLength: 1, maxLength: 120 },
+              { type: 'integer', minimum: 0 }
+            ]
+          },
+          maxItems: 24
+        },
+        fallback: { type: 'number' }
+      },
+      required: ['kind', 'path', 'fallback'],
+      additionalProperties: false
+    }
+  ]
+}
+
+const seriesSourceJsonSchema: WebMcpJsonSchema = {
+  type: 'object',
+  oneOf: [
+    {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'literal' },
+        value: {
+          type: 'array',
+          items: { type: 'number' },
+          maxItems: WIDGET_CONSTRAINTS.visualData.maxSeriesPoints
+        }
+      },
+      required: ['kind', 'value'],
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'binding' },
+        bindingId: { type: 'string', minLength: 1, maxLength: 80 },
+        fallback: {
+          type: 'array',
+          items: { type: 'number' },
+          maxItems: WIDGET_CONSTRAINTS.visualData.maxSeriesPoints
+        }
+      },
+      required: ['kind', 'bindingId', 'fallback'],
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', const: 'item' },
+        path: {
+          type: 'array',
+          items: {
+            oneOf: [
+              { type: 'string', minLength: 1, maxLength: 120 },
+              { type: 'integer', minimum: 0 }
+            ]
+          },
+          maxItems: 24
+        },
+        fallback: {
+          type: 'array',
+          items: { type: 'number' },
+          maxItems: WIDGET_CONSTRAINTS.visualData.maxSeriesPoints
+        }
+      },
+      required: ['kind', 'path', 'fallback'],
+      additionalProperties: false
+    }
+  ]
+}
+
+const visualDataTypeJsonSchema: WebMcpJsonSchema = {
+  type: 'string',
+  enum: [...VISUAL_DATA_ELEMENT_TYPES]
+}
+
+const progressRingJsonSchema: WebMcpJsonSchema = objectJsonSchema({
+  id: { type: 'string', minLength: 1, maxLength: 80 },
+  value: numericSourceJsonSchema,
+  min: { type: 'number' },
+  max: { type: 'number' },
+  trackColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+  fillColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' }
+}, ['id', 'value', 'min', 'max', 'trackColor', 'fillColor'])
 
 const backgroundJsonSchema: WebMcpJsonSchema = {
   type: 'object',
@@ -391,6 +515,59 @@ const reorderInputSchema = z.object({
   scope: designScopeSchema,
   childId: z.string().trim().min(1).max(80),
   toIndex: z.number().int().nonnegative().max(WIDGET_CONSTRAINTS.tree.maxElementsPerLayout - 1)
+}).strict()
+
+const visualDataTypeSchema = z.enum(VISUAL_DATA_ELEMENT_TYPES)
+const progressRingListSchema = z.array(progressRingDatumSchema)
+  .min(1)
+  .max(WIDGET_CONSTRAINTS.visualData.maxRings)
+  .refine(
+    rings => new Set(rings.map(ring => ring.id)).size === rings.length,
+    'Progress ring ids must be unique.'
+  )
+
+const visualInsertInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  scope: designScopeSchema,
+  type: visualDataTypeSchema,
+  parentId: z.string().trim().min(1).max(80).optional(),
+  index: z.number().int().nonnegative().max(WIDGET_CONSTRAINTS.tree.maxElementsPerLayout - 1).optional()
+}).strict()
+
+const visualConfigureInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  scope: designScopeSchema,
+  numericValue: numericSourceSchema.optional(),
+  series: seriesSourceSchema.optional(),
+  rings: progressRingListSchema.optional(),
+  size: z.number().finite()
+    .min(WIDGET_CONSTRAINTS.visualData.ringSize.min)
+    .max(WIDGET_CONSTRAINTS.visualData.ringSize.max)
+    .optional(),
+  min: z.number().finite().optional(),
+  max: z.number().finite().optional(),
+  trackColor: toolColorSchema.optional(),
+  fillColor: toolColorSchema.nullable().optional(),
+  thickness: z.number().finite()
+    .min(WIDGET_CONSTRAINTS.visualData.chartThickness.min)
+    .max(WIDGET_CONSTRAINTS.visualData.progressBarThickness.max)
+    .optional(),
+  centerLabel: boundedValueSourceSchema.nullable().optional(),
+  density: z.enum(['compact', 'balanced', 'detailed']).optional(),
+  lineColor: toolColorSchema.optional(),
+  barColor: toolColorSchema.optional(),
+  gap: z.number().finite()
+    .min(WIDGET_CONSTRAINTS.visualData.chartGap.min)
+    .max(WIDGET_CONSTRAINTS.visualData.chartGap.max)
+    .optional()
+}).strict().refine(
+  input => Object.keys(input).some(key => !['expectedRevision', 'scope'].includes(key)),
+  'Include at least one visual-data property.'
+)
+
+const visualRemoveInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  scope: designScopeSchema
 }).strict()
 
 type ToolInputResult<T> =
@@ -782,9 +959,237 @@ export function createStarterWebMcpToolCatalog(studioUrl: string): WebMcpToolDes
   return [getStartedTool(studioUrl), createWidgetTool()]
 }
 
+function nextVisualElementId(project: WidgetProject, type: VisualDataElementType): string {
+  const base = `visual-${type}`
+  let suffix = 1
+  let candidate = `${base}-${suffix}`
+  while (WIDGET_SIZES.some(size => findWidgetElement(project.layouts[size].root, candidate))) {
+    suffix += 1
+    candidate = `${base}-${suffix}`
+  }
+  return candidate
+}
+
+function visualInsertTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_insert_visual_data',
+    title: 'Insert a Widgetr visual-data element',
+    description: 'Insert a bounded progress ring, progress bar, sparkline, or bar chart into the selected group or the layout root.',
+    inputSchema: operationJsonSchema({
+      type: visualDataTypeJsonSchema,
+      parentId: { type: 'string', minLength: 1, maxLength: 80, description: 'Optional group or repeat id. Defaults to the selected group or layout root.' },
+      index: { type: 'integer', minimum: 0, maximum: WIDGET_CONSTRAINTS.tree.maxElementsPerLayout - 1 }
+    }, ['scope', 'type']),
+    annotations: mutationAnnotations(),
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(visualInsertInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      const project = runtime.getProject()
+      const targetSize = resolveDesignScope(parsed.value.scope)[0]!
+      const parentId = parsed.value.parentId
+        ?? project.selection?.elementId
+        ?? project.layouts[targetSize].root.id
+      const element = createVisualDataElement(
+        parsed.value.type,
+        nextVisualElementId(project, parsed.value.type)
+      )
+
+      return operationPayload(runtime.commitOperation({
+        type: 'insert-element',
+        expectedRevision: parsed.value.expectedRevision,
+        parentId,
+        element,
+        index: parsed.value.index,
+        scope: parsed.value.scope
+      }))
+    }
+  })
+}
+
+const visualConfigureJsonProperties: Record<string, WebMcpJsonSchema> = {
+  numericValue: numericSourceJsonSchema,
+  series: seriesSourceJsonSchema,
+  rings: {
+    type: 'array',
+    items: progressRingJsonSchema,
+    minItems: 1,
+    maxItems: WIDGET_CONSTRAINTS.visualData.maxRings
+  },
+  size: {
+    type: 'number',
+    minimum: WIDGET_CONSTRAINTS.visualData.ringSize.min,
+    maximum: WIDGET_CONSTRAINTS.visualData.ringSize.max
+  },
+  min: { type: 'number' },
+  max: { type: 'number' },
+  trackColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+  fillColor: {
+    oneOf: [
+      { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+      { type: 'null' }
+    ]
+  },
+  thickness: {
+    type: 'number',
+    minimum: WIDGET_CONSTRAINTS.visualData.chartThickness.min,
+    maximum: WIDGET_CONSTRAINTS.visualData.progressBarThickness.max
+  },
+  centerLabel: {
+    oneOf: [valueSourceJsonSchema, { type: 'null' }]
+  },
+  density: { type: 'string', enum: ['compact', 'balanced', 'detailed'] },
+  lineColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+  barColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+  gap: {
+    type: 'number',
+    minimum: WIDGET_CONSTRAINTS.visualData.chartGap.min,
+    maximum: WIDGET_CONSTRAINTS.visualData.chartGap.max
+  }
+}
+
+const visualConfigurePatchKeys: Record<VisualDataElementType, readonly string[]> = {
+  'progress-ring': ['rings', 'size', 'thickness', 'centerLabel'],
+  'progress-bar': ['numericValue', 'min', 'max', 'trackColor', 'fillColor', 'thickness'],
+  sparkline: ['series', 'lineColor', 'fillColor', 'thickness', 'density'],
+  'bar-chart': ['series', 'barColor', 'gap', 'density']
+}
+
+function visualConfigureTargetError(
+  runtime: WebMcpRuntime,
+  target: WidgetElement,
+  patch: UpdateElementContentOperation['patch']
+): WebMcpToolPayload | null {
+  if (!isVisualDataElement(target)) {
+    return errorPayload(runtime, 'TARGET_TYPE_MISMATCH', 'The selected element is not a visual-data element.')
+  }
+
+  const supportedKeys = visualConfigurePatchKeys[target.type]
+  const unsupportedKeys = Object.keys(patch).filter(key => !supportedKeys.includes(key))
+  if (unsupportedKeys.length > 0) {
+    return errorPayload(
+      runtime,
+      'INVALID_INPUT',
+      `${widgetElementLabel(target)} does not support ${unsupportedKeys.join(', ')}. Supported properties: ${supportedKeys.join(', ')}.`
+    )
+  }
+
+  if (target.type === 'progress-ring' && patch.thickness !== undefined) {
+    const { min, max } = WIDGET_CONSTRAINTS.visualData.ringThickness
+    if (patch.thickness < min || patch.thickness > max) {
+      return errorPayload(runtime, 'INVALID_INPUT', `Progress ring thickness must be between ${min} and ${max}.`)
+    }
+  }
+
+  if (target.type === 'progress-bar') {
+    if (patch.fillColor === null) {
+      return errorPayload(runtime, 'INVALID_INPUT', 'Progress bar fillColor must be a six-digit hex color.')
+    }
+    if (patch.thickness !== undefined) {
+      const { min, max } = WIDGET_CONSTRAINTS.visualData.progressBarThickness
+      if (patch.thickness < min || patch.thickness > max) {
+        return errorPayload(runtime, 'INVALID_INPUT', `Progress bar thickness must be between ${min} and ${max}.`)
+      }
+    }
+    const nextMin = patch.min ?? target.min
+    const nextMax = patch.max ?? target.max
+    if (nextMax <= nextMin) {
+      return errorPayload(runtime, 'INVALID_INPUT', 'Progress bar max must be greater than min.')
+    }
+  }
+
+  if (target.type === 'sparkline' && patch.thickness !== undefined) {
+    const { min, max } = WIDGET_CONSTRAINTS.visualData.chartThickness
+    if (patch.thickness < min || patch.thickness > max) {
+      return errorPayload(runtime, 'INVALID_INPUT', `Sparkline thickness must be between ${min} and ${max}.`)
+    }
+  }
+
+  return null
+}
+
+function visualConfigureTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_configure_visual_data',
+    title: 'Configure a Widgetr visual-data element',
+    description: 'Update the selected progress ring, progress bar, sparkline, or bar chart using bounded numeric sources, colors, ranges, and density settings.',
+    inputSchema: operationJsonSchema(visualConfigureJsonProperties, ['scope']),
+    annotations: mutationAnnotations(false, true),
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(visualConfigureInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+      const target = selectedTarget(runtime, [...VISUAL_DATA_ELEMENT_TYPES])
+      if (!target.ok) {
+        return target.payload
+      }
+
+      const { expectedRevision, scope, ...patch } = parsed.value
+      const targetError = visualConfigureTargetError(runtime, target.element, patch)
+      if (targetError) {
+        return targetError
+      }
+      return operationPayload(runtime.commitOperation({
+        type: 'update-element-content',
+        expectedRevision,
+        elementId: target.element.id,
+        scope,
+        patch
+      }))
+    }
+  })
+}
+
+function visualRemoveTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_remove_visual_data',
+    title: 'Remove a Widgetr visual-data element',
+    description: 'Ask for confirmation before removing the selected progress ring, progress bar, sparkline, or bar chart from the requested layouts.',
+    inputSchema: operationJsonSchema({}, ['scope']),
+    annotations: mutationAnnotations(true),
+    execute: async (_input, context, runtime) => {
+      const parsed = parseOrError(visualRemoveInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+      const target = selectedTarget(runtime, [...VISUAL_DATA_ELEMENT_TYPES])
+      if (!target.ok) {
+        return target.payload
+      }
+
+      const changedSizes = resolveDesignScope(parsed.value.scope)
+      const confirmed = await runtime.requestConfirmation({
+        title: 'Confirm visual-data removal',
+        description: `Remove ${widgetElementLabel(target.element)} from ${formatSizes(changedSizes)}?`,
+        actionLabel: 'Remove element',
+        changedSizes
+      }, context.signal)
+      if (context.signal.aborted) {
+        return errorPayload(runtime, 'CANCELLED', 'The visual-data removal was cancelled before it could be applied.')
+      }
+      if (!confirmed) {
+        return errorPayload(runtime, 'CONFIRMATION_REQUIRED', 'The visual-data removal was not confirmed by the user.', {
+          confirmed: false
+        })
+      }
+
+      return operationPayload(runtime.commitOperation({
+        type: 'remove-element',
+        expectedRevision: parsed.value.expectedRevision,
+        elementId: target.element.id,
+        scope: parsed.value.scope
+      }))
+    }
+  })
+}
+
 function noSelectionTools(): WebMcpToolDescriptor[] {
   return [
     createWidgetTool(),
+    visualInsertTool(),
     descriptor({
       name: 'widgetr_set_design_scope',
       title: 'Set Widgetr design scope',
@@ -1247,7 +1652,8 @@ function groupTools(): WebMcpToolDescriptor[] {
           scope: parsed.value.scope
         }))
       }
-    })
+    }),
+    visualInsertTool()
   ]
 }
 
@@ -1286,7 +1692,8 @@ const contextToolNames: Record<Exclude<WebMcpContext, 'unsupported'>, string[]> 
   none: [
     'widgetr_create_widget',
     'widgetr_set_design_scope',
-    'widgetr_change_overall_style'
+    'widgetr_change_overall_style',
+    'widgetr_insert_visual_data'
   ],
   text: [
     'widgetr_change_text_content',
@@ -1307,7 +1714,12 @@ const contextToolNames: Record<Exclude<WebMcpContext, 'unsupported'>, string[]> 
     'widgetr_align_group',
     'widgetr_set_group_direction',
     'widgetr_set_group_distribution',
-    'widgetr_reorder_group'
+    'widgetr_reorder_group',
+    'widgetr_insert_visual_data'
+  ],
+  'visual-data': [
+    'widgetr_configure_visual_data',
+    'widgetr_remove_visual_data'
   ]
 }
 
@@ -1332,6 +1744,9 @@ export function getWebMcpContext(project: WidgetProject): WebMcpContext {
   if (element.type === 'group' || element.type === 'repeat') {
     return 'group'
   }
+  if (isVisualDataElement(element)) {
+    return 'visual-data'
+  }
   return 'unsupported'
 }
 
@@ -1353,6 +1768,8 @@ export function createWebMcpToolCatalog(project: WidgetProject): WebMcpToolDescr
     tools.push(...imageTools())
   } else if (context === 'group') {
     tools.push(...groupTools())
+  } else if (context === 'visual-data') {
+    tools.push(visualConfigureTool(), visualRemoveTool())
   }
 
   return tools

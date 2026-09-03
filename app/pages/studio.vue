@@ -9,6 +9,10 @@ import {
   createWebMcpToolCatalog
 } from '~/domain/widget/webmcp'
 import { findWidgetElement, widgetElementLabel } from '~/domain/widget/tree'
+import {
+  VISUAL_DATA_ELEMENT_OPTIONS,
+  createVisualDataElement
+} from '~/domain/widget/visual-data'
 import { useWidgetProjects } from '~/composables/useWidgetProjects'
 import { useWidgetWebMcp } from '~/composables/useWidgetWebMcp'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
@@ -19,7 +23,9 @@ import type {
   WidgetProject,
   WidgetSelection,
   WidgetStarterId,
-  WidgetSize
+  WidgetSize,
+  WidgetElement,
+  VisualDataElementType
 } from '~/types/widget'
 import type { WebMcpConfirmationRequest } from '~/types/webmcp'
 
@@ -121,6 +127,8 @@ const renameProjectName = ref('')
 const renameTarget = ref<WidgetProject | null>(null)
 const deleteProjectOpen = ref(false)
 const deleteTarget = ref<WidgetProject | null>(null)
+const removeElementOpen = ref(false)
+const removeElementTarget = ref<WidgetSelection | null>(null)
 const referenceUpload = ref<File | null | undefined>()
 const referenceUrl = ref<string | null>(null)
 const referenceError = ref<string | null>(null)
@@ -425,6 +433,99 @@ function clearSelection(): void {
     expectedRevision: project.value.revision,
     selection: null
   }, { recordHistory: false })
+}
+
+function findWidgetParent(root: WidgetElement, elementId: string): WidgetElement | null {
+  if (root.type !== 'group' && root.type !== 'repeat') {
+    return null
+  }
+  if (root.children.some(child => child.id === elementId)) {
+    return root
+  }
+  for (const child of root.children) {
+    const parent = findWidgetParent(child, elementId)
+    if (parent) {
+      return parent
+    }
+  }
+  return null
+}
+
+function nextVisualElementId(type: VisualDataElementType): string {
+  const base = `visual-${type}`
+  let suffix = 1
+  let candidate = `${base}-${suffix}`
+  while (WIDGET_SIZES.some(size => findWidgetElement(project.value.layouts[size].root, candidate))) {
+    suffix += 1
+    candidate = `${base}-${suffix}`
+  }
+  return candidate
+}
+
+function addVisualDataElement(type: VisualDataElementType): void {
+  if (isEmptyStudio.value) {
+    openNewProject()
+    return
+  }
+
+  const targetSize = project.value.selection?.size
+    ?? (previewView.value === 'all' ? structureSize.value : previewView.value)
+  const root = project.value.layouts[targetSize].root
+  const selected = project.value.selection?.size === targetSize
+    ? findWidgetElement(root, project.value.selection.elementId)
+    : null
+  const parent = selected && (selected.type === 'group' || selected.type === 'repeat')
+    ? selected
+    : selected
+      ? findWidgetParent(root, selected.id)
+      : root
+  const element = createVisualDataElement(type, nextVisualElementId(type))
+
+  toolsOpen.value = false
+  commitOperation({
+    type: 'insert-element',
+    expectedRevision: project.value.revision,
+    parentId: parent?.id ?? root.id,
+    element
+  })
+}
+
+const removeElementLabel = computed(() => {
+  const target = removeElementTarget.value
+  if (!target) {
+    return 'this element'
+  }
+  const element = findWidgetElement(
+    project.value.layouts[target.size].root,
+    target.elementId
+  )
+  return element ? widgetElementLabel(element) : target.elementId
+})
+
+function requestRemoveElement(selection: WidgetSelection): void {
+  removeElementTarget.value = selection
+  removeElementOpen.value = true
+}
+
+function cancelRemoveElement(): void {
+  removeElementOpen.value = false
+  removeElementTarget.value = null
+}
+
+function confirmRemoveElement(): void {
+  const target = removeElementTarget.value
+  if (!target) {
+    return
+  }
+
+  const result = commitOperation({
+    type: 'remove-element',
+    expectedRevision: project.value.revision,
+    elementId: target.elementId
+  })
+  if (result.ok) {
+    cancelRemoveElement()
+  }
 }
 
 function closeContextualSurfaces(options: { keepLayers?: boolean } = {}): void {
@@ -1278,6 +1379,18 @@ onBeforeUnmount(() => {
                   <UButton label="Layers" icon="i-lucide-layers-2" color="neutral" variant="ghost" block @click="openLayers" />
                   <UButton label="Reference" icon="i-lucide-image-plus" color="neutral" variant="ghost" block @click="openReference" />
                   <UButton label="Widget settings" icon="i-lucide-settings-2" color="neutral" variant="ghost" block @click="openWidgetSettings" />
+                  <div class="tools-menu-divider" aria-hidden="true" />
+                  <span class="tools-menu-label">Add visual data</span>
+                  <UButton
+                    v-for="option in VISUAL_DATA_ELEMENT_OPTIONS"
+                    :key="option.value"
+                    :label="option.label"
+                    :icon="option.value === 'progress-ring' ? 'i-lucide-circle-gauge' : option.value === 'progress-bar' ? 'i-lucide-rectangle-horizontal' : option.value === 'sparkline' ? 'i-lucide-chart-spline' : 'i-lucide-chart-no-axes-column'"
+                    color="neutral"
+                    variant="ghost"
+                    block
+                    @click="addVisualDataElement(option.value)"
+                  />
                 </div>
               </template>
             </UPopover>
@@ -1377,6 +1490,7 @@ onBeforeUnmount(() => {
             :selection="project.selection"
             :focused-size="previewView === 'all' ? structureSize : previewView"
             @operation="commitOperation"
+            @remove="requestRemoveElement"
           />
         </aside>
       </section>
@@ -1678,6 +1792,7 @@ onBeforeUnmount(() => {
           :selection="project.selection"
           :focused-size="previewView === 'all' ? structureSize : previewView"
           @operation="commitOperation"
+          @remove="requestRemoveElement"
         />
       </template>
       <template #footer v-if="project.selection">
@@ -1748,6 +1863,33 @@ onBeforeUnmount(() => {
             label="Delete project"
             color="error"
             @click="confirmDeleteProject"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="removeElementOpen"
+      title="Remove element"
+      description="This removes the selected element from the active design scope."
+    >
+      <template #body>
+        <p class="modal-copy">
+          Remove <strong>{{ removeElementLabel }}</strong>? This cannot be undone except with Undo.
+        </p>
+      </template>
+      <template #footer>
+        <div class="modal-actions">
+          <UButton
+            label="Keep element"
+            color="neutral"
+            variant="outline"
+            @click="cancelRemoveElement"
+          />
+          <UButton
+            label="Remove element"
+            color="error"
+            @click="confirmRemoveElement"
           />
         </div>
       </template>
@@ -3389,6 +3531,21 @@ onBeforeUnmount(() => {
 .tools-menu :deep(button) {
   justify-content: flex-start;
   text-align: left;
+}
+
+.tools-menu-divider {
+  height: 1px;
+  margin: 0.35rem 0;
+  background: var(--widgetr-border);
+}
+
+.tools-menu-label {
+  padding: 0.25rem 0.7rem 0.1rem;
+  color: var(--widgetr-muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .canvas-stage {

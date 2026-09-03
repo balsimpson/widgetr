@@ -51,5 +51,13 @@ export function widgetElementIcon(element: WidgetElement): string {
       return 'i-lucide-move-horizontal'
     case 'repeat':
       return 'i-lucide-repeat-2'
+    case 'progress-ring':
+      return 'i-lucide-circle-gauge'
+    case 'progress-bar':
+      return 'i-lucide-rectangle-horizontal'
+    case 'sparkline':
+      return 'i-lucide-chart-spline'
+    case 'bar-chart':
+      return 'i-lucide-chart-no-axes-column'
   }
 }

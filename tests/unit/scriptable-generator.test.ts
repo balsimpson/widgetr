@@ -6,6 +6,7 @@ import {
   getScriptableExportIssues,
   isScriptableExportReady
 } from '~/domain/widget/scriptable'
+import { createVisualDataElement } from '~/domain/widget/visual-data'
 
 describe('deterministic Scriptable export', () => {
   it('generates stable, syntactically valid source for the fixed fixture', () => {
@@ -48,6 +49,66 @@ describe('deterministic Scriptable export', () => {
 
       expect(widget.children.length).toBeGreaterThan(0)
     }
+  })
+
+  it('renders the bounded visual-data elements through the Scriptable harness', async () => {
+    const project = createSampleWidgetProject()
+    const visualTypes = ['progress-ring', 'progress-bar', 'sparkline', 'bar-chart'] as const
+    visualTypes.forEach((type, index) => {
+      project.layouts.medium.root.children.push(
+        createVisualDataElement(type, `export-${type}-${index}`)
+      )
+    })
+
+    const result = generateScriptableCode(project)
+
+    expect(result.code).toBeTruthy()
+    if (!result.code) {
+      return
+    }
+    expect(result.code).toContain('drawVisualData')
+    expect(result.code).toContain('new Path()')
+    expect(result.code).toContain('limitedSeries')
+    expect(result.code).toContain('Math.round(ratio * 100) + "%"')
+
+    const completed = new Promise<MockContainer>(resolve => {
+      const context = createScriptableHarness('medium', resolve)
+      runInContext(result.code!, context)
+    })
+    const widget = await completed
+
+    expect(widget.children.length).toBeGreaterThan(0)
+  })
+
+  it('reports empty, invalid, and bounded visual-data sources', () => {
+    const project = createSampleWidgetProject()
+    const empty = createVisualDataElement('sparkline', 'empty-series')
+    if (empty.type !== 'sparkline') {
+      throw new Error('Sparkline fixture was not created')
+    }
+    empty.values = {
+      kind: 'binding',
+      bindingId: 'forecast',
+      fallback: []
+    }
+    const bounded = createVisualDataElement('bar-chart', 'long-series')
+    if (bounded.type !== 'bar-chart') {
+      throw new Error('Bar chart fixture was not created')
+    }
+    bounded.values = {
+      kind: 'literal',
+      value: Array.from({ length: 9 }, (_, index) => index)
+    }
+    const oversized = createVisualDataElement('progress-bar', 'oversized-progress')
+    oversized.style.width = 400
+    project.layouts.small.root.children.push(empty, bounded, oversized)
+
+    const issues = getScriptableExportIssues(project)
+
+    expect(issues.some(issue => issue.code === 'VISUAL_DATA_NO_POINTS')).toBe(true)
+    expect(issues.some(issue => issue.code === 'VISUAL_DATA_INVALID_POINTS')).toBe(true)
+    expect(issues.some(issue => issue.code === 'VISUAL_DATA_POINTS_BOUNDED')).toBe(true)
+    expect(issues.some(issue => issue.code === 'VISUAL_DATA_DIMENSION_EXCEEDS_WIDGET')).toBe(true)
   })
 
   it('keeps browser-local image references as export warnings, not blockers', () => {
@@ -236,7 +297,18 @@ function createScriptableHarness(
     opaque = true
     drawImageInRect(): void {}
     setFillColor(): void {}
+    setStrokeColor(): void {}
+    setLineWidth(): void {}
+    strokeEllipse(): void {}
     fillRect(): void {}
+    fillEllipse(): void {}
+    setFont(): void {}
+    setTextColor(): void {}
+    setTextAlignedCenter(): void {}
+    drawTextInRect(): void {}
+    addPath(): void {}
+    strokePath(): void {}
+    fillPath(): void {}
     getImage(): MockImage {
       return new MockImage()
     }
@@ -291,6 +363,12 @@ function createScriptableHarness(
   class MockSize {
     constructor(public width: number, public height: number) {}
   }
+  class MockPath {
+    addRoundedRect(): void {}
+    addLines(): void {}
+    addLine(): void {}
+    closeSubpath(): void {}
+  }
   class MockColor {
     constructor(public hex: string, public opacity = 1) {}
   }
@@ -309,6 +387,7 @@ function createScriptableHarness(
     LinearGradient: MockLinearGradient,
     ListWidget: MockContainer,
     Point: MockPoint,
+    Path: MockPath,
     Rect: MockRect,
     Request: MockRequest,
     SFSymbol,

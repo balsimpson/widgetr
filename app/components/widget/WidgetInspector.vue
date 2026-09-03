@@ -2,9 +2,17 @@
 import { computed } from 'vue'
 import { findWidgetElement, widgetElementLabel } from '~/domain/widget/tree'
 import { resolveDesignScope } from '~/domain/widget/schema'
+import {
+  VISUAL_DATA_DENSITY_OPTIONS,
+  isVisualDataElement
+} from '~/domain/widget/visual-data'
 import type {
   DesignScope,
   ElementStyle,
+  NumericSource,
+  ProgressRingDatum,
+  ProgressRingElement,
+  SeriesSource,
   TextStyle,
   UpdateElementContentOperation,
   ValueSource,
@@ -26,6 +34,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   operation: [operation: WidgetOperation]
+  remove: [selection: WidgetSelection]
 }>()
 
 const selectedSize = computed<WidgetSize>(() => (
@@ -73,7 +82,7 @@ const inspectorSections = computed(() => {
     }
   ]
 
-  if (['text', 'date', 'symbol', 'image'].includes(element.type)) {
+  if (['text', 'date', 'symbol', 'image'].includes(element.type) || isVisualDataElement(element)) {
     sections.push({
       label: 'Content',
       value: 'content',
@@ -101,6 +110,67 @@ const defaultInspectorSection = computed(() => {
   }
   return 'content'
 })
+
+const selectedVisualData = computed(() => (
+  selectedElement.value && isVisualDataElement(selectedElement.value)
+    ? selectedElement.value
+    : null
+))
+
+const selectedProgressRing = computed<ProgressRingElement | null>(() => (
+  selectedElement.value?.type === 'progress-ring' ? selectedElement.value : null
+))
+
+function isInsideRepeat(
+  element: WidgetElement,
+  elementId: string,
+  insideRepeat = false
+): boolean {
+  if (element.id === elementId) {
+    return insideRepeat
+  }
+  if (element.type !== 'group' && element.type !== 'repeat') {
+    return false
+  }
+  return element.children.some(child => isInsideRepeat(
+    child,
+    elementId,
+    insideRepeat || element.type === 'repeat'
+  ))
+}
+
+const selectedElementCanUseItemSource = computed(() => {
+  if (!props.selection) {
+    return false
+  }
+  return resolveDesignScope(props.project.designScope).every(size => {
+    const root = props.project.layouts[size].root
+    const element = findWidgetElement(root, props.selection!.elementId)
+    return !element || isInsideRepeat(root, props.selection!.elementId)
+  })
+})
+
+const numberBindingOptions = computed(() => [
+  { label: 'Fixed value', value: 'literal' },
+  ...(selectedElementCanUseItemSource.value
+    ? [{ label: 'Repeat item value', value: 'item' }]
+    : []),
+  ...props.project.bindings
+    .filter(binding => binding.valueType === 'number')
+    .map(binding => ({ label: binding.label, value: `binding:${binding.id}` }))
+])
+
+const seriesBindingOptions = computed(() => [
+  { label: 'Fixed series', value: 'literal' },
+  ...(selectedElementCanUseItemSource.value
+    ? [{ label: 'Repeat item series', value: 'item' }]
+    : []),
+  ...props.project.bindings
+    .filter(binding => binding.valueType === 'list')
+    .map(binding => ({ label: binding.label, value: `binding:${binding.id}` }))
+])
+
+const visualDensityOptions = VISUAL_DATA_DENSITY_OPTIONS
 
 const selectedSource = computed<ValueSource | null>(() => {
   const element = selectedElement.value
@@ -303,6 +373,239 @@ function updateSource(value: string): void {
     return
   }
   updateContent({ value: nextSource })
+}
+
+function sourceMode(source: NumericSource | SeriesSource): string {
+  if (source.kind === 'literal') {
+    return 'literal'
+  }
+  if (source.kind === 'binding') {
+    return `binding:${source.bindingId}`
+  }
+  return 'item'
+}
+
+function numericSourceValue(source: NumericSource): string {
+  return String(source.kind === 'literal' ? source.value : source.fallback)
+}
+
+function seriesSourceValue(source: SeriesSource): string {
+  const values = source.kind === 'literal' ? source.value : source.fallback
+  return values.join(', ')
+}
+
+function numericSourceFromMode(
+  current: NumericSource,
+  mode: string
+): NumericSource {
+  if (mode === 'literal') {
+    return {
+      kind: 'literal',
+      value: current.kind === 'literal' ? current.value : current.fallback
+    }
+  }
+  if (mode === 'item') {
+    return {
+      kind: 'item',
+      path: current.kind === 'item' ? current.path : ['value'],
+      fallback: current.kind === 'literal' ? current.value : current.fallback
+    }
+  }
+
+  const bindingId = mode.startsWith('binding:') ? mode.slice('binding:'.length) : ''
+  if (!bindingId) {
+    return current
+  }
+  return {
+    kind: 'binding',
+    bindingId,
+    fallback: current.kind === 'literal' ? current.value : current.fallback
+  }
+}
+
+function seriesSourceFromMode(
+  current: SeriesSource,
+  mode: string
+): SeriesSource {
+  const currentValues = current.kind === 'literal' ? current.value : current.fallback
+  if (mode === 'literal') {
+    return { kind: 'literal', value: currentValues }
+  }
+  if (mode === 'item') {
+    return {
+      kind: 'item',
+      path: current.kind === 'item' ? current.path : ['values'],
+      fallback: currentValues
+    }
+  }
+
+  const bindingId = mode.startsWith('binding:') ? mode.slice('binding:'.length) : ''
+  if (!bindingId) {
+    return current
+  }
+  return { kind: 'binding', bindingId, fallback: currentValues }
+}
+
+function parseSeriesInput(value: string): number[] {
+  return value
+    .split(',')
+    .map(item => Number(item.trim()))
+    .filter(item => Number.isFinite(item))
+}
+
+function updateRing(index: number, patch: Partial<ProgressRingDatum>): void {
+  const element = selectedProgressRing.value
+  if (!element || !element.rings[index]) {
+    return
+  }
+  updateContent({
+    rings: element.rings.map((ring, ringIndex) => (
+      ringIndex === index ? { ...ring, ...patch } : ring
+    ))
+  })
+}
+
+function updateRingSourceMode(index: number, mode: string): void {
+  const ring = selectedProgressRing.value?.rings[index]
+  if (!ring) {
+    return
+  }
+  updateRing(index, { value: numericSourceFromMode(ring.value, mode) })
+}
+
+function updateRingSourceValue(index: number, value: string | number | undefined): void {
+  const ring = selectedProgressRing.value?.rings[index]
+  const numberValue = Number(value)
+  if (!ring || !Number.isFinite(numberValue)) {
+    return
+  }
+  const source = ring.value
+  updateRing(index, {
+    value: source.kind === 'literal'
+      ? { kind: 'literal', value: numberValue }
+      : { ...source, fallback: numberValue }
+  })
+}
+
+function updateRingSourcePath(index: number, value: string): void {
+  const ring = selectedProgressRing.value?.rings[index]
+  if (!ring || ring.value.kind !== 'item') {
+    return
+  }
+  const path = value.split('.').map(part => part.trim()).filter(Boolean)
+  updateRing(index, { value: { ...ring.value, path } })
+}
+
+function addProgressRing(): void {
+  const element = selectedProgressRing.value
+  if (!element || element.rings.length >= 3) {
+    return
+  }
+  const source = element.rings.at(-1)!
+  let suffix = element.rings.length + 1
+  let id = `ring-${suffix}`
+  while (element.rings.some(ring => ring.id === id)) {
+    suffix += 1
+    id = `ring-${suffix}`
+  }
+  updateContent({
+    rings: [...element.rings, {
+      ...source,
+      id,
+      value: source.value.kind === 'literal'
+        ? { kind: 'literal', value: Math.max(0, source.value.value - 0.12) }
+        : { ...source.value }
+    }]
+  })
+}
+
+function removeProgressRing(index: number): void {
+  const element = selectedProgressRing.value
+  if (!element || element.rings.length <= 1) {
+    return
+  }
+  updateContent({ rings: element.rings.filter((_, ringIndex) => ringIndex !== index) })
+}
+
+function updateProgressCenterLabel(value: string): void {
+  updateContent({
+    centerLabel: value.trim() ? { kind: 'literal', value } : null
+  })
+}
+
+function updateSeriesSourceMode(mode: string): void {
+  const element = selectedVisualData.value
+  if (element?.type !== 'sparkline' && element?.type !== 'bar-chart') {
+    return
+  }
+  updateContent({ series: seriesSourceFromMode(element.values, mode) })
+}
+
+function updateSeriesSourceValue(value: string): void {
+  const element = selectedVisualData.value
+  if (element?.type !== 'sparkline' && element?.type !== 'bar-chart') {
+    return
+  }
+  const values = parseSeriesInput(value)
+  const source = element.values
+  updateContent({
+    series: source.kind === 'literal'
+      ? { kind: 'literal', value: values }
+      : { ...source, fallback: values }
+  })
+}
+
+function updateSeriesSourcePath(value: string): void {
+  const element = selectedVisualData.value
+  if (
+    (element?.type !== 'sparkline' && element?.type !== 'bar-chart')
+    || element.values.kind !== 'item'
+  ) {
+    return
+  }
+  const path = value.split('.').map(part => part.trim()).filter(Boolean)
+  updateContent({ series: { ...element.values, path } })
+}
+
+function updateVisualColor(key: 'trackColor' | 'fillColor' | 'lineColor' | 'barColor', value: string): void {
+  updateContent({ [key]: value } as UpdateElementContentOperation['patch'])
+}
+
+function updateVisualNumericSource(mode: string): void {
+  const element = selectedVisualData.value
+  if (element?.type !== 'progress-bar') {
+    return
+  }
+  updateContent({ numericValue: numericSourceFromMode(element.value, mode) })
+}
+
+function updateVisualNumericValue(value: string | number | undefined): void {
+  const element = selectedVisualData.value
+  const numberValue = Number(value)
+  if (element?.type !== 'progress-bar' || !Number.isFinite(numberValue)) {
+    return
+  }
+  const source = element.value
+  updateContent({
+    numericValue: source.kind === 'literal'
+      ? { kind: 'literal', value: numberValue }
+      : { ...source, fallback: numberValue }
+  })
+}
+
+function updateVisualNumericPath(value: string): void {
+  const element = selectedVisualData.value
+  if (element?.type !== 'progress-bar' || element.value.kind !== 'item') {
+    return
+  }
+  const path = value.split('.').map(part => part.trim()).filter(Boolean)
+  updateContent({ numericValue: { ...element.value, path } })
+}
+
+function removeSelectedElement(): void {
+  if (props.selection && props.selection.elementId !== 'root') {
+    emit('remove', props.selection)
+  }
 }
 
 function updateNumber(
@@ -816,6 +1119,349 @@ function updateOverlayOpacity(value: string | number | undefined): void {
         </template>
       </section>
 
+      <section
+        v-if="selectedElement.type === 'progress-ring'"
+        class="inspector-section"
+        aria-labelledby="progress-ring-heading"
+      >
+        <div class="section-heading">
+          <div>
+            <h3 id="progress-ring-heading">Progress rings</h3>
+          </div>
+          <span class="section-meta">{{ selectedElement.rings.length }} / 3 rings</span>
+        </div>
+
+        <div
+          v-for="(ring, index) in selectedElement.rings"
+          :key="ring.id"
+          class="visual-data-editor"
+        >
+          <div class="section-heading">
+            <span class="visual-data-editor-title">Ring {{ index + 1 }}</span>
+            <UButton
+              v-if="selectedElement.rings.length > 1"
+              label="Remove"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="removeProgressRing(index)"
+            />
+          </div>
+
+          <UFormField label="Value source">
+            <USelect
+              class="w-full"
+              :model-value="sourceMode(ring.value)"
+              :items="numberBindingOptions"
+              value-key="value"
+              @update:model-value="value => updateRingSourceMode(index, value)"
+            />
+          </UFormField>
+          <UFormField label="Value" description="Used as the fallback when a source is unavailable.">
+            <UInput
+              class="w-full"
+              type="number"
+              :model-value="numericSourceValue(ring.value)"
+              @update:model-value="value => updateRingSourceValue(index, value)"
+            />
+          </UFormField>
+          <UFormField
+            v-if="ring.value.kind === 'item'"
+            label="Item path"
+            description="Use dot-separated fields from the current repeat item."
+          >
+            <UInput
+              class="w-full"
+              :model-value="ring.value.path.join('.')"
+              @update:model-value="value => updateRingSourcePath(index, value)"
+            />
+          </UFormField>
+          <div class="inspector-grid">
+            <UFormField label="Minimum">
+              <UInput
+                class="w-full"
+                type="number"
+                :model-value="String(ring.min)"
+                @update:model-value="value => updateNumber(value, min => updateRing(index, { min }))"
+              />
+            </UFormField>
+            <UFormField label="Maximum">
+              <UInput
+                class="w-full"
+                type="number"
+                :model-value="String(ring.max)"
+                @update:model-value="value => updateNumber(value, max => updateRing(index, { max }))"
+              />
+            </UFormField>
+          </div>
+          <div class="inspector-grid">
+            <UFormField label="Track color">
+              <UInput
+                class="w-full"
+                type="color"
+                :model-value="ring.trackColor"
+                @update:model-value="value => updateRing(index, { trackColor: value })"
+              />
+            </UFormField>
+            <UFormField label="Fill color">
+              <UInput
+                class="w-full"
+                type="color"
+                :model-value="ring.fillColor"
+                @update:model-value="value => updateRing(index, { fillColor: value })"
+              />
+            </UFormField>
+          </div>
+        </div>
+
+        <UButton
+          v-if="selectedElement.rings.length < 3"
+          label="Add nested ring"
+          icon="i-lucide-plus"
+          color="neutral"
+          variant="outline"
+          block
+          @click="addProgressRing"
+        />
+
+        <div class="inspector-grid">
+          <UFormField label="Ring size">
+            <UInput
+              class="w-full"
+              type="number"
+              min="32"
+              max="128"
+              step="1"
+              :model-value="String(selectedElement.size)"
+              @update:model-value="value => updateNumber(value, size => updateContent({ size }))"
+            />
+          </UFormField>
+          <UFormField label="Thickness">
+            <UInput
+              class="w-full"
+              type="number"
+              min="2"
+              max="14"
+              step="1"
+              :model-value="String(selectedElement.thickness)"
+              @update:model-value="value => updateNumber(value, thickness => updateContent({ thickness }))"
+            />
+          </UFormField>
+        </div>
+        <UFormField label="Center label" description="Leave empty to hide the label.">
+          <UInput
+            class="w-full"
+            :model-value="selectedElement.centerLabel ? (selectedElement.centerLabel.kind === 'literal' ? selectedElement.centerLabel.value : selectedElement.centerLabel.fallback) : ''"
+            @update:model-value="updateProgressCenterLabel"
+          />
+        </UFormField>
+      </section>
+
+      <section
+        v-if="selectedElement.type === 'progress-bar'"
+        class="inspector-section"
+        aria-labelledby="progress-bar-heading"
+      >
+        <div class="section-heading">
+          <div>
+            <h3 id="progress-bar-heading">Progress bar</h3>
+          </div>
+          <span class="section-meta">bounded value</span>
+        </div>
+        <UFormField label="Value source">
+          <USelect
+            class="w-full"
+            :model-value="sourceMode(selectedElement.value)"
+            :items="numberBindingOptions"
+            value-key="value"
+            @update:model-value="updateVisualNumericSource"
+          />
+        </UFormField>
+        <UFormField label="Value" description="Used as the fallback when a source is unavailable.">
+          <UInput
+            class="w-full"
+            type="number"
+            :model-value="numericSourceValue(selectedElement.value)"
+            @update:model-value="updateVisualNumericValue"
+          />
+        </UFormField>
+        <UFormField
+          v-if="selectedElement.value.kind === 'item'"
+          label="Item path"
+          description="Use dot-separated fields from the current repeat item."
+        >
+          <UInput
+            class="w-full"
+            :model-value="selectedElement.value.path.join('.')"
+            @update:model-value="updateVisualNumericPath"
+          />
+        </UFormField>
+        <div class="inspector-grid">
+          <UFormField label="Minimum">
+            <UInput
+              class="w-full"
+              type="number"
+              :model-value="String(selectedElement.min)"
+              @update:model-value="value => updateNumber(value, min => updateContent({ min }))"
+            />
+          </UFormField>
+          <UFormField label="Maximum">
+            <UInput
+              class="w-full"
+              type="number"
+              :model-value="String(selectedElement.max)"
+              @update:model-value="value => updateNumber(value, max => updateContent({ max }))"
+            />
+          </UFormField>
+        </div>
+        <div class="inspector-grid">
+          <UFormField label="Track color">
+            <UInput
+              class="w-full"
+              type="color"
+              :model-value="selectedElement.trackColor"
+              @update:model-value="value => updateVisualColor('trackColor', value)"
+            />
+          </UFormField>
+          <UFormField label="Fill color">
+            <UInput
+              class="w-full"
+              type="color"
+              :model-value="selectedElement.fillColor"
+              @update:model-value="value => updateVisualColor('fillColor', value)"
+            />
+          </UFormField>
+        </div>
+        <UFormField label="Thickness">
+          <UInput
+            class="w-full"
+            type="number"
+            min="4"
+            max="28"
+            step="1"
+            :model-value="String(selectedElement.thickness)"
+            @update:model-value="value => updateNumber(value, thickness => updateContent({ thickness }))"
+          />
+        </UFormField>
+      </section>
+
+      <section
+        v-if="selectedElement.type === 'sparkline' || selectedElement.type === 'bar-chart'"
+        class="inspector-section"
+        aria-labelledby="series-chart-heading"
+      >
+        <div class="section-heading">
+          <div>
+            <h3 id="series-chart-heading">{{ selectedElement.type === 'sparkline' ? 'Sparkline' : 'Bar chart' }}</h3>
+          </div>
+          <span class="section-meta">numeric series</span>
+        </div>
+        <UFormField label="Series source">
+          <USelect
+            class="w-full"
+            :model-value="sourceMode(selectedElement.values)"
+            :items="seriesBindingOptions"
+            value-key="value"
+            @update:model-value="updateSeriesSourceMode"
+          />
+        </UFormField>
+        <UFormField label="Values" description="Enter comma-separated numeric values. The latest points are kept when the chart is dense.">
+          <UInput
+            class="w-full"
+            :model-value="seriesSourceValue(selectedElement.values)"
+            @update:model-value="updateSeriesSourceValue"
+          />
+        </UFormField>
+        <UFormField
+          v-if="selectedElement.values.kind === 'item'"
+          label="Item path"
+          description="Use dot-separated fields from the current repeat item."
+        >
+          <UInput
+            class="w-full"
+            :model-value="selectedElement.values.path.join('.')"
+            @update:model-value="updateSeriesSourcePath"
+          />
+        </UFormField>
+        <UFormField label="Density" description="Controls the maximum number of rendered points.">
+          <USelect
+            class="w-full"
+            :model-value="selectedElement.density"
+            :items="visualDensityOptions"
+            value-key="value"
+            @update:model-value="value => updateContent({ density: value as 'compact' | 'balanced' | 'detailed' })"
+          />
+        </UFormField>
+
+        <template v-if="selectedElement.type === 'sparkline'">
+          <div class="inspector-grid">
+            <UFormField label="Line color">
+              <UInput
+                class="w-full"
+                type="color"
+                :model-value="selectedElement.lineColor"
+                @update:model-value="value => updateVisualColor('lineColor', value)"
+              />
+            </UFormField>
+            <UFormField label="Thickness">
+              <UInput
+                class="w-full"
+                type="number"
+                min="1"
+                max="8"
+                step="1"
+                :model-value="String(selectedElement.thickness)"
+                @update:model-value="value => updateNumber(value, thickness => updateContent({ thickness }))"
+              />
+            </UFormField>
+          </div>
+          <UFormField v-if="selectedElement.fillColor" label="Area fill">
+            <UInput
+              class="w-full"
+              type="color"
+              :model-value="selectedElement.fillColor"
+              @update:model-value="value => updateVisualColor('fillColor', value)"
+            />
+          </UFormField>
+          <div class="inspector-grid">
+            <UButton
+              v-if="selectedElement.fillColor"
+              label="Remove area fill"
+              color="neutral"
+              variant="outline"
+              @click="updateContent({ fillColor: null })"
+            />
+            <UButton
+              v-else
+              label="Add area fill"
+              color="neutral"
+              variant="outline"
+              @click="updateContent({ fillColor: '#6D5BD0' })"
+            />
+          </div>
+        </template>
+
+        <UFormField v-else label="Bar color">
+          <UInput
+            class="w-full"
+            type="color"
+            :model-value="selectedElement.barColor"
+            @update:model-value="value => updateVisualColor('barColor', value)"
+          />
+        </UFormField>
+        <UFormField v-if="selectedElement.type === 'bar-chart'" label="Bar gap">
+          <UInput
+            class="w-full"
+            type="number"
+            min="0"
+            max="12"
+            step="1"
+            :model-value="String(selectedElement.gap)"
+            @update:model-value="value => updateNumber(value, gap => updateContent({ gap }))"
+          />
+        </UFormField>
+      </section>
+
         </template>
 
         <template #layout-body>
@@ -936,6 +1582,15 @@ function updateOverlayOpacity(value: string | number | undefined): void {
 
         </template>
       </UAccordion>
+      <UButton
+        v-if="selection && selection.elementId !== 'root'"
+        label="Remove element"
+        icon="i-lucide-trash-2"
+        color="error"
+        variant="soft"
+        block
+        @click="removeSelectedElement"
+      />
       </template>
     </template>
   </aside>
@@ -998,6 +1653,21 @@ function updateOverlayOpacity(value: string | number | undefined): void {
   gap: 0.8rem;
   padding-top: 1rem;
   border-top: 1px solid var(--widgetr-border);
+}
+
+.visual-data-editor {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid var(--widgetr-border);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--widgetr-surface) 65%, transparent);
+}
+
+.visual-data-editor-title {
+  color: var(--widgetr-ink);
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 .inspector-accordion .inspector-section {

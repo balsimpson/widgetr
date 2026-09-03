@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { WebMcpStatus } from '~/types/webmcp'
 import AssistantChoiceGuideComponent from './HomeAssistantChoiceGuide.vue'
 
 const props = defineProps<{
-  status: WebMcpStatus
-  error: string | null
   assistantMessage: string
   copyState: 'idle' | 'copied' | 'failed'
   hasSavedProjects: boolean
@@ -13,7 +10,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   copy: []
-  retry: []
 }>()
 
 const copyLabel = computed(() => {
@@ -74,21 +70,16 @@ const copyReceipt = computed(() => {
 
         <section class="homepage-start" aria-labelledby="homepage-start-heading">
           <div class="homepage-section-heading">
-            <p class="homepage-section-label">Start here</p>
-            <h2 id="homepage-start-heading">Tell your assistant what to build</h2>
+            <h2 id="homepage-start-heading">Connect an assistant to start</h2>
           </div>
 
-          <WidgetWebMcpReadiness
-            :status="props.status"
-            :error="props.error"
-            retry-label="Try again"
-            @retry="emit('retry')"
-          />
+          <div class="homepage-assistant">
+            <AssistantChoiceGuideComponent />
+          </div>
 
           <section class="homepage-prompt" aria-labelledby="homepage-prompt-heading">
             <div class="homepage-prompt-heading">
               <h3 id="homepage-prompt-heading">Start with this message</h3>
-              <span>One message</span>
             </div>
             <ClientOnly>
               <p class="homepage-prompt-message">{{ props.assistantMessage }}</p>
@@ -121,16 +112,7 @@ const copyReceipt = computed(() => {
             class="homepage-continue-action"
           />
         </section>
-
-        <div class="homepage-assistant">
-          <AssistantChoiceGuideComponent />
-        </div>
       </div>
-
-      <footer class="homepage-footer">
-        <span>Projects and reference images stay in this browser.</span>
-        <span>Assistant access depends on the browser and assistant you use.</span>
-      </footer>
     </div>
   </main>
 </template>
@@ -167,8 +149,7 @@ const copyReceipt = computed(() => {
   box-shadow: none;
 }
 
-.homepage-topbar,
-.homepage-footer {
+.homepage-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -178,11 +159,6 @@ const copyReceipt = computed(() => {
 :deep(.homepage-logo) {
   width: auto;
   height: 1.65rem;
-}
-
-.homepage-footer {
-  color: var(--widgetr-muted);
-  font-size: 0.68rem;
 }
 
 .homepage-grid {
@@ -197,17 +173,6 @@ const copyReceipt = computed(() => {
 
 .homepage-intro {
   min-width: 0;
-}
-
-.homepage-section-label {
-  margin: 0;
-  color: var(--widgetr-accent-strong);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 650;
-  letter-spacing: 0.12em;
-  line-height: 1.4;
-  text-transform: uppercase;
 }
 
 .homepage-intro h1 {
@@ -287,9 +252,7 @@ const copyReceipt = computed(() => {
 }
 
 .homepage-assistant {
-  grid-column: 1 / -1;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--widgetr-border);
+  min-width: 0;
 }
 
 :deep(.homepage-assistant .assistant-choice) {
@@ -335,14 +298,6 @@ const copyReceipt = computed(() => {
   font-weight: 700;
 }
 
-.homepage-prompt-heading span {
-  color: var(--widgetr-muted);
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .homepage-prompt-message {
   max-height: 11rem;
   margin: 0;
@@ -372,12 +327,6 @@ const copyReceipt = computed(() => {
 
 .homepage-continue-action {
   min-height: 3.1rem;
-}
-
-.homepage-footer {
-  align-items: flex-end;
-  padding-top: 1.1rem;
-  border-top: 1px solid var(--widgetr-border);
 }
 
 @media (max-width: 52rem) {
@@ -446,10 +395,5 @@ const copyReceipt = computed(() => {
     text-align: left;
   }
 
-  .homepage-footer {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
 }
 </style>

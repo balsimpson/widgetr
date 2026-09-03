@@ -50,6 +50,9 @@ function selectAssistant(id: AssistantOptionId): void {
 <template>
   <section class="assistant-choice" aria-labelledby="assistant-choice-heading">
     <h2 id="assistant-choice-heading" class="assistant-choice-label">Assistant</h2>
+    <p class="assistant-choice-intro">
+      Choose an assistant below, then connect it to Widgetr. It needs page actions to build and shape the widget here.
+    </p>
 
     <div class="assistant-choice-list" role="group" aria-label="Choose an assistant">
       <button
@@ -90,6 +93,14 @@ function selectAssistant(id: AssistantOptionId): void {
   letter-spacing: 0.12em;
   line-height: 1.4;
   text-transform: uppercase;
+}
+
+.assistant-choice-intro {
+  max-width: 36ch;
+  margin: 0;
+  color: var(--widgetr-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
 }
 
 .assistant-choice-list {
