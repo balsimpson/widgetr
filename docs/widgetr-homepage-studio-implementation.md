@@ -97,7 +97,7 @@ The current starter and editor experience moves here.
 - Cancel and Escape dismiss the forced chooser and return a saved-project user to the active project.
 - Choosing a starter or cancelling the forced chooser removes `new=1` with history replacement so refresh and Back do not reopen it unexpectedly.
 - The starter modal currently exposes only Weather and Cryptocurrency templates plus a reference-image dropzone; Examples and other starter cards stay deferred from this visible flow.
-- Existing project persistence, history, previews, manual controls, export, and reference-image behavior remain unchanged.
+- Existing project persistence, history, previews, manual controls, export, and reference-image behavior remain unchanged. A person's selected preview mode is preserved while an assistant selects or edits another size; in `All`, all three previews stay visible.
 
 ## Homepage content
 
@@ -134,7 +134,7 @@ Use plain, provider-neutral copy. The first screen should be understandable with
 **Copied message**
 
 ```text
-Open Widgetr at {current Widgetr URL} and help me build a Scriptable widget.
+Open Widgetr in the in-app browser at {current Widgetr URL}. Wait until its page actions are ready, then use its getting-started action. Ask me what I want to build before creating a widget.
 ```
 
 Generate the URL from the current page at runtime. Do not hard-code production so the message also works in the local preview and future deployment domains.

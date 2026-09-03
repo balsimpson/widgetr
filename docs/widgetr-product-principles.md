@@ -85,6 +85,8 @@ Starting points should describe an outcome in plain language. Each one should te
 
 Do not show a complete sample widget as the default starting state. Keep finished examples behind `Explore examples`. Choosing an example should create or open an intentional starting point. It must not silently replace an existing project.
 
+For Weather, the chosen location belongs to that project; it is never a starter-wide fixed value. The assistant should resolve the chosen place to a public weather source, preserve the source timezone, normalize provider forecast fields into the supported repeat layout, and use the device locale for day, time, and whole-number display. It must not silently substitute another place or truncate a rendered value.
+
 ## The two places have different jobs
 
 ### The connected assistant
@@ -174,6 +176,7 @@ Better:
 - Show suggestions before showing finished examples.
 - Keep complete example previews hidden until the person asks to explore them.
 - Keep the preview central. Show editing controls when they are relevant instead of presenting every control at once.
+- Treat the selected preview mode as the person's view preference. Assistant selection or editing may change the inspector's focused layout, but must not replace `All` with a single-size preview.
 - Keep the first-run message and status in the same place so the person does not have to relearn the layout when an assistant becomes available.
 - Keep reference-image upload on the Widgetr page.
 - Make it clear that uploading an image does not, by itself, create a widget. Explain that the person should continue in the assistant's chat.

@@ -684,7 +684,9 @@ function focusPreview(size: WidgetSize): void {
   }
 
   structureSize.value = size
-  previewView.value = size
+  if (previewView.value !== 'all') {
+    previewView.value = size
+  }
 
   const currentSelection = project.value.selection
   if (!currentSelection || currentSelection.size === size) {

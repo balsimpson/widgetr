@@ -47,7 +47,8 @@ const dataPathSchema: z.ZodType<DataPath> = z.array(
 
 const valueFormatSchema = z.object({
   prefix: z.string().max(40),
-  suffix: z.string().max(40)
+  suffix: z.string().max(40),
+  transform: z.enum(['weekday', 'time', 'integer', 'weather-code']).optional()
 }).strict()
 
 export const valueSourceSchema: z.ZodType<ValueSource> = z.discriminatedUnion('kind', [
@@ -420,6 +421,42 @@ function stripRemovedProjectFields(input: unknown): unknown {
   return project
 }
 
+const dataSourceConfigSchema = z.object({
+  kind: z.enum(['none', 'sample', 'pasted', 'public-api']),
+  url: z.url().nullable(),
+  method: z.enum(['GET', 'POST']),
+  parameters: z.array(z.object({
+    key: z.string().trim().min(1).max(120),
+    value: z.string().max(500)
+  }).strict()).max(40),
+  headers: z.array(z.object({
+    key: z.string().trim().min(1).max(120),
+    value: z.string().max(500)
+  }).strict()).max(40),
+  refreshMinutes: z.number().int()
+    .min(WIDGET_CONSTRAINTS.refreshMinutes.min)
+    .max(WIDGET_CONSTRAINTS.refreshMinutes.max),
+  secretPlaceholders: z.array(z.object({
+    name: z.string().trim().min(1).max(80).regex(/^[A-Z][A-Z0-9_]*$/),
+    label: labelSchema,
+    location: z.enum(['header', 'query', 'body'])
+  }).strict()).max(20)
+}).strict()
+
+const normalizedDataStateSchema = z.object({
+  kind: z.enum(['sample', 'pasted', 'cached', 'live']),
+  label: labelSchema,
+  capturedAt: z.iso.datetime({ offset: true }),
+  value: jsonObjectSchema
+}).strict()
+
+const dataBindingSchema = z.object({
+  id: idSchema,
+  label: labelSchema,
+  path: dataPathSchema,
+  valueType: z.enum(['string', 'number', 'boolean', 'date', 'image-url', 'list', 'object'])
+}).strict()
+
 const widgetProjectBaseSchema = z.preprocess(stripRemovedProjectFields, z.object({
   schemaVersion: z.literal(WIDGET_SCHEMA_VERSION),
   id: idSchema,
@@ -428,39 +465,9 @@ const widgetProjectBaseSchema = z.preprocess(stripRemovedProjectFields, z.object
   updatedAt: z.iso.datetime({ offset: true }),
   revision: z.number().int().nonnegative(),
   startingIntent: z.enum(WIDGET_STARTER_IDS).nullable().optional(),
-  dataSource: z.object({
-    kind: z.enum(['none', 'sample', 'pasted', 'public-api']),
-    url: z.url().nullable(),
-    method: z.enum(['GET', 'POST']),
-    parameters: z.array(z.object({
-      key: z.string().trim().min(1).max(120),
-      value: z.string().max(500)
-    }).strict()).max(40),
-    headers: z.array(z.object({
-      key: z.string().trim().min(1).max(120),
-      value: z.string().max(500)
-    }).strict()).max(40),
-    refreshMinutes: z.number().int()
-      .min(WIDGET_CONSTRAINTS.refreshMinutes.min)
-      .max(WIDGET_CONSTRAINTS.refreshMinutes.max),
-    secretPlaceholders: z.array(z.object({
-      name: z.string().trim().min(1).max(80).regex(/^[A-Z][A-Z0-9_]*$/),
-      label: labelSchema,
-      location: z.enum(['header', 'query', 'body'])
-    }).strict()).max(20)
-  }).strict(),
-  data: z.object({
-    kind: z.enum(['sample', 'pasted', 'cached', 'live']),
-    label: labelSchema,
-    capturedAt: z.iso.datetime({ offset: true }),
-    value: jsonObjectSchema
-  }).strict(),
-  bindings: z.array(z.object({
-    id: idSchema,
-    label: labelSchema,
-    path: dataPathSchema,
-    valueType: z.enum(['string', 'number', 'boolean', 'date', 'image-url', 'list', 'object'])
-  }).strict()).max(100),
+  dataSource: dataSourceConfigSchema,
+  data: normalizedDataStateSchema,
+  bindings: z.array(dataBindingSchema).max(100),
   layouts: z.object({
     small: widgetLayoutSchema,
     medium: widgetLayoutSchema,
@@ -791,6 +798,23 @@ export const widgetOperationSchema: z.ZodType<WidgetOperation> = z.discriminated
     type: z.literal('update-project-metadata'),
     expectedRevision: z.number().int().nonnegative(),
     patch: projectMetadataPatchSchema
+  }).strict(),
+  z.object({
+    type: z.literal('set-public-data-source'),
+    expectedRevision: z.number().int().nonnegative(),
+    source: dataSourceConfigSchema.refine(source => (
+      source.kind === 'public-api'
+      && source.method === 'GET'
+      && source.headers.length === 0
+      && source.secretPlaceholders.length === 0
+    ), 'Public browser sources must use GET without headers or secrets.'),
+    data: normalizedDataStateSchema.refine(data => data.kind === 'live', 'A public source needs live JSON data.')
+  }).strict(),
+  z.object({
+    type: z.literal('set-data-bindings'),
+    expectedRevision: z.number().int().nonnegative(),
+    bindings: z.array(dataBindingSchema).min(1).max(100)
+      .refine(bindings => new Set(bindings.map(binding => binding.id)).size === bindings.length, 'Binding ids must be unique.')
   }).strict(),
   z.object({
     type: z.literal('set-layout-background'),

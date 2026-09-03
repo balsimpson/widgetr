@@ -42,12 +42,31 @@ describe('deterministic Scriptable export', () => {
 
     for (const family of ['small', 'medium', 'large']) {
       const completed = new Promise<MockContainer>(resolve => {
-        const context = createScriptableHarness(family, resolve)
+        const context = createScriptableHarness(family, resolve, true)
         runInContext(result.code!, context)
       })
       const widget = await completed
 
       expect(widget.children.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('presents every generated family when run directly in Scriptable', async () => {
+    const result = generateScriptableCode(createSampleWidgetProject())
+
+    expect(result.code).toBeTruthy()
+    if (!result.code) {
+      return
+    }
+
+    for (const family of ['small', 'medium', 'large']) {
+      const completed = new Promise<MockContainer>(resolve => {
+        const context = createScriptableHarness(family, resolve, false)
+        runInContext(result.code!, context)
+      })
+      const widget = await completed
+
+      expect(widget.presentedFamily).toBe(family)
     }
   })
 
@@ -72,7 +91,7 @@ describe('deterministic Scriptable export', () => {
     expect(result.code).toContain('Math.round(ratio * 100) + "%"')
 
     const completed = new Promise<MockContainer>(resolve => {
-      const context = createScriptableHarness('medium', resolve)
+      const context = createScriptableHarness('medium', resolve, true)
       runInContext(result.code!, context)
     })
     const widget = await completed
@@ -198,6 +217,7 @@ class MockImageWidget {
 
 class MockContainer {
   children: unknown[] = []
+  presentedFamily: string | null = null
 
   setPadding(): void {}
   layoutHorizontally(): void {}
@@ -235,20 +255,34 @@ class MockContainer {
     this.children.push(child)
     return child
   }
+
+  async presentSmall(): Promise<void> {
+    this.presentedFamily = 'small'
+  }
+
+  async presentMedium(): Promise<void> {
+    this.presentedFamily = 'medium'
+  }
+
+  async presentLarge(): Promise<void> {
+    this.presentedFamily = 'large'
+  }
 }
 
 function createScriptableHarness(
   family: string,
-  resolve: (widget: MockContainer) => void
+  resolve: (widget: MockContainer) => void,
+  runsInWidget: boolean
 ): Record<string, unknown> {
   let widget: MockContainer | null = null
+  let presentedWidget: MockContainer | null = null
   const scriptable = {
     setWidget(value: MockContainer) {
       widget = value
     },
     complete() {
-      if (widget) {
-        resolve(widget)
+      if (widget || presentedWidget) {
+        resolve(widget ?? presentedWidget!)
       }
     }
   }
@@ -270,6 +304,22 @@ function createScriptableHarness(
     static fromFile(): null {
       return null
     }
+  }
+
+  const originalPresentSmall = MockContainer.prototype.presentSmall
+  const originalPresentMedium = MockContainer.prototype.presentMedium
+  const originalPresentLarge = MockContainer.prototype.presentLarge
+  MockContainer.prototype.presentSmall = async function (): Promise<void> {
+    presentedWidget = this
+    await originalPresentSmall.call(this)
+  }
+  MockContainer.prototype.presentMedium = async function (): Promise<void> {
+    presentedWidget = this
+    await originalPresentMedium.call(this)
+  }
+  MockContainer.prototype.presentLarge = async function (): Promise<void> {
+    presentedWidget = this
+    await originalPresentLarge.call(this)
   }
 
   class MockRequest {
@@ -393,7 +443,7 @@ function createScriptableHarness(
     SFSymbol,
     Script: scriptable,
     Size: MockSize,
-    config: { widgetFamily: family },
+    config: { widgetFamily: family, runsInWidget },
     console
   })
 }

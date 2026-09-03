@@ -138,6 +138,7 @@ function itemText(
     weight?: 'regular' | 'medium' | 'semibold' | 'bold'
     width?: number | 'fill' | 'fit'
     alignment?: 'leading' | 'center' | 'trailing'
+    transform?: 'weekday' | 'time' | 'integer' | 'weather-code'
   } = {}
 ): WidgetElement {
   return {
@@ -148,7 +149,8 @@ function itemText(
     value: {
       kind: 'item',
       path: [path],
-      fallback
+      fallback,
+      ...(options.transform ? { format: { prefix: '', suffix: '', transform: options.transform } } : {})
     },
     textStyle: createTextStyle({
       fontSize,
@@ -348,7 +350,8 @@ const mediumLayoutRoot = group('root', 'horizontal', [
 const largeForecastItem = group('forecast-row', 'horizontal', [
   itemText('forecast-day', 'day', 'Day', 13, {
     weight: 'semibold',
-    width: 44
+    width: 44,
+    transform: 'weekday'
   }),
   itemSymbol('forecast-symbol', 18, '#DCEBFF'),
   itemText('forecast-rain', 'rain', '--', 11, {
@@ -359,12 +362,14 @@ const largeForecastItem = group('forecast-row', 'horizontal', [
   itemText('forecast-high', 'high', '--', 14, {
     weight: 'bold',
     width: 32,
-    alignment: 'trailing'
+    alignment: 'trailing',
+    transform: 'integer'
   }),
   itemText('forecast-low', 'low', '--', 13, {
     color: '#BFD3F5',
     width: 32,
-    alignment: 'trailing'
+    alignment: 'trailing',
+    transform: 'integer'
   })
 ], {
   style: createElementStyle({

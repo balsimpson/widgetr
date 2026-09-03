@@ -100,7 +100,44 @@ function sourceText(source, data, item) {
   if (source.kind === "literal" || !source.format) {
     return text;
   }
-  return source.format.prefix + text + source.format.suffix;
+  var transformed = text;
+  if (source.format.transform === "weekday") {
+    var date = /^\\d{4}-\\d{2}-\\d{2}$/.test(text) ? new Date(text + "T00:00:00Z") : new Date(text);
+    if (!Number.isNaN(date.getTime())) {
+      var weekdayFormatter = new DateFormatter();
+      weekdayFormatter.locale = Device.locale();
+      weekdayFormatter.dateFormat = "EEE";
+      transformed = weekdayFormatter.string(date);
+    }
+  } else if (source.format.transform === "time") {
+    var localTime = new Date(text);
+    if (!Number.isNaN(localTime.getTime())) {
+      var timeFormatter = new DateFormatter();
+      timeFormatter.locale = Device.locale();
+      timeFormatter.useNoDateStyle();
+      timeFormatter.useShortTimeStyle();
+      transformed = timeFormatter.string(localTime);
+    }
+  } else if (source.format.transform === "integer") {
+    var numeric = Number(text);
+    if (Number.isFinite(numeric)) {
+      transformed = String(Math.round(numeric));
+    }
+  } else if (source.format.transform === "weather-code") {
+    var weatherCode = Number(text);
+    var weatherLabels = {
+      0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+      45: "Fog", 48: "Fog", 51: "Drizzle", 53: "Drizzle", 55: "Drizzle",
+      56: "Freezing drizzle", 57: "Freezing drizzle", 61: "Rain", 63: "Rain", 65: "Rain",
+      66: "Freezing rain", 67: "Freezing rain", 71: "Snow", 73: "Snow", 75: "Snow", 77: "Snow",
+      80: "Rain showers", 81: "Rain showers", 82: "Rain showers", 85: "Snow showers", 86: "Snow showers",
+      95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm"
+    };
+    if (Object.prototype.hasOwnProperty.call(weatherLabels, weatherCode)) {
+      transformed = weatherLabels[weatherCode];
+    }
+  }
+  return source.format.prefix + transformed + source.format.suffix;
 }
 
 function numberSourceValue(source, data, item) {
@@ -931,6 +968,16 @@ async function renderLarge(data) {
   return renderLayout("large", data);
 }
 
+async function presentWidget(widget, family) {
+  if (family === "small") {
+    await widget.presentSmall();
+  } else if (family === "large") {
+    await widget.presentLarge();
+  } else {
+    await widget.presentMedium();
+  }
+}
+
 async function main() {
   var family = config.widgetFamily;
   if (family !== "small" && family !== "medium" && family !== "large") {
@@ -941,7 +988,11 @@ async function main() {
     ? renderErrorWidget(family)
     : await ({ small: renderSmall, medium: renderMedium, large: renderLarge }[family])(loaded.value);
   widget.refreshAfterDate = new Date(Date.now() + PROJECT.dataSource.refreshMinutes * 60000);
-  Script.setWidget(widget);
+  if (config.runsInWidget) {
+    Script.setWidget(widget);
+  } else {
+    await presentWidget(widget, family);
+  }
   Script.complete();
 }
 
@@ -951,8 +1002,14 @@ main().catch(function () {
   var message = widget.addText("Widget unavailable");
   message.font = Font.boldSystemFont(14);
   message.textColor = color("#FFFFFF");
-  Script.setWidget(widget);
-  Script.complete();
+  if (config.runsInWidget) {
+    Script.setWidget(widget);
+    Script.complete();
+  } else {
+    presentWidget(widget, "medium").then(function () {
+      Script.complete();
+    });
+  }
 });
 `
 

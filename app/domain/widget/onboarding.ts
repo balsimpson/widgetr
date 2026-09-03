@@ -1,3 +1,3 @@
 export function createAssistantPrompt(widgetrUrl: string): string {
-  return `Open Widgetr at ${widgetrUrl} and help me build a Scriptable widget.`
+  return `Open Widgetr in the in-app browser at ${widgetrUrl}. Wait until its page actions are ready, then use its getting-started action and open the new-project flow. Wait for me to choose a starter in Widgetr. If I choose Weather, ask for my location in this chat, then connect a public JSON weather source and update the widget from its returned fields.`
 }

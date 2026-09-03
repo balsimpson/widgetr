@@ -41,13 +41,13 @@ export type ValueSource =
     kind: 'binding'
     bindingId: string
     fallback: string
-    format?: { prefix: string, suffix: string }
+    format?: { prefix: string, suffix: string, transform?: 'weekday' | 'time' | 'integer' | 'weather-code' }
   }
   | {
     kind: 'item'
     path: DataPath
     fallback: string
-    format?: { prefix: string, suffix: string }
+    format?: { prefix: string, suffix: string, transform?: 'weekday' | 'time' | 'integer' | 'weather-code' }
   }
 
 export type NumericSource =
@@ -405,6 +405,17 @@ export interface UpdateProjectMetadataOperation extends OperationBase {
   }
 }
 
+export interface SetPublicDataSourceOperation extends OperationBase {
+  type: 'set-public-data-source'
+  source: DataSourceConfig
+  data: NormalizedDataState
+}
+
+export interface SetDataBindingsOperation extends OperationBase {
+  type: 'set-data-bindings'
+  bindings: DataBinding[]
+}
+
 export interface SetLayoutBackgroundOperation extends OperationBase {
   type: 'set-layout-background'
   scope?: DesignScope
@@ -445,6 +456,8 @@ export type WidgetOperation =
   | UpdateTextStyleOperation
   | UpdateElementContentOperation
   | UpdateProjectMetadataOperation
+  | SetPublicDataSourceOperation
+  | SetDataBindingsOperation
   | SetLayoutBackgroundOperation
   | ReorderChildrenOperation
   | InsertElementOperation

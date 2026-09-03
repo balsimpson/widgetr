@@ -69,17 +69,82 @@ export function resolveValueText(
   if (source.kind === 'literal' || !source.format) {
     return text
   }
-  return `${source.format.prefix}${text}${source.format.suffix}`
+
+  const transformed = source.format.transform === 'weekday'
+    ? formatWeekday(text)
+    : source.format.transform === 'time'
+      ? formatLocalTime(text)
+      : source.format.transform === 'integer'
+        ? formatInteger(text)
+        : source.format.transform === 'weather-code'
+          ? formatWeatherCode(text)
+      : text
+  return `${source.format.prefix}${transformed}${source.format.suffix}`
+}
+
+function formatWeekday(value: string): string {
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00Z`)
+    : new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' }).format(parsed)
+}
+
+function formatLocalTime(value: string): string {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(parsed)
+}
+
+function formatInteger(value: string): string {
+  const numeric = Number(value)
+  return Number.isFinite(numeric)
+    ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(numeric)
+    : value
+}
+
+function formatWeatherCode(value: string): string {
+  const code = Number(value)
+  if (!Number.isInteger(code)) {
+    return value
+  }
+  if (code === 0) return 'Clear sky'
+  if (code === 1) return 'Mainly clear'
+  if (code === 2) return 'Partly cloudy'
+  if (code === 3) return 'Overcast'
+  if ([45, 48].includes(code)) return 'Fog'
+  if ([51, 53, 55].includes(code)) return 'Drizzle'
+  if ([56, 57].includes(code)) return 'Freezing drizzle'
+  if ([61, 63, 65].includes(code)) return 'Rain'
+  if ([66, 67].includes(code)) return 'Freezing rain'
+  if ([71, 73, 75, 77].includes(code)) return 'Snow'
+  if ([80, 81, 82].includes(code)) return 'Rain showers'
+  if ([85, 86].includes(code)) return 'Snow showers'
+  if ([95, 96, 99].includes(code)) return 'Thunderstorm'
+  return value
 }
 
 export function resolveRepeatItems(project: WidgetProject, bindingId: string): JsonObject[] {
   const value = resolveBindingValue(project, bindingId)
-  if (!Array.isArray(value)) {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is JsonObject => (
+      typeof item === 'object' && item !== null && !Array.isArray(item)
+    ))
+  }
+
+  if (typeof value !== 'object' || value === null) {
     return []
   }
-  return value.filter((item): item is JsonObject => (
-    typeof item === 'object' && item !== null && !Array.isArray(item)
+
+  const columns = Object.entries(value).filter((entry): entry is [string, JsonValue[]] => (
+    Array.isArray(entry[1])
   ))
+  const length = Math.max(0, ...columns.map(([, column]) => column.length))
+  return Array.from({ length }, (_, index) => Object.fromEntries(
+    columns.map(([key, column]) => [key, column[index] ?? null])
+  ) as JsonObject)
 }
 
 export function formatDateValue(value: string, format: 'date' | 'time' | 'date-time' | 'relative'): string {

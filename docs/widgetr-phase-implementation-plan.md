@@ -30,6 +30,8 @@ Update this section after every session that changes implementation, verificatio
 | Next action | Run the pending focused visual-data tests and typecheck, then verify the browser, deployed WebMCP, export, and iPhone gates |
 | Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
 | Next production checkpoint | Complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
+| Reprioritized work | The first Phase 7 general public-data onboarding slice is implemented locally for the Weather starter. It supports bounded public HTTPS GET JSON sources, field bindings, browser fetch diagnostics, Scriptable refresh configuration, locale-aware day/time/whole-number display transforms, WMO weather-code labels, and columnar five-day forecast normalization for Open-Meteo-style responses. A user-selected location remains project data rather than a starter constant. Secrets and authenticated sources remain deferred. |
+| Latest local browser evidence | At `1280 x 900`, an Open-Meteo five-day Ladakh document rendered all values without overflow; source-local `Asia/Kolkata` time appeared in Small and Large; an agent-style Large-element selection preserved the person's `All` preview view. Typecheck, tests, production, and iPhone execution remain unverified. |
 | Next phase | Phase 6: assistant handoff, truthful status, and fallback |
 | Visual-data phase | Phase 9: constrained progress and chart elements is implemented locally; verification gates remain |
 

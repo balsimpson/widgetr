@@ -395,6 +395,32 @@ export function applyWidgetOperation(
     )
   }
 
+  if (operation.type === 'set-public-data-source') {
+    nextState.dataSource = structuredClone(operation.source)
+    nextState.data = structuredClone(operation.data)
+    nextState.diagnostics = []
+    return finish(
+      state,
+      nextState,
+      [...WIDGET_SIZES],
+      [],
+      'Connected public JSON data and updated the preview.',
+      now
+    )
+  }
+
+  if (operation.type === 'set-data-bindings') {
+    nextState.bindings = structuredClone(operation.bindings)
+    return finish(
+      state,
+      nextState,
+      [...WIDGET_SIZES],
+      [],
+      'Updated data bindings for every widget size.',
+      now
+    )
+  }
+
   if (operation.type === 'restore-snapshot') {
     return finish(
       state,

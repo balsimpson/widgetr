@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
 import { createNewWidgetProject } from '~/domain/widget/projects'
 import { createNeutralWidgetProject, createSampleWidgetProject } from '~/domain/widget/fixture'
@@ -106,13 +106,13 @@ describe('Widgetr WebMCP catalog', () => {
     expect(result).toMatchObject({
       ok: true,
       studioUrl: 'http://127.0.0.1:3100/studio',
-      nextStep: expect.stringContaining('widgetr_create_widget')
+      nextStep: expect.stringContaining('choose a starter')
     })
     expect(JSON.stringify(result)).toContain('Build a weather widget')
     expect(JSON.stringify(result)).not.toContain('Kochi')
   })
 
-  it('creates a neutral project from the chooser catalog with a validated starter', async () => {
+  it('creates a complete weather starter from the chooser catalog', async () => {
     const project = createNeutralWidgetProject()
     const { runtime, state } = createRuntime(project)
     const catalog = createStarterWebMcpToolCatalog('http://127.0.0.1:3100/studio')
@@ -135,8 +135,8 @@ describe('Widgetr WebMCP catalog', () => {
       startingIntent: 'weather'
     })
     expect(state.project.startingIntent).toBe('weather')
-    expect(state.project.dataSource.kind).toBe('none')
-    expect(JSON.stringify(state.project)).not.toContain('Kochi')
+    expect(state.project.dataSource.kind).toBe('sample')
+    expect(state.project.data.value.location).toBe('Kochi')
   })
 
   it('rejects an unlisted starter id before creating a project', async () => {
@@ -159,7 +159,7 @@ describe('Widgetr WebMCP catalog', () => {
 
   it('builds the assistant message from the current Widgetr URL', () => {
     expect(createAssistantPrompt('http://127.0.0.1:3100/')).toBe(
-      'Open Widgetr at http://127.0.0.1:3100/ and help me build a Scriptable widget.'
+      'Open Widgetr in the in-app browser at http://127.0.0.1:3100/. Wait until its page actions are ready, then use its getting-started action and open the new-project flow. Wait for me to choose a starter in Widgetr. If I choose Weather, ask for my location in this chat, then connect a public JSON weather source and update the widget from its returned fields.'
     )
   })
 
@@ -180,6 +180,8 @@ describe('Widgetr WebMCP catalog', () => {
     expect(getWebMcpToolNames(project)).toEqual([
       'widgetr_get_context',
       'widgetr_export',
+      'widgetr_connect_public_data',
+      'widgetr_set_data_bindings',
       'widgetr_select_element',
       'widgetr_clear_selection',
       'widgetr_create_widget',
@@ -211,6 +213,51 @@ describe('Widgetr WebMCP catalog', () => {
     expect(getWebMcpToolNames(visualProject)).toContain('widgetr_configure_visual_data')
     expect(getWebMcpToolNames(visualProject)).toContain('widgetr_remove_visual_data')
     expect(getWebMcpToolNames(visualProject)).not.toContain('widgetr_change_typography')
+  })
+
+  it('connects a bounded public JSON source and returns its fields for binding', async () => {
+    const project = createNewWidgetProject(fixedClock(), 'Weather widget', 'weather')
+    const { runtime, state, operations } = createRuntime(project)
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      current: { temperature_2m: 29, weather_code: 61 }
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    })))
+
+    try {
+      const result = await toolFor(project, 'widgetr_connect_public_data').execute({
+        expectedRevision: 0,
+        url: 'https://api.example.test/forecast',
+        refreshMinutes: 30
+      }, { signal: signal() }, runtime)
+
+      expect(result).toMatchObject({
+        ok: true,
+        revision: 1,
+        source: { hostname: 'api.example.test', refreshMinutes: 30 }
+      })
+      expect(result.fields).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          path: ['current', 'temperature_2m'],
+          valueType: 'number'
+        })
+      ]))
+      expect(state.project.dataSource).toMatchObject({
+        kind: 'public-api',
+        url: 'https://api.example.test/forecast',
+        method: 'GET',
+        headers: [],
+        secretPlaceholders: []
+      })
+      expect(state.project.data).toMatchObject({
+        kind: 'live',
+        value: { current: { temperature_2m: 29, weather_code: 61 } }
+      })
+      expect(operations.at(-1)).toMatchObject({ type: 'set-public-data-source' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('inserts a visual-data element from the no-selection context', async () => {

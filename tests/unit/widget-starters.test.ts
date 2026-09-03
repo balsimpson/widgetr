@@ -24,18 +24,17 @@ describe('Widgetr starting paths', () => {
     expect(getWidgetStarter('example').action).toBe('example')
   })
 
-  it('creates a valid neutral project with a recorded starting intent', () => {
+  it('creates a complete weather starter with a recorded starting intent', () => {
     const project = createNewWidgetProject(fixedTimestamp, 'Weather widget', 'weather')
 
     expect(project.startingIntent).toBe('weather')
-    expect(project.dataSource.kind).toBe('none')
-    expect(project.data.value).toEqual({})
-    expect(project.bindings).toEqual([])
-    expect(JSON.stringify(project)).not.toContain('Kochi')
+    expect(project.dataSource.kind).toBe('sample')
+    expect(project.data.value.location).toBe('Kochi')
+    expect(project.bindings.map(binding => binding.id)).toContain('temperature')
     expect(validateWidgetProject(project).ok).toBe(true)
   })
 
-  it.each(['weather', 'cryptocurrency', 'daily-agenda', 'own-idea'] as const)(
+  it.each(['cryptocurrency', 'daily-agenda', 'own-idea'] as const)(
     'creates a valid neutral project for the %s starting path',
     (starterId) => {
       const starter = getWidgetStarter(starterId)

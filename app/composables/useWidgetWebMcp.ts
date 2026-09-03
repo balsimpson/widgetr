@@ -130,7 +130,6 @@ export function useWidgetWebMcp(options: UseWidgetWebMcpOptions) {
     return [
       options.enabled.value ? 'enabled' : 'disabled',
       options.project.value.id,
-      selection?.size ?? 'none',
       selection?.elementId ?? 'none',
       context.value,
       options.catalogKey?.value ?? 'default'

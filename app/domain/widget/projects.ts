@@ -45,7 +45,10 @@ export function createNewWidgetProject(
   name = 'New widget',
   startingIntent?: WidgetStarterId
 ): WidgetProject {
-  return createProjectFromTemplate(createNeutralWidgetProject(), {
+  const template = startingIntent === 'weather'
+    ? createSampleWidgetProject()
+    : createNeutralWidgetProject()
+  return createProjectFromTemplate(template, {
     now,
     name,
     startingIntent

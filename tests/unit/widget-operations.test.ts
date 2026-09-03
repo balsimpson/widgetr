@@ -38,6 +38,90 @@ function textColor(project: WidgetProject, size: WidgetSize, elementId: string):
 }
 
 describe('shared widget operations', () => {
+  it('saves bounded public data through the shared revision-checked operation', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'set-public-data-source',
+      expectedRevision: 0,
+      source: {
+        kind: 'public-api',
+        url: 'https://api.example.test/weather',
+        method: 'GET',
+        parameters: [],
+        headers: [],
+        refreshMinutes: 30,
+        secretPlaceholders: []
+      },
+      data: {
+        kind: 'live',
+        label: 'Live data from api.example.test',
+        capturedAt: fixedClock(),
+        value: { current: { temperature: 29 } }
+      }
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) {
+      return
+    }
+    expect(result.revision).toBe(1)
+    expect(result.changedSizes).toEqual(['small', 'medium', 'large'])
+    expect(result.state.dataSource.kind).toBe('public-api')
+    expect(result.state.data.value).toEqual({ current: { temperature: 29 } })
+  })
+
+  it('rejects a public source that includes a browser secret or header', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'set-public-data-source',
+      expectedRevision: 0,
+      source: {
+        kind: 'public-api',
+        url: 'https://api.example.test/weather',
+        method: 'GET',
+        parameters: [],
+        headers: [{ key: 'Authorization', value: 'secret' }],
+        refreshMinutes: 30,
+        secretPlaceholders: []
+      },
+      data: {
+        kind: 'live',
+        label: 'Live data',
+        capturedAt: fixedClock(),
+        value: {}
+      }
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.code).toBe('INVALID_OPERATION')
+    }
+  })
+
+  it('replaces data bindings through the shared revision-checked operation', () => {
+    const project = createSampleWidgetProject()
+    const result = applyWidgetOperation(project, {
+      type: 'set-data-bindings',
+      expectedRevision: 0,
+      bindings: [{
+        id: 'temperature',
+        label: 'Current temperature',
+        path: ['current', 'temperature_2m'],
+        valueType: 'number'
+      }]
+    }, { now: fixedClock })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.state.bindings).toEqual([{
+        id: 'temperature',
+        label: 'Current temperature',
+        path: ['current', 'temperature_2m'],
+        valueType: 'number'
+      }])
+    }
+  })
+
   it('updates only one requested size', () => {
     const project = createSampleWidgetProject()
     const result = applyWidgetOperation(project, {

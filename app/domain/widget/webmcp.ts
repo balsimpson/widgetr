@@ -21,6 +21,7 @@ import type {
   OperationResult,
   UpdateElementContentOperation,
   ValueSource,
+  JsonObject,
   WidgetElement,
   WidgetOperation,
   WidgetProject,
@@ -137,7 +138,8 @@ const valueSourceJsonSchema: WebMcpJsonSchema = {
           type: 'object',
           properties: {
             prefix: { type: 'string', maxLength: 40 },
-            suffix: { type: 'string', maxLength: 40 }
+            suffix: { type: 'string', maxLength: 40 },
+            transform: { type: 'string', enum: ['weekday', 'time', 'integer', 'weather-code'] }
           },
           required: ['prefix', 'suffix'],
           additionalProperties: false
@@ -165,7 +167,8 @@ const valueSourceJsonSchema: WebMcpJsonSchema = {
           type: 'object',
           properties: {
             prefix: { type: 'string', maxLength: 40 },
-            suffix: { type: 'string', maxLength: 40 }
+            suffix: { type: 'string', maxLength: 40 },
+            transform: { type: 'string', enum: ['weekday', 'time', 'integer', 'weather-code'] }
           },
           required: ['prefix', 'suffix'],
           additionalProperties: false
@@ -396,6 +399,69 @@ const createWidgetInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
   starterId: starterIdSchema.optional()
 }).strict()
+
+const publicDataSourceInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  url: z.url().refine(url => new URL(url).protocol === 'https:', 'Use an https URL.'),
+  refreshMinutes: z.number().int().min(5).max(360).default(30)
+}).strict()
+
+const dataBindingInputSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(120),
+  path: z.array(z.union([
+    z.string().trim().min(1).max(80),
+    z.number().int().nonnegative().max(100)
+  ])).min(1).max(8),
+  valueType: z.enum(['string', 'number', 'boolean', 'date', 'image-url', 'list', 'object'])
+}).strict()
+
+const dataBindingsInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  bindings: z.array(dataBindingInputSchema).min(1).max(100)
+    .refine(bindings => new Set(bindings.map(binding => binding.id)).size === bindings.length, 'Binding ids must be unique.')
+}).strict()
+
+type FieldSummary = {
+  path: Array<string | number>
+  valueType: 'string' | 'number' | 'boolean' | 'list' | 'object'
+  example: string
+}
+
+function summarizePublicJson(value: unknown, path: Array<string | number> = [], depth = 0): FieldSummary[] {
+  if (depth >= 3 || value === null || typeof value !== 'object') {
+    const valueType = Array.isArray(value)
+      ? 'list'
+      : typeof value === 'boolean'
+        ? 'boolean'
+        : typeof value === 'number'
+          ? 'number'
+          : 'string'
+    return [{
+      path,
+      valueType,
+      example: String(value).slice(0, 160)
+    }]
+  }
+
+  if (Array.isArray(value)) {
+    const summary: FieldSummary[] = [{
+      path,
+      valueType: 'list',
+      example: `${value.length} items`
+    }]
+    if (value.length > 0) {
+      summary.push(...summarizePublicJson(value[0], [...path, 0], depth + 1))
+    }
+    return summary
+  }
+
+  const entries = Object.entries(value).slice(0, 20)
+  if (entries.length === 0) {
+    return [{ path, valueType: 'object', example: 'Empty object' }]
+  }
+  return entries.flatMap(([key, child]) => summarizePublicJson(child, [...path, key], depth + 1))
+}
 
 const designScopeInputSchema = z.object({
   expectedRevision: expectedRevisionSchema,
@@ -748,6 +814,14 @@ function sharedTools(): WebMcpToolDescriptor[] {
         return {
           ok: true,
           revision: project.revision,
+          startingIntent: project.startingIntent ?? null,
+          data: {
+            sourceKind: project.dataSource.kind,
+            sourceUrl: project.dataSource.url,
+            state: project.data.kind,
+            label: project.data.label,
+            bindingCount: project.bindings.length
+          },
           selection: project.selection,
           designScope: project.designScope,
           context,
@@ -900,8 +974,8 @@ function getStartedTool(studioUrl: string): WebMcpToolDescriptor {
           label: starter.label,
           action: starter.action
         })),
-        nextStep: 'Ask the user what they want to create before using widgetr_create_widget. Open the widget editor URL to shape it together.',
-        message: 'Widgetr is ready. Ask what the user wants to build, then shape it together in the widget editor.'
+        nextStep: 'Open the widget editor new-project flow and wait for the person to choose a starter. Once they choose one, continue the required questions in the assistant chat.',
+        message: 'Widgetr is ready. Let the person choose a starter in the editor, then shape it together there.'
       }
     }
   })
@@ -947,6 +1021,165 @@ function createWidgetTool(): WebMcpToolDescriptor {
           error instanceof Error ? error.message : 'The local widget could not be created.'
         )
       }
+    }
+  })
+}
+
+function connectPublicDataSourceTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_connect_public_data',
+    title: 'Connect public JSON data',
+    description: 'Fetch one public HTTPS GET JSON endpoint in the browser, save its live response for preview and Scriptable export, and return a bounded catalog of fields for binding. Do not use this for sources that need credentials, headers, or cookies.',
+    inputSchema: objectJsonSchema({
+      expectedRevision: { type: 'integer', minimum: 0 },
+      url: { type: 'string', minLength: 8, maxLength: 2000, pattern: '^https://' },
+      refreshMinutes: { type: 'integer', minimum: 5, maximum: 360 }
+    }, ['expectedRevision', 'url']),
+    annotations: {
+      ...mutationAnnotations(),
+      openWorldHint: true,
+      untrustedContentHint: true
+    },
+    execute: async (_input, context, runtime) => {
+      const parsed = parseOrError(publicDataSourceInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      let response: Response
+      try {
+        response = await fetch(parsed.value.url, {
+          method: 'GET',
+          credentials: 'omit',
+          redirect: 'error',
+          signal: context.signal
+        })
+      } catch (error) {
+        return errorPayload(
+          runtime,
+          context.signal.aborted ? 'CANCELLED' : 'BROWSER_FETCH_FAILED',
+          context.signal.aborted
+            ? 'The data request was cancelled.'
+            : 'The browser could not read this source. It may block cross-origin requests, redirect, or be unavailable. Choose a CORS-friendly public JSON endpoint or provide a safe sample response.'
+        )
+      }
+
+      if (!response.ok) {
+        return errorPayload(
+          runtime,
+          response.status === 429 ? 'RATE_LIMITED' : 'HTTP_ERROR',
+          response.status === 429
+            ? 'This source rate-limited the browser request. Wait or choose another public source.'
+            : `The source returned HTTP ${response.status}. Check the public endpoint and its access requirements.`
+        )
+      }
+
+      const declaredLength = Number(response.headers.get('content-length') ?? '0')
+      if (Number.isFinite(declaredLength) && declaredLength > 200_000) {
+        return errorPayload(
+          runtime,
+          'RESPONSE_TOO_LARGE',
+          'This response is too large for a widget data source. Use an endpoint that returns a smaller JSON payload.'
+        )
+      }
+
+      const body = await response.text()
+      if (body.length > 200_000) {
+        return errorPayload(
+          runtime,
+          'RESPONSE_TOO_LARGE',
+          'This response is too large for a widget data source. Use an endpoint that returns a smaller JSON payload.'
+        )
+      }
+
+      let value: unknown
+      try {
+        value = JSON.parse(body)
+      } catch {
+        return errorPayload(
+          runtime,
+          'INVALID_JSON',
+          'This source did not return valid JSON. Choose a JSON endpoint or provide a compatible sample response.'
+        )
+      }
+
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return errorPayload(
+          runtime,
+          'UNSUPPORTED_JSON_ROOT',
+          'Widgetr currently needs a JSON object at the top level. Choose a compatible endpoint.'
+        )
+      }
+
+      const sourceUrl = new URL(parsed.value.url)
+      const result = runtime.commitOperation({
+        type: 'set-public-data-source',
+        expectedRevision: parsed.value.expectedRevision,
+        source: {
+          kind: 'public-api',
+          url: parsed.value.url,
+          method: 'GET',
+          parameters: [],
+          headers: [],
+          refreshMinutes: parsed.value.refreshMinutes,
+          secretPlaceholders: []
+        },
+        data: {
+          kind: 'live',
+          label: `Live data from ${sourceUrl.hostname}`,
+          capturedAt: new Date().toISOString(),
+          value: value as JsonObject
+        }
+      })
+      const payload = operationPayload(result)
+      if (!result.ok) {
+        return payload
+      }
+      return {
+        ...payload,
+        source: { hostname: sourceUrl.hostname, refreshMinutes: parsed.value.refreshMinutes },
+        fields: summarizePublicJson(value).slice(0, 60),
+        nextStep: 'Use widgetr_set_data_bindings with the returned field paths, then update any widget text or repeat elements that need those bindings.'
+      }
+    }
+  })
+}
+
+function setDataBindingsTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_set_data_bindings',
+    title: 'Set Widgetr data bindings',
+    description: 'Replace the project binding catalog with fields from the currently connected public JSON source. Use the paths returned by widgetr_connect_public_data.',
+    inputSchema: objectJsonSchema({
+      expectedRevision: { type: 'integer', minimum: 0 },
+      bindings: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 100,
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 80 },
+            label: { type: 'string', minLength: 1, maxLength: 120 },
+            path: { type: 'array', minItems: 1, maxItems: 8 },
+            valueType: { type: 'string', enum: ['string', 'number', 'boolean', 'date', 'image-url', 'list', 'object'] }
+          },
+          required: ['id', 'label', 'path', 'valueType'],
+          additionalProperties: false
+        }
+      }
+    }, ['expectedRevision', 'bindings']),
+    annotations: mutationAnnotations(),
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(dataBindingsInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+      return operationPayload(runtime.commitOperation({
+        type: 'set-data-bindings',
+        expectedRevision: parsed.value.expectedRevision,
+        bindings: parsed.value.bindings
+      }))
     }
   })
 }
@@ -1684,6 +1917,8 @@ function groupContentOperation<T extends { expectedRevision: number, scope: Desi
 const sharedToolNames = [
   'widgetr_get_context',
   'widgetr_export',
+  'widgetr_connect_public_data',
+  'widgetr_set_data_bindings',
   'widgetr_select_element',
   'widgetr_clear_selection'
 ]
@@ -1758,7 +1993,11 @@ export function getWebMcpToolNames(project: WidgetProject): string[] {
 
 export function createWebMcpToolCatalog(project: WidgetProject): WebMcpToolDescriptor[] {
   const context = getWebMcpContext(project)
-  const tools = sharedTools()
+  const tools = [
+    ...sharedTools(),
+    connectPublicDataSourceTool(),
+    setDataBindingsTool()
+  ]
 
   if (context === 'none') {
     tools.push(...noSelectionTools())
