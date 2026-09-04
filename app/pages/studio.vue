@@ -103,16 +103,26 @@ function clearForcedNewQuery(): void {
 
 const lastResult = ref<OperationResult | null>(null)
 const lastChangeReceiptMessage = ref<string | null>(null)
+const lastChangeReceiptActor = ref<'user' | 'assistant' | null>(null)
+type ChangeActor = 'user' | 'assistant'
 type HistoryEntry = {
   snapshot: WidgetProject
   message: string
+  actor: ChangeActor
+}
+
+type RecentCanvasChange = {
+  actor: ChangeActor
+  sizes: WidgetSize[]
 }
 
 const historyPast = ref<HistoryEntry[]>([])
 const historyFuture = ref<HistoryEntry[]>([])
+const recentCanvasChange = ref<RecentCanvasChange | null>(null)
 const structureSize = ref<WidgetSize>('medium')
 const previewView = ref<WidgetSize | 'all'>('medium')
 const copyState = ref<'idle' | 'copied' | 'failed'>('idle')
+let recentCanvasChangeTimeout: number | null = null
 
 type NavigationMode = 'projects' | 'layers' | 'reference'
 
@@ -302,18 +312,24 @@ const agentHistory = computed(() => [
     id: `future-${entry.snapshot.revision}-${index}`,
     message: entry.message,
     detail: 'Redo available',
+    actor: entry.actor,
     direction: 'future' as const
   })),
   ...historyPast.value.slice().reverse().map((entry, index) => ({
     id: `past-${entry.snapshot.revision}-${index}`,
     message: entry.message,
     detail: 'Undo available',
+    actor: entry.actor,
     direction: 'past' as const
   }))
 ])
 
 const changeReceiptMessage = computed(() => (
   lastChangeReceiptMessage.value
+))
+
+const statusDockIcon = computed(() => (
+  lastChangeReceiptActor.value === 'user' ? 'i-lucide-user-round' : 'i-lucide-bot'
 ))
 
 const inspectorOpen = computed({
@@ -347,7 +363,7 @@ const {
 } = useWidgetWebMcp({
   enabled: computed(() => true),
   project,
-  commitOperation,
+  commitOperation: operation => commitOperation(operation, { actor: 'assistant' }),
   createProject: createAgentProject,
   getExport: () => exportResult.value,
   requestConfirmation: requestAgentConfirmation,
@@ -417,16 +433,19 @@ const statusDockColor = computed(() => {
 
 function commitOperation(
   operation: WidgetOperation,
-  options: { recordHistory?: boolean } = {}
+  options: { recordHistory?: boolean, actor?: ChangeActor } = {}
 ): OperationResult {
+  const actor = options.actor ?? 'user'
   const previousState = cloneWidgetProject(project.value)
   const result = applyWidgetOperation(project.value, operation)
-  lastResult.value = result
-  lastChangeReceiptMessage.value = result.ok
+  const showChangeReceipt = result.ok
     && operation.type !== 'set-selection'
     && result.changedSizes.length > 0
-    ? result.message
+  lastResult.value = result
+  lastChangeReceiptMessage.value = showChangeReceipt
+    ? `${actor === 'assistant' ? 'Assistant' : 'You'} · ${result.message}`
     : null
+  lastChangeReceiptActor.value = showChangeReceipt ? actor : null
 
   if (!result.ok) {
     return result
@@ -438,8 +457,19 @@ function commitOperation(
 
   const recordHistory = options.recordHistory ?? operation.type !== 'set-selection'
   if (recordHistory) {
-    historyPast.value = [...historyPast.value, { snapshot: previousState, message: result.message }]
+    historyPast.value = [...historyPast.value, { snapshot: previousState, message: result.message, actor }]
     historyFuture.value = []
+  }
+
+  if (operation.type !== 'set-selection' && result.changedSizes.length > 0) {
+    recentCanvasChange.value = { actor, sizes: result.changedSizes }
+    if (recentCanvasChangeTimeout !== null) {
+      window.clearTimeout(recentCanvasChangeTimeout)
+    }
+    recentCanvasChangeTimeout = window.setTimeout(() => {
+      recentCanvasChange.value = null
+      recentCanvasChangeTimeout = null
+    }, 1800)
   }
 
   replaceProject(result.state)
@@ -816,7 +846,8 @@ function undo(): void {
   historyPast.value = historyPast.value.slice(0, -1)
   historyFuture.value = [...historyFuture.value, {
     snapshot: cloneWidgetProject(project.value),
-    message: previous.message
+    message: previous.message,
+    actor: previous.actor
   }]
   const result = commitOperation({
     type: 'restore-snapshot',
@@ -839,7 +870,8 @@ function redo(): void {
   historyFuture.value = historyFuture.value.slice(0, -1)
   historyPast.value = [...historyPast.value, {
     snapshot: cloneWidgetProject(project.value),
-    message: next.message
+    message: next.message,
+    actor: next.actor
   }]
   const result = commitOperation({
     type: 'restore-snapshot',
@@ -1213,6 +1245,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   previewMediaQuery?.removeEventListener('change', syncPreviewView)
   window.removeEventListener('keydown', handleKeydown)
+  if (recentCanvasChangeTimeout !== null) {
+    window.clearTimeout(recentCanvasChangeTimeout)
+  }
   if (referenceUrl.value) {
     URL.revokeObjectURL(referenceUrl.value)
   }
@@ -1554,9 +1589,10 @@ onBeforeUnmount(() => {
                   v-for="size in visiblePreviewSizes"
                   :key="size"
                   :project="project"
-                :size="size"
-                @select="selectElement"
-              />
+                  :size="size"
+                  :change-actor="recentCanvasChange?.sizes.includes(size) ? recentCanvasChange.actor : null"
+                  @select="selectElement"
+                />
               </div>
             </div>
           </div>
@@ -1612,11 +1648,15 @@ onBeforeUnmount(() => {
               type="button"
               class="canvas-status-trigger"
               :class="`canvas-status-trigger-${statusDockColor}`"
-              :aria-label="agentStatusLabel"
-              :title="agentStatusLabel"
+              :aria-label="statusDockMessage"
+              :title="statusDockMessage"
             >
-              <span class="status-dock-icon" aria-hidden="true">
-                <UIcon name="i-lucide-bot" />
+              <span
+                class="status-dock-icon"
+                :class="lastChangeReceiptActor ? `status-dock-icon-${lastChangeReceiptActor}` : undefined"
+                aria-hidden="true"
+              >
+                <UIcon :name="statusDockIcon" />
                 <span class="status-dock-dot" />
               </span>
               <span class="status-dock-copy" aria-live="polite">
@@ -3832,9 +3872,14 @@ onBeforeUnmount(() => {
   color: var(--widgetr-accent-strong);
 }
 
-.status-dock-icon .i-lucide-bot {
+.status-dock-icon > svg {
   width: 0.95rem;
   height: 0.95rem;
+}
+
+.status-dock-icon-assistant {
+  background: color-mix(in srgb, var(--widgetr-assistant) 16%, transparent);
+  color: var(--widgetr-assistant);
 }
 
 .status-dock-copy {

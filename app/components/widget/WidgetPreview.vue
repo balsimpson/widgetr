@@ -4,10 +4,15 @@ import { backgroundStyle } from '~/domain/widget/styles'
 import { WIDGET_DIMENSIONS } from '~/types/widget'
 import type { WidgetProject, WidgetSelection, WidgetSize } from '~/types/widget'
 
-const props = defineProps<{
+type ChangeActor = 'user' | 'assistant'
+
+const props = withDefaults(defineProps<{
   project: WidgetProject
   size: WidgetSize
-}>()
+  changeActor?: ChangeActor | null
+}>(), {
+  changeActor: null
+})
 
 const emit = defineEmits<{
   select: [selection: WidgetSelection]
@@ -35,6 +40,10 @@ const previewStyle = computed(() => ({
   padding: `${layout.value.padding.top}px ${layout.value.padding.right}px ${layout.value.padding.bottom}px ${layout.value.padding.left}px`,
   borderRadius: `${layout.value.cornerRadius}px`
 }))
+
+const collaborationOutlineStyle = computed(() => ({
+  borderRadius: `${layout.value.cornerRadius + 4}px`
+}))
 </script>
 
 <template>
@@ -53,7 +62,24 @@ const previewStyle = computed(() => ({
       </button>
     </figcaption>
 
-    <div class="calibration-frame">
+    <div
+      class="calibration-frame"
+      :class="changeActor ? `calibration-frame-${changeActor}` : undefined"
+    >
+      <span
+        v-if="changeActor"
+        class="collaboration-outline"
+        :style="collaborationOutlineStyle"
+        aria-hidden="true"
+      />
+      <span
+        v-if="changeActor"
+        class="collaboration-marker"
+        :class="`collaboration-marker-${changeActor}`"
+      >
+        <UIcon :name="changeActor === 'assistant' ? 'i-lucide-bot' : 'i-lucide-user-round'" aria-hidden="true" />
+        {{ changeActor === 'assistant' ? 'Assistant' : 'You' }}
+      </span>
       <div
         class="widget-preview"
         :class="{ 'widget-preview-selected': isWidgetSelected }"
@@ -124,8 +150,90 @@ const previewStyle = computed(() => ({
 }
 
 .calibration-frame {
+  position: relative;
   display: flex;
   justify-content: center;
+}
+
+.collaboration-outline {
+  position: absolute;
+  z-index: 3;
+  inset: -5px;
+  border: 2px solid var(--widgetr-accent);
+  pointer-events: none;
+  animation: collaboration-trace 1800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.calibration-frame-assistant .collaboration-outline {
+  border-color: var(--widgetr-assistant);
+  border-style: dashed;
+}
+
+.collaboration-marker {
+  position: absolute;
+  z-index: 4;
+  top: -1.45rem;
+  left: -0.45rem;
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-accent) 38%, var(--widgetr-border));
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--widgetr-pane-solid) 92%, transparent);
+  box-shadow: 0 5px 14px rgb(29 29 31 / 14%);
+  color: var(--widgetr-accent-strong);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  animation: collaboration-marker-arrive 1800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.collaboration-marker-assistant {
+  border-color: color-mix(in srgb, var(--widgetr-assistant) 45%, var(--widgetr-border));
+  color: var(--widgetr-assistant);
+}
+
+.collaboration-marker > svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: 0 0 auto;
+}
+
+@keyframes collaboration-trace {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 100% 0 round 0.75rem);
+  }
+
+  14%, 82% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.75rem);
+  }
+
+  100% {
+    opacity: 0;
+    clip-path: inset(0 0 0 0 round 0.75rem);
+  }
+}
+
+@keyframes collaboration-marker-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+
+  14%, 82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
 }
 
 .widget-preview {

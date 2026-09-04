@@ -51,7 +51,7 @@ This snapshot records the starting point for the next chat. Recheck it before ed
 | Declared runtime | Node 24 from `.nvmrc` |
 | Package engine | `^22.19.0 || ^24.11.0 || >=26.0.0` |
 | Current shell during planning | Node `v25.8.0`, unsupported by the package engine |
-| Production URL recorded by the phase plan | `https://widgetrmcp.vercel.app/` |
+| Production URL recorded by the phase plan | `https://widgetr.vercel.app/` |
 
 Before this document was added, the existing uncommitted work was:
 

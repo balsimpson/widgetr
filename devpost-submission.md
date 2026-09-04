@@ -43,7 +43,7 @@ Widgetr is a Nuxt application with a single canonical `WidgetProject`. It stores
 
 ## Testing Instructions
 
-1. Open `https://widgetrmcp.vercel.app/` in ChatGPT's in-app browser.
+1. Open `https://widgetr.vercel.app/` in ChatGPT's in-app browser.
 2. Choose or continue a widget project, then open the Studio.
 3. Select a text element. Confirm that Widgetr exposes contextual tools such as `widgetr_get_context`, `widgetr_change_text_content`, and `widgetr_export`.
 4. Ask the assistant to read the current context, change selected text across all sizes, and inspect the small, medium, and large previews.
@@ -53,7 +53,7 @@ No login or credentials are required.
 
 ## Public Demo Link
 
-https://widgetrmcp.vercel.app/
+https://widgetr.vercel.app/
 
 ## Public Repository Link
 
@@ -82,7 +82,7 @@ Verified today:
 
 - The Devpost account is registered for The WebMCP Challenge, and the event is accepting submissions.
 - A Devpost project draft exists at `https://devpost.com/software/widgetr` and is attached to the challenge with status `Draft`.
-- `https://widgetrmcp.vercel.app/` opens in ChatGPT's in-app browser and exposes Widgetr's WebMCP tools.
+- `https://widgetr.vercel.app/` opens in ChatGPT's in-app browser and exposes Widgetr's WebMCP tools.
 - `https://github.com/balsimpson/widgetr` is public and shows a visible MIT license.
 - The local repository guard confirms the Widgetr checkout, origin, and package identity.
 
@@ -107,7 +107,7 @@ Use these exact Devpost fields when the video URL is ready:
 | Submitter Type | `Individual` |
 | Country of residence | `India` |
 | App Status | `New` |
-| Live URL | `https://widgetrmcp.vercel.app/` |
+| Live URL | `https://widgetr.vercel.app/` |
 | Testing instructions | Use the Testing Instructions section above. No credentials are needed. |
 | Public code repository | `https://github.com/balsimpson/widgetr` |
 | Agents or clients tested | ChatGPT's in-app browser. It exposed Widgetr's registered WebMCP tool catalog and was used to run context and widget-edit operations. |

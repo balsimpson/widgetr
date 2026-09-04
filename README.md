@@ -4,7 +4,7 @@ Widgetr is a standalone Nuxt application for building Scriptable widgets through
 
 The current public-facing editor is intentionally functional rather than visually polished: it demonstrates three independent widget-size layouts, shared data, revision-checked operations, local project history, deterministic Scriptable export, and a live WebMCP tool catalog that changes with the selected element. Data onboarding and design curation remain later phases in the approved product plan.
 
-Live deployment: [widgetrmcp.vercel.app](https://widgetrmcp.vercel.app/)
+Live deployment for the Devpost challenge and testing: [widgetr.vercel.app](https://widgetr.vercel.app/)
 
 ## Requirements
 
@@ -29,7 +29,7 @@ Widgetr is configured for a normal Nuxt server deployment. Vercel detects Nuxt a
 1. Push the repository to a public Git provider.
 2. In Vercel, choose **Add New → Project**, import the repository, and keep the detected Nuxt framework settings.
 3. Use `npm run build` as the build command if Vercel asks for an explicit command. Leave the output directory at its automatic setting.
-4. Deploy, open the resulting URL, and verify the three previews, scoped operations, export preflight, Copy action, and `.js` download. The current deployment is [widgetrmcp.vercel.app](https://widgetrmcp.vercel.app/).
+4. Deploy, open the resulting URL, and verify the three previews, scoped operations, export preflight, Copy action, and `.js` download. The current deployment is [widgetr.vercel.app](https://widgetr.vercel.app/).
 
 Phase 4 has no required environment variables. Do not add secrets to the repository or to the generated Scriptable file.
 

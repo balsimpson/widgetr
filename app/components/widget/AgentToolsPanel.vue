@@ -6,6 +6,7 @@ type AgentHistoryEntry = {
   id: string
   message: string
   detail: string
+  actor: 'user' | 'assistant'
   direction: 'past' | 'future'
 }
 
@@ -192,7 +193,16 @@ const contextLabel = computed(() => {
           </span>
           <span class="agent-history-copy">
             <span class="agent-history-message">{{ historyEntry.message }}</span>
-            <span class="agent-history-detail">{{ historyEntry.detail }}</span>
+            <span class="agent-history-attribution">
+              <span
+                class="agent-history-actor"
+                :class="`agent-history-actor-${historyEntry.actor}`"
+              >
+                <UIcon :name="historyEntry.actor === 'assistant' ? 'i-lucide-bot' : 'i-lucide-user-round'" aria-hidden="true" />
+                {{ historyEntry.actor === 'assistant' ? 'Assistant' : 'You' }}
+              </span>
+              <span class="agent-history-detail">{{ historyEntry.detail }}</span>
+            </span>
           </span>
         </div>
       </div>
@@ -454,6 +464,32 @@ const contextLabel = computed(() => {
   color: var(--widgetr-ink);
   font-size: 0.7rem;
   line-height: 1.35;
+}
+
+.agent-history-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.agent-history-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--widgetr-accent-strong);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.agent-history-actor-assistant {
+  color: var(--widgetr-assistant);
+}
+
+.agent-history-actor > svg {
+  width: 0.68rem;
+  height: 0.68rem;
+  flex: 0 0 auto;
 }
 
 .agent-history-detail {
