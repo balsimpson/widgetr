@@ -2,7 +2,7 @@
 
 ## Status
 
-**The current homepage follow-up is committed in `9b37b26` and pushed to `origin/main`.** The homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are in place. The homepage now shows its WebMCP status and registered tool names, routes new visitors to Studio, and uses a short assistant message. The provider chooser is no longer part of the rendered homepage. `npm test` passes 8 files and 74 tests, `npm run typecheck` passes, and a local Nuxt SSR/HMR smoke check confirms the changed homepage output; rendered browser inspection, production build, deployment, and real WebMCP invocation remain separate checkpoints for this follow-up.
+**The homepage and `/studio` split is in place and pushed to `origin/main`.** The homepage uses a provider-neutral readiness surface, safe onboarding catalogs, a dynamic assistant message, and the official Scriptable asset. New visitors see `Start in Studio` only when page actions are ready; when they are unavailable, the homepage explains how to connect an assistant instead. Saved-project visitors can still continue to review existing work. The provider chooser is no longer part of the rendered homepage. Automated checks and rendered/deployed verification remain separate checkpoints for the latest follow-up.
 
 The user has explicitly reprioritized this homepage and Studio split. Do not reopen whether it belongs to a later phase. When implementation begins, record the reprioritization and current evidence in the canonical [phase implementation plan](./widgetr-phase-implementation-plan.md).
 
@@ -85,7 +85,7 @@ It contains:
 - A compact, truthful WebMCP status row and registered tool disclosure
 - One copyable message for the user's assistant
 - One clear copy action for the assistant handoff
-- A `Start in Studio` or `Continue` button that names the next place to act
+- A readiness-aware next action: `Start in Studio` for a new visitor only when page actions are ready, `Continue` for a saved project, or `How to connect an assistant` when a new visitor cannot use page actions
 
 ### `/studio`
 
@@ -125,7 +125,7 @@ Use plain, provider-neutral copy. The first screen should be understandable with
 
 **Start section heading**
 
-> Start in Studio
+> Use `Connect an assistant to start` when a new visitor cannot use page actions, `Start in Studio` when page actions are ready, and `Continue your widget` when saved work exists.
 
 **Copied message**
 
@@ -138,15 +138,16 @@ Generate the URL from the current page at runtime. Do not hard-code production s
 **Actions**
 
 - `Copy message` copies the complete message and shows a short success or failure receipt.
-- `Start in Studio` opens `/studio?new=1` for a new visitor.
-- `Continue` opens `/studio` to resume the active saved project.
+- `How to connect an assistant` opens concise setup guidance for a new visitor when page actions are unavailable or registration fails.
+- `Start in Studio` opens `/studio?new=1` for a new visitor only when page actions are ready or working.
+- `Continue` opens `/studio` to resume the active saved project regardless of page-action readiness.
 - The page actions disclosure shows the registered tool names when registration succeeds.
 
 ### WebMCP readiness and tools
 
 The start area uses the shared readiness component in an inline row. It does not ask the person to identify or choose an assistant provider. The row describes the page-side state, while the native `Page actions` disclosure shows the exact registered names for people who want to inspect the technical handoff.
 
-Do not add a provider chooser, compatibility ranking, provider logos, or a second chat surface. If setup guidance is needed later, keep it behind a short help disclosure and describe only the observable page-action requirement.
+Do not add a provider chooser, compatibility ranking, provider logos, or a second chat surface. When page actions are unavailable for a new visitor, show a short setup disclosure that explains the observable page-action requirement, points to concrete current setup examples, and keeps the person on the homepage until the environment is ready.
 
 ## Readiness state model
 
@@ -155,11 +156,11 @@ Keep status copy in one reusable component for the Studio assistant handoff and 
 | State | Evidence | User-facing copy | Next action |
 | --- | --- | --- | --- |
 | Checking | Client has mounted but capability has not been resolved | `Checking page actions...` | None |
-| Unavailable | `document.modelContext?.registerTool` is missing | `WebMCP unavailable` | Use a WebMCP-capable environment or copy the assistant message |
+| Unavailable | `document.modelContext?.registerTool` is missing | `WebMCP unavailable` | Open Widgetr where an AI assistant can use page actions; the homepage exposes concrete setup guidance for new visitors |
 | Registering | Registration has started | `Preparing page actions...` | Wait |
 | Ready | Every required tool for the current route registered | `WebMCP ready` | Ask what to build, then shape it together on the canvas |
 | Working | A registered tool is executing | `Your assistant is working` | Watch the page update |
-| Error | Required registration failed | `Page actions could not start` | Retry registration or copy the assistant message |
+| Error | Required registration failed | `Page actions could not start` | Retry registration or open Widgetr where an AI assistant can use page actions |
 
 Rules:
 
@@ -276,7 +277,7 @@ Use a legitimate Scriptable brand asset from an official or user-approved source
 - The homepage does not ask a person to choose or compare assistant providers.
 - The copied message contains the current absolute Widgetr URL.
 - Copy success and failure are visible and accessible.
-- A new visitor can open `/studio?new=1`, while a saved-project visitor can `Continue` into `/studio`.
+- A new visitor can open `/studio?new=1` only when page actions are ready or working; an unavailable new visitor receives setup guidance instead, while a saved-project visitor can always `Continue` into `/studio`.
 - No runtime path asks for, detects, or branches on assistant provider identity.
 
 ### Studio
@@ -306,8 +307,8 @@ Use a legitimate Scriptable brand asset from an official or user-approved source
 - Verify the relevant mobile layout, including the prompt and CTA, at 390 x 844.
 - Verify light and dark themes.
 - Verify keyboard focus and the copy action.
-- Verify the no-WebMCP state in ordinary Brave.
-- Verify the homepage readiness row, page-actions disclosure, and new-visitor Studio CTA.
+- Verify the no-WebMCP state in ordinary Brave, including the absence of the new-visitor Studio CTA and the setup guidance action.
+- Verify the homepage readiness row, page-actions disclosure, readiness-gated new-visitor Studio CTA, and saved-project continuation.
 - Verify registration, listed tools, one safe onboarding invocation, and the working receipt in an actual WebMCP-capable in-app browser.
 - Treat browser rendering, successful registration, actual invocation, deployment, and real Scriptable execution as separate evidence.
 

@@ -40,7 +40,7 @@ export function describeWebMcpStatus(status: WebMcpStatus): WebMcpStatusDescript
     case 'error':
       return {
         label: 'Page actions could not start',
-        description: 'Retry registration or use the copied message.',
+        description: 'Retry registration or open Widgetr where an AI assistant can use page actions.',
         color: 'error',
         icon: 'i-lucide-circle-alert'
       }
@@ -48,7 +48,7 @@ export function describeWebMcpStatus(status: WebMcpStatus): WebMcpStatusDescript
     default:
       return {
         label: 'WebMCP unavailable',
-        description: 'Use a WebMCP-capable environment or continue manually.',
+        description: 'Open Widgetr where an AI assistant can use page actions.',
         color: 'error',
         icon: 'i-lucide-plug-zap'
       }

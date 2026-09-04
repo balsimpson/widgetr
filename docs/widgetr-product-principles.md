@@ -28,7 +28,7 @@ The Widgetr page owns the visual work. It handles reference-image upload, previe
 
 Widgetr must remain neutral about which assistant is being used. The core product must not assume ChatGPT, a particular browser, a model provider, or a specific agent interface.
 
-WebMCP is a progressive improvement to the experience. If no compatible assistant is available, the page must explain that clearly and provide the best available manual or example path.
+WebMCP is required for Widgetr's assistant-led build experience. If no compatible assistant is available, the page must explain that clearly, provide setup guidance, and avoid presenting a first-run Studio path as if a person can complete a new widget alone. Saved widgets may remain available for review or export.
 
 ## The first-run experience
 
@@ -180,7 +180,7 @@ Better:
 - Keep the first-run message and status in the same place so the person does not have to relearn the layout when an assistant becomes available.
 - Keep reference-image upload on the Widgetr page.
 - Make it clear that uploading an image starts a reference-led project but does not produce a finished widget. Explain that the person should continue in the assistant's chat.
-- Keep the page useful when no assistant is available. If generation cannot happen, say so and provide manual editing or example exploration when those paths exist.
+- Keep the page useful when no assistant is available, but do not imply that a person can complete a new widget alone. Provide setup guidance and keep saved widgets available for review or export when those paths exist.
 - Make every agent change visible in the preview.
 - Ask the person before applying changes that may remove or replace work.
 - Keep one clear surface. Do not bury the starting action inside nested panels or card stacks.
@@ -207,7 +207,7 @@ Before approving any copy, design, UI change, agent tool, or documentation updat
 - Does the copy say where the next step will happen?
 - If an assistant is required, does the page name concrete, current ways to use one?
 - If a reference image is needed, is it clear that the upload happens on the Widgetr page?
-- If the current environment cannot provide the feature, does the page explain the alternative?
+- If the current environment cannot provide the assistant-led build path, does the page explain how to reach one without offering a misleading Studio CTA?
 - Does the interface avoid provider-specific assumptions?
 - Does every error or waiting state include a useful next action?
 - Is the result visible without asking the person to read code?

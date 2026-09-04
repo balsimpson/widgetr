@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { WebMcpStatus } from '~/types/webmcp'
 
 const props = defineProps<{
@@ -39,6 +39,34 @@ const copyReceipt = computed(() => {
 const toolCountLabel = computed(() => (
   `${props.webmcpToolNames.length} ${props.webmcpToolNames.length === 1 ? 'action' : 'actions'}`
 ))
+
+const connectionHelpOpen = ref(false)
+
+const canStartInStudio = computed(() => (
+  props.webmcpStatus === 'registered' || props.webmcpStatus === 'working'
+))
+
+const showConnectionHelp = computed(() => (
+  !props.hasSavedProjects
+  && (props.webmcpStatus === 'unsupported' || props.webmcpStatus === 'error')
+))
+
+const showStudioAction = computed(() => (
+  props.hasSavedProjects || canStartInStudio.value
+))
+
+const startHeading = computed(() => {
+  if (props.hasSavedProjects) {
+    return 'Continue your widget'
+  }
+  if (canStartInStudio.value) {
+    return 'Start in Studio'
+  }
+  if (props.webmcpStatus === 'checking' || props.webmcpStatus === 'registering') {
+    return 'Getting ready'
+  }
+  return 'Connect an assistant to start'
+})
 </script>
 
 <template>
@@ -78,7 +106,7 @@ const toolCountLabel = computed(() => (
 
         <section class="homepage-start" aria-labelledby="homepage-start-heading">
           <div class="homepage-section-heading">
-            <h2 id="homepage-start-heading">Start in Studio</h2>
+            <h2 id="homepage-start-heading">{{ startHeading }}</h2>
           </div>
 
           <WidgetWebMcpReadiness
@@ -90,6 +118,39 @@ const toolCountLabel = computed(() => (
             retry-label="Retry"
             @retry="emit('retry')"
           />
+
+          <UButton
+            v-if="showConnectionHelp"
+            label="How to connect an assistant"
+            icon="i-lucide-circle-help"
+            color="primary"
+            size="lg"
+            block
+            class="homepage-connection-action"
+            :aria-expanded="connectionHelpOpen"
+            aria-controls="homepage-connection-guidance"
+            @click="connectionHelpOpen = !connectionHelpOpen"
+          />
+
+          <section
+            v-if="showConnectionHelp && connectionHelpOpen"
+            id="homepage-connection-guidance"
+            class="homepage-connection-guidance"
+            aria-label="How to connect an assistant"
+          >
+            <p>Widgetr needs an AI assistant that can use page actions to build your widget with you.</p>
+            <p>Choose a way to open Widgetr with page actions:</p>
+            <ul>
+              <li>
+                The <a href="https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app" target="_blank" rel="noopener noreferrer">ChatGPT desktop app’s built-in browser</a>, when site tools are available.
+              </li>
+              <li>
+                Chrome for testing, following <a href="https://developer.chrome.com/docs/ai/webmcp" target="_blank" rel="noopener noreferrer">Chrome’s WebMCP setup</a> at <code>chrome://flags/#enable-webmcp-testing</code>, then relaunched.
+              </li>
+              <li>Another AI assistant or browser that supports WebMCP.</li>
+            </ul>
+            <p>Then paste the starter message below into the assistant’s chat and start when the status says <strong>WebMCP ready</strong>.</p>
+          </section>
 
           <details class="homepage-tools">
             <summary class="homepage-tools-summary">
@@ -129,10 +190,13 @@ const toolCountLabel = computed(() => (
           </section>
 
           <p v-if="props.hasSavedProjects" class="homepage-continue-note">
-            You have saved widgets. Continue where you left off.
+            {{ canStartInStudio
+              ? 'You have saved widgets. Continue where you left off.'
+              : 'You have saved widgets. Continue to review them, then connect an assistant to keep building.' }}
           </p>
 
           <UButton
+            v-if="showStudioAction"
             :label="props.hasSavedProjects ? 'Continue' : 'Start in Studio'"
             icon="i-lucide-arrow-right"
             :to="props.hasSavedProjects ? '/studio' : '/studio?new=1'"
@@ -431,6 +495,48 @@ const toolCountLabel = computed(() => (
 
 .homepage-studio-action {
   min-height: 3.1rem;
+}
+
+.homepage-connection-action {
+  min-height: 3.1rem;
+}
+
+.homepage-connection-guidance {
+  display: grid;
+  gap: 0.7rem;
+  margin: -0.2rem 0 0;
+  color: var(--widgetr-muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.homepage-connection-guidance p {
+  margin: 0;
+}
+
+.homepage-connection-guidance ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.homepage-connection-guidance a {
+  color: var(--widgetr-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.homepage-connection-guidance code {
+  overflow-wrap: anywhere;
+  color: var(--widgetr-ink);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.homepage-connection-guidance strong {
+  color: var(--widgetr-ink);
+  font-weight: 700;
 }
 
 @media (max-width: 52rem) {
