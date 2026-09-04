@@ -139,6 +139,60 @@ describe('Widgetr WebMCP catalog', () => {
     expect(state.project.data.value.location).toBe('Kochi')
   })
 
+  it('returns a focused assistant intake after a local reference is attached', async () => {
+    const project = createNewWidgetProject(fixedClock(), 'Reference-led widget', 'reference-image')
+    const referenceResult = applyWidgetOperation(project, {
+      type: 'update-project-metadata',
+      expectedRevision: project.revision,
+      patch: {
+        localReference: {
+          storageKey: 'reference/widget/reference.png',
+          fileName: 'reference.png',
+          mimeType: 'image/png',
+          width: 1200,
+          height: 800,
+          addedAt: fixedClock()
+        }
+      }
+    }, { now: fixedClock })
+
+    if (!referenceResult.ok) {
+      throw new Error(referenceResult.message)
+    }
+
+    const { runtime } = createRuntime(referenceResult.state)
+    const catalog = createWebMcpToolCatalog(referenceResult.state)
+    const intakeTool = catalog.find(tool => tool.name === 'widgetr_get_reference_intake')
+    const contextTool = catalog.find(tool => tool.name === 'widgetr_get_context')
+
+    expect(getWebMcpToolNames(referenceResult.state)).toContain('widgetr_get_reference_intake')
+    expect(intakeTool).toBeDefined()
+    expect(contextTool).toBeDefined()
+
+    const intake = await intakeTool!.execute({}, { signal: signal() }, runtime)
+    expect(intake).toMatchObject({
+      ok: true,
+      assistantTask: 'reference-intake',
+      reference: {
+        fileName: 'reference.png',
+        width: 1200,
+        height: 800,
+        storedLocally: true
+      },
+      firstQuestion: 'What should this widget help you see at a glance?',
+      suggestedReplies: expect.arrayContaining(['A live dashboard', 'Something else'])
+    })
+
+    const context = await contextTool!.execute({}, { signal: signal() }, runtime)
+    expect(context).toMatchObject({
+      reference: {
+        fileName: 'reference.png',
+        storedLocally: true
+      },
+      assistantNextStep: expect.stringContaining('Ask one focused question')
+    })
+  })
+
   it('rejects an unlisted starter id before creating a project', async () => {
     const project = createNeutralWidgetProject()
     const { runtime, state } = createRuntime(project)
@@ -158,9 +212,12 @@ describe('Widgetr WebMCP catalog', () => {
   })
 
   it('builds the assistant message from the current Widgetr URL', () => {
-    expect(createAssistantPrompt('http://127.0.0.1:3100/')).toBe(
-      'Open Widgetr in the in-app browser at http://127.0.0.1:3100/. Wait until its page actions are ready, then use its getting-started action and open the new-project flow. Wait for me to choose a starter in Widgetr. If I choose Weather, ask for my location in this chat, then connect a public JSON weather source and update the widget from its returned fields. If I choose Bitcoin, use the live BTC / USD data already loaded in Widgetr and help me shape the widget or change its source if I ask.'
-    )
+    const prompt = createAssistantPrompt('http://127.0.0.1:3100/')
+
+    expect(prompt).toContain('Open Widgetr in the in-app browser at http://127.0.0.1:3100/.')
+    expect(prompt).toContain('If I add a reference image, read Widgetr\'s reference handoff and ask one focused question at a time')
+    expect(prompt).toContain('For a screenshot or UI reference, ask whether to preserve the layout, visual style, or both.')
+    expect(prompt).toContain('Do not claim to have analyzed visual details unless the reference is visible to you.')
   })
 
   it('keeps all WebMCP status labels provider-neutral and observable', () => {

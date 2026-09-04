@@ -54,7 +54,7 @@ export const WIDGET_STARTERS: readonly WidgetStarterDefinition[] = [
     action: 'reference',
     label: 'Start from a reference image',
     description: 'Use a screenshot or photo to set the visual direction.',
-    nextStep: 'Add the image here, then continue in your assistant\'s chat.',
+    nextStep: 'Add the image here. Your assistant will ask what to preserve and what the widget should show.',
     icon: 'i-lucide-image-plus',
     projectName: 'Reference-led widget'
   },

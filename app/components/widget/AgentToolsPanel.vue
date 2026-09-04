@@ -9,6 +9,13 @@ type AgentHistoryEntry = {
   direction: 'past' | 'future'
 }
 
+type ReferenceIntake = {
+  fileName: string
+  width: number
+  height: number
+  url: string | null
+}
+
 type AgentPanelTab = 'history' | 'tools'
 
 const props = withDefaults(defineProps<{
@@ -17,8 +24,10 @@ const props = withDefaults(defineProps<{
   context: WebMcpContext
   toolNames: string[]
   error: string | null
+  referenceIntake?: ReferenceIntake | null
   history?: AgentHistoryEntry[]
 }>(), {
+  referenceIntake: null,
   history: () => []
 })
 
@@ -99,6 +108,28 @@ const contextLabel = computed(() => {
       :error="error"
       compact
     />
+
+    <section
+      v-if="props.referenceIntake"
+      class="reference-intake-handoff"
+      aria-labelledby="reference-intake-heading"
+      data-testid="reference-intake-handoff"
+    >
+      <div class="reference-intake-thumbnail">
+        <img
+          v-if="props.referenceIntake.url"
+          :src="props.referenceIntake.url"
+          :alt="`Reference image: ${props.referenceIntake.fileName}`"
+        >
+        <UIcon v-else name="i-lucide-image" aria-hidden="true" />
+      </div>
+      <div class="reference-intake-copy">
+        <strong id="reference-intake-heading">Reference added</strong>
+        <p>Your assistant will ask what to preserve and what the widget should show.</p>
+        <span>{{ props.referenceIntake.fileName }} · {{ props.referenceIntake.width }} × {{ props.referenceIntake.height }}</span>
+        <small>Continue in your AI assistant's chat.</small>
+      </div>
+    </section>
 
     <div class="agent-tools-meta">
       <span>{{ contextLabel }}</span>
@@ -227,6 +258,75 @@ const contextLabel = computed(() => {
 
 .panel-heading > .i-lucide-bot {
   color: var(--widgetr-accent);
+}
+
+.reference-intake-handoff {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--widgetr-accent) 28%, var(--widgetr-border));
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--widgetr-accent) 5%, transparent);
+}
+
+.reference-intake-thumbnail {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--widgetr-ink) 8%, transparent);
+  color: var(--widgetr-accent);
+}
+
+.reference-intake-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reference-intake-thumbnail > .i-lucide-image {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.reference-intake-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+}
+
+.reference-intake-copy strong {
+  color: var(--widgetr-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.reference-intake-copy p,
+.reference-intake-copy span,
+.reference-intake-copy small {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.reference-intake-copy p {
+  color: var(--widgetr-ink);
+  font-size: 0.69rem;
+}
+
+.reference-intake-copy span,
+.reference-intake-copy small {
+  color: var(--widgetr-muted);
+  font-size: 0.6rem;
+}
+
+.reference-intake-copy small {
+  color: var(--widgetr-accent-strong);
+  font-weight: 650;
 }
 
 .agent-panel-tabs {

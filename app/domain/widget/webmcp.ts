@@ -810,6 +810,15 @@ function sharedTools(): WebMcpToolDescriptor[] {
           ? findWidgetElement(project.layouts[project.selection.size].root, project.selection.elementId)
           : null
         const context = getWebMcpContext(project)
+        const reference = project.localReference
+          ? {
+              fileName: project.localReference.fileName,
+              mimeType: project.localReference.mimeType,
+              width: project.localReference.width,
+              height: project.localReference.height,
+              storedLocally: true
+            }
+          : null
 
         return {
           ok: true,
@@ -826,6 +835,10 @@ function sharedTools(): WebMcpToolDescriptor[] {
           designScope: project.designScope,
           context,
           availableTools: getWebMcpToolNames(project),
+          reference,
+          assistantNextStep: reference
+            ? 'Ask one focused question at a time about the reference before changing the widget.'
+            : null,
           selectedElement: element
             ? {
                 id: element.id,
@@ -972,10 +985,67 @@ function getStartedTool(studioUrl: string): WebMcpToolDescriptor {
         starters: WIDGET_STARTERS.map(starter => ({
           id: starter.id,
           label: starter.label,
-          action: starter.action
+          action: starter.action,
+          description: starter.description,
+          nextStep: starter.nextStep
         })),
-        nextStep: 'Open the widget editor new-project flow and wait for the person to choose a starter. Once they choose one, continue the required questions in the assistant chat.',
+        nextStep: 'Open the widget editor new-project flow and wait for the person to choose a starter. If the person adds a reference image, read the reference handoff and continue with one focused question at a time in the assistant chat.',
         message: 'Widgetr is ready. Let the person choose a starter in the editor, then shape it together there.'
+      }
+    }
+  })
+}
+
+function referenceIntakeTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_get_reference_intake',
+    title: 'Read Widgetr reference handoff',
+    description: 'Read the latest local reference-image handoff after a person adds an image. Use the image if it is visible in your page context, then ask only the questions needed to decide the widget purpose, image treatment, and content before making changes.',
+    inputSchema: objectJsonSchema({}),
+    annotations: {
+      ...readOnlyAnnotations(),
+      untrustedContentHint: true
+    },
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(emptyInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      const reference = runtime.getProject().localReference
+      if (!reference) {
+        return errorPayload(
+          runtime,
+          'REFERENCE_NOT_FOUND',
+          'No local reference image is attached. Ask the person to add one from the Widgetr starter or Reference panel.'
+        )
+      }
+
+      return {
+        ok: true,
+        assistantTask: 'reference-intake',
+        reference: {
+          fileName: reference.fileName,
+          mimeType: reference.mimeType,
+          width: reference.width,
+          height: reference.height,
+          storedLocally: true
+        },
+        firstQuestion: 'What should this widget help you see at a glance?',
+        suggestedReplies: [
+          'A live dashboard',
+          'A personal photo or visual',
+          'A status card',
+          'Something else'
+        ],
+        questionGuidance: [
+          'Ask one question at a time and stop when the next design decision is clear.',
+          'For a screenshot or UI reference, ask whether to preserve the layout, visual style, or both.',
+          'For a photo or illustration, ask whether it should be the main content, a background, or an accent.',
+          'For a chart or data image, ask which information should be live and where it comes from.',
+          'Do not claim to have analyzed visual details unless the reference is visible in your context.'
+        ],
+        nextStep: 'Ask the first question in the assistant chat and wait for the answer before changing the widget.'
       }
     }
   })
@@ -1988,7 +2058,8 @@ export function getWebMcpContext(project: WidgetProject): WebMcpContext {
 export function getWebMcpToolNames(project: WidgetProject): string[] {
   const context = getWebMcpContext(project)
   const contextNames = context === 'unsupported' ? [] : contextToolNames[context]
-  return [...sharedToolNames, ...contextNames]
+  const referenceNames = project.localReference ? ['widgetr_get_reference_intake'] : []
+  return [...sharedToolNames, ...referenceNames, ...contextNames]
 }
 
 export function createWebMcpToolCatalog(project: WidgetProject): WebMcpToolDescriptor[] {
@@ -1998,6 +2069,10 @@ export function createWebMcpToolCatalog(project: WidgetProject): WebMcpToolDescr
     connectPublicDataSourceTool(),
     setDataBindingsTool()
   ]
+
+  if (project.localReference) {
+    tools.push(referenceIntakeTool())
+  }
 
   if (context === 'none') {
     tools.push(...noSelectionTools())

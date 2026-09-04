@@ -154,6 +154,7 @@ const removeElementTarget = ref<WidgetSelection | null>(null)
 const referenceUpload = ref<File | null | undefined>()
 const referenceUrl = ref<string | null>(null)
 const referenceError = ref<string | null>(null)
+const referenceIntakeOpen = ref(false)
 const agentConfirmation = ref<WebMcpConfirmationRequest | null>(null)
 const starterBusy = ref(false)
 const starterModalOpen = ref(false)
@@ -263,6 +264,19 @@ const layerPreviewSize = computed<WidgetSize>(() => (
 ))
 
 const activeProject = computed(() => projects.value.find(item => item.id === project.value.id) ?? project.value)
+const referenceIntake = computed(() => {
+  const reference = activeProject.value.localReference
+  if (!referenceIntakeOpen.value || !reference) {
+    return null
+  }
+
+  return {
+    fileName: reference.fileName,
+    width: reference.width,
+    height: reference.height,
+    url: referenceUrl.value
+  }
+})
 
 const selectedElementTitle = computed(() => {
   const selection = project.value.selection
@@ -376,6 +390,9 @@ const statusDockMessage = computed(() => {
   if (changeReceiptMessage.value) {
     return changeReceiptMessage.value
   }
+  if (referenceIntakeOpen.value) {
+    return 'Reference added. Continue in your assistant\'s chat.'
+  }
   if (project.value.selection) {
     return `Selected ${selectedElementTitle.value} in the ${selectedSizeLabel.value.toLowerCase()} layout.`
   }
@@ -413,6 +430,10 @@ function commitOperation(
 
   if (!result.ok) {
     return result
+  }
+
+  if (operation.type !== 'set-selection') {
+    referenceIntakeOpen.value = false
   }
 
   const recordHistory = options.recordHistory ?? operation.type !== 'set-selection'
@@ -834,6 +855,7 @@ function redo(): void {
 
 async function selectProject(projectId: string): Promise<void> {
   closeContextualSurfaces()
+  referenceIntakeOpen.value = false
   await openProject(projectId)
   historyPast.value = []
   historyFuture.value = []
@@ -844,6 +866,7 @@ async function selectProject(projectId: string): Promise<void> {
 
 function openNewProject(): void {
   closeContextualSurfaces()
+  referenceIntakeOpen.value = false
   starterModalDismissed.value = false
   starterModalOpen.value = true
   void router.push({
@@ -872,6 +895,7 @@ function updateStarterModal(open: boolean): void {
 }
 
 async function createAgentProject(name: string, startingIntent?: WidgetStarterId): Promise<WidgetProject> {
+  referenceIntakeOpen.value = false
   const created = await createProject(name, startingIntent)
   historyPast.value = []
   historyFuture.value = []
@@ -888,6 +912,7 @@ async function startFromStarter(starterId: WidgetStarterId, referenceFile?: File
   }
 
   starterBusy.value = true
+  referenceIntakeOpen.value = false
 
   try {
     const starter = getWidgetStarter(starterId)
@@ -910,7 +935,7 @@ async function startFromStarter(starterId: WidgetStarterId, referenceFile?: File
     }
     clearForcedNewQuery()
 
-    if (starter.action === 'reference') {
+    if (starter.action === 'reference' && (referenceError.value || !referenceFile)) {
       referenceOpen.value = true
     }
   } finally {
@@ -1033,6 +1058,13 @@ async function handleReferenceUpload(value: File | null | undefined): Promise<vo
       await deleteReference(oldReference)
     }
     await loadReferenceImage()
+    if (referenceError.value) {
+      return
+    }
+
+    referenceIntakeOpen.value = true
+    closeContextualSurfaces()
+    agentOpen.value = true
   } catch (error) {
     await deleteReference(storageKey).catch(() => undefined)
     referenceError.value = error instanceof Error ? error.message : 'The reference image could not be saved.'
@@ -1080,6 +1112,7 @@ async function removeReference(): Promise<void> {
     patch: { localReference: null }
   })
   if (result.ok) {
+    referenceIntakeOpen.value = false
     await deleteReference(storageKey)
     await loadReferenceImage()
   }
@@ -1599,6 +1632,7 @@ onBeforeUnmount(() => {
                 :context="webmcpContext"
                 :tool-names="webmcpRegisteredToolNames"
                 :error="webmcpError"
+                :reference-intake="referenceIntake"
                 :history="agentHistory"
               />
             </template>

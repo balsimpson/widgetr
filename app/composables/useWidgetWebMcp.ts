@@ -130,6 +130,8 @@ export function useWidgetWebMcp(options: UseWidgetWebMcpOptions) {
     return [
       options.enabled.value ? 'enabled' : 'disabled',
       options.project.value.id,
+      options.project.value.startingIntent ?? 'none',
+      options.project.value.localReference?.storageKey ?? 'no-reference',
       selection?.elementId ?? 'none',
       context.value,
       options.catalogKey?.value ?? 'default'

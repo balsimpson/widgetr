@@ -97,7 +97,7 @@ The current starter and editor experience moves here.
 - Cancel and Escape dismiss the forced chooser and return a saved-project user to the active project.
 - Choosing a starter or cancelling the forced chooser removes `new=1` with history replacement so refresh and Back do not reopen it unexpectedly.
 - The starter modal currently exposes only Weather and Cryptocurrency templates plus a reference-image dropzone; Examples and other starter cards stay deferred from this visible flow.
-- Existing project persistence, history, previews, manual controls, export, and reference-image behavior remain unchanged. A person's selected preview mode is preserved while an assistant selects or edits another size; in `All`, all three previews stay visible.
+- Existing project persistence, history, previews, manual controls, export, and reference-image behavior remain unchanged. Choosing a reference image immediately creates the local reference-led project, opens the assistant handoff, and keeps the image available for replacement from the Reference panel. A person's selected preview mode is preserved while an assistant selects or edits another size; in `All`, all three previews stay visible.
 
 ## Homepage content
 
@@ -291,7 +291,7 @@ Use a legitimate Scriptable brand asset from an official or user-approved source
 - `/studio?new=1` opens that modal for a returning user without deleting or replacing saved work.
 - Direct `/studio` resumes the active saved project.
 - Starter, cancel, and Escape behavior remove the forced-new query correctly.
-- Weather and Cryptocurrency are the only visible template actions; reference-led creation starts with a dropzone, selected-image preview, and explicit confirmation.
+- Weather and Cryptocurrency are the only visible template actions; reference-led creation starts with a dropzone and immediately hands the selected image to the local project and assistant handoff.
 - The Studio keeps the shared readiness status in its assistant dock while the starter modal stays focused on creation choices.
 - Creating a starter produces a separate local project through the existing persistence path.
 - The active Studio retains existing preview, selection, history, reference, export, and assistant behavior.

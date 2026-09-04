@@ -72,12 +72,7 @@ function handleReferenceFile(file: File | null | undefined): void {
   referenceFile.value = file
   referencePreviewUrl.value = URL.createObjectURL(file)
   referenceError.value = null
-}
-
-function confirmReference(): void {
-  if (referenceFile.value) {
-    emit('reference', referenceFile.value)
-  }
+  emit('reference', file)
 }
 
 watch(() => props.open, isOpen => {
@@ -151,8 +146,8 @@ onBeforeUnmount(() => {
           class="starter-dropzone"
           accept="image/*"
           icon="i-lucide-image-plus"
-          label="Drop a screenshot or image to guide your widget"
-          description="Drag it here, or click to browse"
+          label="Add a screenshot or image"
+          description="Your assistant will ask how to use it as a guide"
           variant="area"
           layout="list"
           :preview="false"
@@ -166,26 +161,9 @@ onBeforeUnmount(() => {
             alt="Selected reference preview"
           >
           <div class="reference-selection-copy">
-            <strong>Use this image?</strong>
+            <strong>Reference added</strong>
             <span>{{ referenceFile.name }}</span>
-            <div class="reference-selection-actions">
-              <UButton
-                label="Use this image"
-                icon="i-lucide-arrow-right"
-                color="primary"
-                size="sm"
-                :disabled="props.disabled"
-                @click="confirmReference"
-              />
-              <UButton
-                label="Choose another"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :disabled="props.disabled"
-                @click="resetReferenceSelection"
-              />
-            </div>
+            <p>Your assistant will ask what to preserve and what the widget should show.</p>
           </div>
         </div>
 
@@ -395,12 +373,11 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.reference-selection-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.3rem;
+.reference-selection-copy p {
+  margin: 0;
+  color: var(--widgetr-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 30rem) {

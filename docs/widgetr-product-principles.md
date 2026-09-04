@@ -179,7 +179,7 @@ Better:
 - Treat the selected preview mode as the person's view preference. Assistant selection or editing may change the inspector's focused layout, but must not replace `All` with a single-size preview.
 - Keep the first-run message and status in the same place so the person does not have to relearn the layout when an assistant becomes available.
 - Keep reference-image upload on the Widgetr page.
-- Make it clear that uploading an image does not, by itself, create a widget. Explain that the person should continue in the assistant's chat.
+- Make it clear that uploading an image starts a reference-led project but does not produce a finished widget. Explain that the person should continue in the assistant's chat.
 - Keep the page useful when no assistant is available. If generation cannot happen, say so and provide manual editing or example exploration when those paths exist.
 - Make every agent change visible in the preview.
 - Ask the person before applying changes that may remove or replace work.
