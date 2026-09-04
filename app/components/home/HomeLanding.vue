@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import AssistantChoiceGuideComponent from './HomeAssistantChoiceGuide.vue'
+import type { WebMcpStatus } from '~/types/webmcp'
 
 const props = defineProps<{
   assistantMessage: string
   copyState: 'idle' | 'copied' | 'failed'
   hasSavedProjects: boolean
+  webmcpStatus: WebMcpStatus
+  webmcpError: string | null
+  webmcpToolNames: string[]
 }>()
 
 const emit = defineEmits<{
   copy: []
+  retry: []
 }>()
 
 const copyLabel = computed(() => {
@@ -31,6 +35,10 @@ const copyReceipt = computed(() => {
   }
   return ''
 })
+
+const toolCountLabel = computed(() => (
+  `${props.webmcpToolNames.length} ${props.webmcpToolNames.length === 1 ? 'action' : 'actions'}`
+))
 </script>
 
 <template>
@@ -64,22 +72,45 @@ const copyReceipt = computed(() => {
 
           <h1 id="homepage-heading">Build Scriptable widgets <span class="homepage-heading-accent">without writing JavaScript</span>.</h1>
           <p class="homepage-description">
-            Connect your AI assistant, describe your idea using natural language, and shape it on the canvas.
+            Choose a starting point, shape it with your assistant, and export the same widget to Scriptable.
           </p>
         </section>
 
         <section class="homepage-start" aria-labelledby="homepage-start-heading">
           <div class="homepage-section-heading">
-            <h2 id="homepage-start-heading">Connect an assistant to start</h2>
+            <h2 id="homepage-start-heading">Start in Studio</h2>
           </div>
 
-          <div class="homepage-assistant">
-            <AssistantChoiceGuideComponent />
-          </div>
+          <WidgetWebMcpReadiness
+            class="homepage-readiness"
+            :status="props.webmcpStatus"
+            :error="props.webmcpError"
+            compact
+            inline
+            retry-label="Retry"
+            @retry="emit('retry')"
+          />
+
+          <details class="homepage-tools">
+            <summary class="homepage-tools-summary">
+              <span>Page actions</span>
+              <span class="homepage-tools-count">{{ toolCountLabel }}</span>
+              <UIcon name="i-lucide-chevron-down" class="homepage-tools-chevron" aria-hidden="true" />
+            </summary>
+            <div class="homepage-tools-content">
+              <ul v-if="props.webmcpToolNames.length" class="homepage-tools-list">
+                <li v-for="toolName in props.webmcpToolNames" :key="toolName">
+                  <UIcon name="i-lucide-wand-sparkles" aria-hidden="true" />
+                  <code>{{ toolName }}</code>
+                </li>
+              </ul>
+              <p v-else class="homepage-tools-empty">Tools appear here when page actions are ready.</p>
+            </div>
+          </details>
 
           <section class="homepage-prompt" aria-labelledby="homepage-prompt-heading">
             <div class="homepage-prompt-heading">
-              <h3 id="homepage-prompt-heading">Start with this message</h3>
+              <h3 id="homepage-prompt-heading">Copy a starter message</h3>
             </div>
             <ClientOnly>
               <p class="homepage-prompt-message">{{ props.assistantMessage }}</p>
@@ -102,14 +133,13 @@ const copyReceipt = computed(() => {
           </p>
 
           <UButton
-            v-if="props.hasSavedProjects"
-            label="Continue"
+            :label="props.hasSavedProjects ? 'Continue' : 'Start in Studio'"
             icon="i-lucide-arrow-right"
-            to="/studio"
+            :to="props.hasSavedProjects ? '/studio' : '/studio?new=1'"
             color="primary"
             size="lg"
             block
-            class="homepage-continue-action"
+            class="homepage-studio-action"
           />
         </section>
       </div>
@@ -251,14 +281,6 @@ const copyReceipt = computed(() => {
   border-left: 1px solid var(--widgetr-border);
 }
 
-.homepage-assistant {
-  min-width: 0;
-}
-
-:deep(.homepage-assistant .assistant-choice) {
-  margin-top: 0;
-}
-
 .homepage-section-heading {
   display: grid;
   gap: 0.4rem;
@@ -274,10 +296,92 @@ const copyReceipt = computed(() => {
   line-height: 1.05;
 }
 
+.homepage-readiness {
+  min-width: 0;
+}
+
+.homepage-tools {
+  min-width: 0;
+  border-bottom: 1px solid var(--widgetr-border);
+}
+
+.homepage-tools-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  color: var(--widgetr-ink);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 650;
+  list-style: none;
+}
+
+.homepage-tools-summary::-webkit-details-marker {
+  display: none;
+}
+
+.homepage-tools-summary:focus-visible {
+  outline: 2px solid var(--widgetr-accent);
+  outline-offset: 0.2rem;
+  border-radius: 0.2rem;
+}
+
+.homepage-tools-count {
+  margin-left: auto;
+  color: var(--widgetr-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 550;
+}
+
+.homepage-tools-chevron {
+  color: var(--widgetr-muted);
+  transition: transform 160ms ease;
+}
+
+.homepage-tools[open] .homepage-tools-chevron {
+  transform: rotate(180deg);
+}
+
+.homepage-tools-content {
+  padding: 0 0 0.75rem;
+}
+
+.homepage-tools-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.homepage-tools-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--widgetr-muted);
+  font-size: 0.64rem;
+}
+
+.homepage-tools-list code {
+  overflow-wrap: anywhere;
+  color: var(--widgetr-ink);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.homepage-tools-empty {
+  margin: 0;
+  color: var(--widgetr-muted);
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
 .homepage-prompt {
   display: grid;
   gap: 0.9rem;
-  padding: 1rem;
+  padding: 0.95rem;
   border: 1px solid var(--widgetr-border);
   border-radius: var(--widgetr-radius-panel);
   background: color-mix(in srgb, var(--widgetr-stage) 48%, transparent);
@@ -299,7 +403,7 @@ const copyReceipt = computed(() => {
 }
 
 .homepage-prompt-message {
-  max-height: 11rem;
+  max-height: 8rem;
   margin: 0;
   overflow: auto;
   color: var(--widgetr-ink);
@@ -325,7 +429,7 @@ const copyReceipt = computed(() => {
   line-height: 1.4;
 }
 
-.homepage-continue-action {
+.homepage-studio-action {
   min-height: 3.1rem;
 }
 

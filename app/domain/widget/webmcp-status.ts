@@ -12,35 +12,35 @@ export function describeWebMcpStatus(status: WebMcpStatus): WebMcpStatusDescript
     case 'checking':
       return {
         label: 'Checking page actions...',
-        description: 'Checking whether an assistant can work with this page.',
+        description: 'Checking whether this page can accept page actions.',
         color: 'neutral',
         icon: 'i-lucide-search-check'
       }
     case 'registering':
       return {
         label: 'Preparing page actions...',
-        description: 'Making the editor actions available to a compatible assistant.',
+        description: 'Getting Widgetr page actions ready.',
         color: 'warning',
         icon: 'i-lucide-loader-circle'
       }
     case 'registered':
       return {
         label: 'WebMCP ready',
-        description: 'This page has registered actions for a compatible assistant. Ask what to build, then shape it together on the canvas.',
+        description: 'Ask what to build, then watch the canvas update.',
         color: 'success',
         icon: 'i-lucide-check-circle-2'
       }
     case 'working':
       return {
         label: 'Your assistant is working',
-        description: 'An editor action is running. Keep shaping the widget together on the canvas.',
+        description: 'A page action is changing the widget.',
         color: 'warning',
         icon: 'i-lucide-loader-circle'
       }
     case 'error':
       return {
         label: 'Page actions could not start',
-        description: 'Reload the page or use the message below to continue.',
+        description: 'Retry registration or use the copied message.',
         color: 'error',
         icon: 'i-lucide-circle-alert'
       }
@@ -48,7 +48,7 @@ export function describeWebMcpStatus(status: WebMcpStatus): WebMcpStatusDescript
     default:
       return {
         label: 'WebMCP unavailable',
-        description: 'This page needs an AI assistant with page actions to build and shape the widget on the canvas.',
+        description: 'Use a WebMCP-capable environment or continue manually.',
         color: 'error',
         icon: 'i-lucide-plug-zap'
       }

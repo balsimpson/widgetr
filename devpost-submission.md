@@ -24,7 +24,7 @@ The tools return the current revision and require that revision for writes. This
 
 ## How We Used Codex
 
-Codex was used to build and iterate on Widgetr's Nuxt application, WebMCP adapter, revision-checked widget operations, editor interactions, and the final in-app-browser demo. It also helped verify the deployed app's contextual tool catalog and prepare this entry.
+Codex was used to build and iterate on Widgetr's Nuxt application, WebMCP adapter, revision-checked widget operations, editor interactions, and the submission materials. Verification notes distinguish local rendering, hosted behavior, WebMCP registration and invocation, export, and Scriptable/iPhone execution.
 
 ## Key Features
 
@@ -43,10 +43,10 @@ Widgetr is a Nuxt application with a single canonical `WidgetProject`. It stores
 
 ## Testing Instructions
 
-1. Open `https://widgetr.vercel.app/` in ChatGPT's in-app browser.
-2. Choose or continue a widget project, then open the Studio.
-3. Select a text element. Confirm that Widgetr exposes contextual tools such as `widgetr_get_context`, `widgetr_change_text_content`, and `widgetr_export`.
-4. Ask the assistant to read the current context, change selected text across all sizes, and inspect the small, medium, and large previews.
+1. Open `https://widgetr.vercel.app/` in a WebMCP-capable browser or in-app browser. The homepage readiness row should report the page-side state, and the `Page actions` disclosure should list registered tool names when registration succeeds. In an ordinary browser, the page explains that WebMCP is unavailable and keeps the copy-message fallback available.
+2. Click `Start in Studio` for a new browser, or `Continue` when a saved project is present. The new-visitor path opens the Studio starter choices.
+3. Choose a starter, then select a text element. Confirm that Widgetr exposes contextual tools such as `widgetr_get_context`, `widgetr_change_text_content`, and `widgetr_export`.
+4. Ask the assistant to read the current context, change selected text across all sizes, and inspect the small, medium, and large previews. Watch the same canvas update and verify that a current revision is required for mutations.
 5. Open Export and confirm the generated Scriptable source is available.
 
 No login or credentials are required.
@@ -72,7 +72,7 @@ Captured for this submission:
 
 Still useful to capture:
 
-1. Widgetr's landing screen, showing the assistant connection path.
+1. Widgetr's landing screen, showing the WebMCP readiness row and `Page actions` disclosure.
 2. Studio with the medium widget selected and its contextual inspector open.
 3. An assistant-driven text change visible in the canvas and inspector.
 
@@ -82,20 +82,23 @@ Verified today:
 
 - The Devpost account is registered for The WebMCP Challenge, and the event is accepting submissions.
 - A Devpost project draft exists at `https://devpost.com/software/widgetr` and is attached to the challenge with status `Draft`.
-- `https://widgetr.vercel.app/` opens in ChatGPT's in-app browser and exposes Widgetr's WebMCP tools.
+- The public deployment URL was previously checked for reachability and a deployed WebMCP catalog; the homepage follow-up in this working tree still needs a fresh production rollout and external invocation check.
 - `https://github.com/balsimpson/widgetr` is public and shows a visible MIT license.
 - The local repository guard confirms the Widgetr checkout, origin, and package identity.
 
 Still needed before the final Devpost action:
 
 - The public YouTube URL.
+- Fresh confirmation that the deployed homepage shows the readiness row, page-action disclosure, and correct Start/Continue routing.
+- One real WebMCP invocation against the deployed URL, followed by the mutating and export checks in the Testing Instructions.
 - Confirmed answers for the submitter type, country of residence, app status, learning level, and career-value questions.
 - Three to five screenshots or a project thumbnail, if you want a stronger visual project page.
 - A final review of the current deployed URL and public repository immediately before submission.
 
 ## Known Limitations
 
-- The live editor is intentionally focused on the current widget-authoring flow. Data onboarding and design curation are later phases.
+- The homepage is intentionally a short handoff surface, while the live editor remains focused on the current widget-authoring flow. Data onboarding and design curation are later phases.
+- WebMCP readiness depends on the capabilities exposed by the current browser. The homepage keeps a copyable message and a direct Studio path when page actions are unavailable.
 - Widgetr's projects are local to the browser unless the user exports their generated Scriptable file.
 
 ## TODO Official Form Fields
@@ -110,8 +113,8 @@ Use these exact Devpost fields when the video URL is ready:
 | Live URL | `https://widgetr.vercel.app/` |
 | Testing instructions | Use the Testing Instructions section above. No credentials are needed. |
 | Public code repository | `https://github.com/balsimpson/widgetr` |
-| Agents or clients tested | ChatGPT's in-app browser. It exposed Widgetr's registered WebMCP tool catalog and was used to run context and widget-edit operations. |
-| AI tools leveraged | Codex with WebMCP-capable ChatGPT in-app-browser testing. Codex was used for implementation, debugging, visual iteration, and deployment verification. |
+| Agents or clients tested | WebMCP-capable in-app browser for the target environment; the current homepage follow-up's external invocation still needs a fresh run after deployment. |
+| AI tools leveraged | Codex for implementation, debugging, local UI verification, WebMCP contract checks, and submission preparation. |
 | Learning level | `Significant` |
 | Career-value question | `Yes` |
 | YouTube video URL | TODO: Add once uploaded. |

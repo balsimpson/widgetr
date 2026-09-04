@@ -1,8 +1,8 @@
 # Widgetr
 
-Widgetr is a standalone Nuxt application for building Scriptable widgets through one shared visual state. Phase 4 adds contextual imperative WebMCP tools over the same revision-checked operation path as the UI, on top of the Phase 3 local-first projects, IndexedDB persistence, structure and inspector editing, local reference images, and deterministic Scriptable generation.
+Widgetr is a standalone Nuxt application for building Scriptable widgets through one shared visual state. It adds contextual imperative WebMCP tools over the same revision-checked operation path as the UI, on top of local-first projects, IndexedDB persistence, structure and inspector editing, local reference images, and deterministic Scriptable generation.
 
-The current public-facing editor is intentionally functional rather than visually polished: it demonstrates three independent widget-size layouts, shared data, revision-checked operations, local project history, deterministic Scriptable export, and a live WebMCP tool catalog that changes with the selected element. Data onboarding and design curation remain later phases in the approved product plan.
+The public entry point is a short onboarding page at `/`; the editor lives at `/studio`. The homepage surfaces the page-side WebMCP readiness state, discloses registered page-action names when available, provides a short copyable assistant message, and routes new visitors to the Studio starter flow. The Studio demonstrates three independent widget-size layouts, shared data, revision-checked operations, local project history, deterministic Scriptable export, and a live contextual WebMCP catalog that changes with the selected element. Data onboarding and design curation remain later phases in the approved product plan.
 
 Live deployment for the Devpost challenge and testing: [widgetr.vercel.app](https://widgetr.vercel.app/)
 
@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL shown by Nuxt. With no saved projects, the editor starts with intentional project choices; returning users resume their last project. Once a project exists, the workspace provides three widget-size previews, structure and inspector controls, and generated Scriptable source. Projects, edits, undo/redo history, and reference images stay in the browser's local IndexedDB storage.
+Open the local URL shown by Nuxt. `/` is the onboarding page and `/studio` is the editor. A new visitor can use `Start in Studio` to open the intentional starter choices; returning users can use `Continue` to resume their last project. The homepage readiness row reports only what the current page can observe: whether page actions are available, registering, ready, or working. In a WebMCP-capable environment, the `Page actions` disclosure lists the registered tool names; ordinary browsers receive the copy-message fallback. Once a project exists, the workspace provides three widget-size previews, structure and inspector controls, and generated Scriptable source. Projects, edits, undo/redo history, and reference images stay in the browser's local IndexedDB storage.
 
 ## Production deployment
 
@@ -29,7 +29,7 @@ Widgetr is configured for a normal Nuxt server deployment. Vercel detects Nuxt a
 1. Push the repository to a public Git provider.
 2. In Vercel, choose **Add New → Project**, import the repository, and keep the detected Nuxt framework settings.
 3. Use `npm run build` as the build command if Vercel asks for an explicit command. Leave the output directory at its automatic setting.
-4. Deploy, open the resulting URL, and verify the three previews, scoped operations, export preflight, Copy action, and `.js` download. The current deployment is [widgetr.vercel.app](https://widgetr.vercel.app/).
+4. Deploy, open the resulting URL, and verify the homepage readiness row and page-action disclosure, the Studio starter flow, the three previews, scoped operations, export preflight, Copy action, and `.js` download. The current deployment is [widgetr.vercel.app](https://widgetr.vercel.app/).
 
 Phase 4 has no required environment variables. Do not add secrets to the repository or to the generated Scriptable file.
 
@@ -45,11 +45,12 @@ The production server listens on port `3000` by default. `npm run generate` rema
 ## Checks
 
 ```bash
+npm run repo:check
 npm run typecheck
 npm test
 ```
 
-The repository also defines `npm run build` and `npm run generate` for the deliberate deployment checkpoint. A local check does not prove that the generated file has run on an iPhone in Scriptable.
+The repository also defines `npm run build` and `npm run generate` for the deliberate deployment checkpoint. A local check does not prove that a deployed page registered its WebMCP tools, that an external assistant invoked one, or that the generated file has run on an iPhone in Scriptable.
 
 ## Environment variables
 

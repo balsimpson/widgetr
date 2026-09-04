@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSampleWidgetProject } from '~/domain/widget/fixture'
+import { createNeutralWidgetProject, createSampleWidgetProject } from '~/domain/widget/fixture'
 import { applyWidgetOperation } from '~/domain/widget/operations'
 import { createVisualDataElement } from '~/domain/widget/visual-data'
 import type { WidgetElement, WidgetProject, WidgetSize } from '~/types/widget'
@@ -99,7 +99,7 @@ describe('shared widget operations', () => {
   })
 
   it('replaces data bindings through the shared revision-checked operation', () => {
-    const project = createSampleWidgetProject()
+    const project = createNeutralWidgetProject()
     const result = applyWidgetOperation(project, {
       type: 'set-data-bindings',
       expectedRevision: 0,

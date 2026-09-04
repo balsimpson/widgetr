@@ -119,10 +119,11 @@ export function useWidgetTextFit(options: UseWidgetTextFitOptions): {
   return {
     containerRef,
     contentRef,
-    style: computed<Record<string, string>>(() => (
-      fittedFontSize.value === null
-        ? {}
-        : { fontSize: `${fittedFontSize.value}px` }
-    ))
+    style: computed((): Record<string, string> => {
+      if (fittedFontSize.value === null) {
+        return {}
+      }
+      return { fontSize: `${fittedFontSize.value}px` }
+    })
   }
 }

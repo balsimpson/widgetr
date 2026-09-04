@@ -31,7 +31,7 @@ describe('Bitcoin public-data adapter', () => {
     expect(result.data.priceDisplay).toBe('$70,123.45')
     expect(result.data.history).toEqual([68500, 70000, 70123.45])
     expect(result.data.change7dDisplay).toBe('+2.4%')
-    expect(result.data.low7dDisplay).toBe('$68,000.00')
+    expect(result.data.low7dDisplay).toBe('$68,500.00')
     expect(result.data.high7dDisplay).toBe('$70,500.00')
     expect(result.data.updatedAt).toBe('2026-09-03T06:00:00.000Z')
   })

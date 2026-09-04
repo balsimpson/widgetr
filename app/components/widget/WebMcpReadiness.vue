@@ -7,10 +7,12 @@ const props = withDefaults(defineProps<{
   status: WebMcpStatus
   error?: string | null
   compact?: boolean
+  inline?: boolean
   retryLabel?: string
 }>(), {
   error: null,
   compact: false,
+  inline: false,
   retryLabel: 'Try again'
 })
 
@@ -27,7 +29,10 @@ const statusCopy = computed(() => describeWebMcpStatus(props.status))
     :class="[
       `webmcp-readiness-${statusCopy.color}`,
       `webmcp-readiness-${props.status}`,
-      { 'webmcp-readiness-compact': props.compact }
+      {
+        'webmcp-readiness-compact': props.compact,
+        'webmcp-readiness-inline': props.inline
+      }
     ]"
     data-testid="webmcp-readiness"
     role="status"
@@ -67,6 +72,26 @@ const statusCopy = computed(() => describeWebMcpStatus(props.status))
 
 .webmcp-readiness-compact {
   padding: 0.65rem 0.75rem;
+}
+
+.webmcp-readiness-inline {
+  align-items: center;
+  padding: 0.35rem 0 0.65rem;
+  border: 0;
+  border-bottom: 1px solid var(--widgetr-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.webmcp-readiness-inline .webmcp-readiness-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.45rem;
+}
+
+.webmcp-readiness-inline .webmcp-readiness-copy p {
+  flex: 1 0 100%;
 }
 
 .webmcp-readiness-icon {

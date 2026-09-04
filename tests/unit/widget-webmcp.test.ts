@@ -106,10 +106,12 @@ describe('Widgetr WebMCP catalog', () => {
     expect(result).toMatchObject({
       ok: true,
       studioUrl: 'http://127.0.0.1:3100/studio',
-      nextStep: expect.stringContaining('choose a starter')
+      nextStep: 'Open Studio and wait for the person to choose a starting point.'
     })
     expect(JSON.stringify(result)).toContain('Build a weather widget')
     expect(JSON.stringify(result)).not.toContain('Kochi')
+    expect(result).not.toHaveProperty('message')
+    expect(JSON.stringify(result)).not.toContain('reference handoff')
   })
 
   it('creates a complete weather starter from the chooser catalog', async () => {
@@ -214,10 +216,12 @@ describe('Widgetr WebMCP catalog', () => {
   it('builds the assistant message from the current Widgetr URL', () => {
     const prompt = createAssistantPrompt('http://127.0.0.1:3100/')
 
-    expect(prompt).toContain('Open Widgetr in the in-app browser at http://127.0.0.1:3100/.')
-    expect(prompt).toContain('If I add a reference image, read Widgetr\'s reference handoff and ask one focused question at a time')
-    expect(prompt).toContain('For a screenshot or UI reference, ask whether to preserve the layout, visual style, or both.')
-    expect(prompt).toContain('Do not claim to have analyzed visual details unless the reference is visible to you.')
+    expect(prompt).toBe(
+      'Open Widgetr at http://127.0.0.1:3100/. Use its page actions to help me build a Scriptable widget. Ask what I want to see at a glance, then wait for me to choose a starting point. Keep changes visible on the canvas.'
+    )
+    expect(prompt).not.toContain('in-app browser')
+    expect(prompt).not.toContain('Bitcoin')
+    expect(prompt).not.toContain('reference handoff')
   })
 
   it('keeps all WebMCP status labels provider-neutral and observable', () => {
@@ -237,10 +241,10 @@ describe('Widgetr WebMCP catalog', () => {
     expect(getWebMcpToolNames(project)).toEqual([
       'widgetr_get_context',
       'widgetr_export',
-      'widgetr_connect_public_data',
-      'widgetr_set_data_bindings',
       'widgetr_select_element',
       'widgetr_clear_selection',
+      'widgetr_connect_public_data',
+      'widgetr_set_data_bindings',
       'widgetr_create_widget',
       'widgetr_set_design_scope',
       'widgetr_change_overall_style',

@@ -969,7 +969,7 @@ function getStartedTool(studioUrl: string): WebMcpToolDescriptor {
   return descriptor({
     name: 'widgetr_get_started',
     title: 'Get started with Widgetr',
-    description: 'Read what Widgetr does, where its widget editor is, and which starting paths are available before creating a widget.',
+    description: 'Read Widgetr\'s starting paths and Studio URL before creating a widget.',
     inputSchema: objectJsonSchema({}),
     annotations: readOnlyAnnotations(),
     execute: (_input, _context, runtime) => {
@@ -986,11 +986,9 @@ function getStartedTool(studioUrl: string): WebMcpToolDescriptor {
           id: starter.id,
           label: starter.label,
           action: starter.action,
-          description: starter.description,
-          nextStep: starter.nextStep
+          description: starter.description
         })),
-        nextStep: 'Open the widget editor new-project flow and wait for the person to choose a starter. If the person adds a reference image, read the reference handoff and continue with one focused question at a time in the assistant chat.',
-        message: 'Widgetr is ready. Let the person choose a starter in the editor, then shape it together there.'
+        nextStep: 'Open Studio and wait for the person to choose a starting point.'
       }
     }
   })
@@ -1987,10 +1985,10 @@ function groupContentOperation<T extends { expectedRevision: number, scope: Desi
 const sharedToolNames = [
   'widgetr_get_context',
   'widgetr_export',
-  'widgetr_connect_public_data',
-  'widgetr_set_data_bindings',
   'widgetr_select_element',
-  'widgetr_clear_selection'
+  'widgetr_clear_selection',
+  'widgetr_connect_public_data',
+  'widgetr_set_data_bindings'
 ]
 
 const contextToolNames: Record<Exclude<WebMcpContext, 'unsupported'>, string[]> = {
