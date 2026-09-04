@@ -10,6 +10,7 @@ import type {
   WidgetProject,
   WidgetStarterId
 } from '~/types/widget'
+import type { WidgetHistoryEntry } from '~/types/widget-history'
 import type {
   ScriptableExportResult
 } from '~/domain/widget/scriptable'
@@ -24,6 +25,7 @@ import type {
 export interface UseWidgetWebMcpOptions {
   enabled: Ref<boolean>
   project: Ref<WidgetProject>
+  history: Ref<WidgetHistoryEntry[]>
   commitOperation: (operation: WidgetOperation) => OperationResult
   createProject: (name: string, startingIntent?: WidgetStarterId) => Promise<WidgetProject>
   getExport: () => ScriptableExportResult
@@ -145,6 +147,7 @@ export function useWidgetWebMcp(options: UseWidgetWebMcpOptions) {
 
   const runtime: WebMcpRuntime = {
     getProject: () => options.project.value,
+    getHistory: () => options.history.value,
     commitOperation: options.commitOperation,
     createProject: options.createProject,
     getExport: options.getExport,

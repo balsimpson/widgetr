@@ -19,6 +19,7 @@ import {
 import type { WidgetProject } from '~/types/widget'
 import type { WidgetStarterId } from '~/types/widget'
 import type { WidgetProjectRepository } from '~/domain/widget/storage'
+import type { WidgetHistoryEntry } from '~/types/widget-history'
 
 export type PersistenceState = 'idle' | 'saving' | 'saved' | 'error'
 export type DataRefreshState = 'idle' | 'refreshing' | 'error'
@@ -30,6 +31,7 @@ function sortProjects(projects: WidgetProject[]): WidgetProject[] {
 export function useWidgetProjects() {
   const project = ref(createNeutralWidgetProject())
   const projects = ref<WidgetProject[]>([])
+  const historyEntries = ref<WidgetHistoryEntry[]>([])
   const isLoading = ref(true)
   const isHydrated = ref(false)
   const persistenceState = ref<PersistenceState>('idle')
@@ -66,12 +68,14 @@ export function useWidgetProjects() {
       if (storedProjects.length === 0) {
         projects.value = []
         project.value = createNeutralWidgetProject()
+        historyEntries.value = []
         await repository.setActiveProjectId(null)
       } else {
         projects.value = storedProjects
         const activeProjectId = await repository.getActiveProjectId()
         const activeProject = storedProjects.find(item => item.id === activeProjectId) ?? storedProjects[0]!
         project.value = cloneWidgetProject(activeProject)
+        historyEntries.value = await repository.listHistory(activeProject.id)
         await repository.setActiveProjectId(activeProject.id)
       }
       dataRefreshState.value = 'idle'
@@ -82,6 +86,7 @@ export function useWidgetProjects() {
       useMemoryFallback(error)
       projects.value = []
       project.value = createNeutralWidgetProject()
+      historyEntries.value = []
       dataRefreshState.value = 'idle'
       dataRefreshError.value = null
       try {
@@ -95,7 +100,14 @@ export function useWidgetProjects() {
     }
   }
 
-  function persistProject(nextProject: WidgetProject): Promise<void> {
+  function persistProject(
+    nextProject: WidgetProject,
+    historyEntry?: WidgetHistoryEntry
+  ): Promise<void> {
+    if (historyEntry && !historyEntries.value.some(entry => entry.id === historyEntry.id)) {
+      historyEntries.value = [...historyEntries.value, historyEntry]
+    }
+
     if (!isHydrated.value) {
       return Promise.resolve()
     }
@@ -105,7 +117,7 @@ export function useWidgetProjects() {
     saveQueue = saveQueue
       .catch(() => undefined)
       .then(async () => {
-        await repository.saveProject(nextProject)
+        await repository.saveProject(nextProject, historyEntry)
         await repository.setActiveProjectId(nextProject.id)
         if (!disposed) {
           persistenceState.value = 'saved'
@@ -125,10 +137,12 @@ export function useWidgetProjects() {
       return
     }
     project.value = cloneWidgetProject(nextProject)
+    historyEntries.value = []
     dataRefreshState.value = 'idle'
     dataRefreshError.value = null
     try {
       await repository.setActiveProjectId(nextProject.id)
+      historyEntries.value = await repository.listHistory(nextProject.id)
     } catch (error) {
       setPersistenceError(error)
     }
@@ -142,6 +156,7 @@ export function useWidgetProjects() {
     dataRefreshError.value = null
     const nextProject = createNewWidgetProject(undefined, name, startingIntent)
     replaceProject(nextProject)
+    historyEntries.value = []
     await persistProject(nextProject)
     if (startingIntent === 'cryptocurrency') {
       return refreshProjectData(nextProject)
@@ -154,6 +169,7 @@ export function useWidgetProjects() {
     dataRefreshError.value = null
     const nextProject = createExampleWidgetProject()
     replaceProject(nextProject)
+    historyEntries.value = []
     await persistProject(nextProject)
     return nextProject
   }
@@ -163,6 +179,7 @@ export function useWidgetProjects() {
     dataRefreshError.value = null
     const nextProject = duplicateWidgetProject(source)
     replaceProject(nextProject)
+    historyEntries.value = []
     await persistProject(nextProject)
     return nextProject
   }
@@ -179,9 +196,11 @@ export function useWidgetProjects() {
         const nextProject = projects.value[0]
         if (nextProject) {
           project.value = cloneWidgetProject(nextProject)
+          historyEntries.value = await repository.listHistory(nextProject.id)
           await repository.setActiveProjectId(nextProject.id)
         } else {
           project.value = createNeutralWidgetProject()
+          historyEntries.value = []
           await repository.setActiveProjectId(null)
         }
       }
@@ -255,6 +274,7 @@ export function useWidgetProjects() {
   return {
     project,
     projects,
+    historyEntries,
     isLoading,
     isHydrated,
     persistenceState,

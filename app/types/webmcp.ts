@@ -1,4 +1,5 @@
 import type { OperationResult, WidgetOperation, WidgetProject, WidgetSize, WidgetStarterId } from './widget'
+import type { WidgetHistoryEntry } from './widget-history'
 import type { ScriptableExportResult } from '~/domain/widget/scriptable'
 
 export type WebMcpContext = 'none' | 'text' | 'image' | 'group' | 'visual-data' | 'unsupported'
@@ -45,6 +46,7 @@ export interface WebMcpConfirmationRequest {
 
 export interface WebMcpRuntime {
   getProject: () => WidgetProject
+  getHistory: () => WidgetHistoryEntry[]
   commitOperation: (operation: WidgetOperation) => OperationResult
   createProject: (name: string, startingIntent?: WidgetStarterId) => Promise<WidgetProject>
   getExport: () => ScriptableExportResult

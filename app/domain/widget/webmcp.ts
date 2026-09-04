@@ -17,10 +17,13 @@ import {
 } from './schema'
 import type {
   DesignScope,
+  NumericSource,
+  SeriesSource,
   VisualDataElementType,
   OperationResult,
   UpdateElementContentOperation,
   ValueSource,
+  WidgetBackground,
   JsonObject,
   WidgetElement,
   WidgetOperation,
@@ -28,7 +31,7 @@ import type {
   WidgetStarterId,
   WidgetSize
 } from '~/types/widget'
-import { WIDGET_SIZES } from '~/types/widget'
+import { WIDGET_DIMENSIONS, WIDGET_SIZES } from '~/types/widget'
 import type {
   WebMcpContext,
   WebMcpJsonSchema,
@@ -385,6 +388,15 @@ const clearSelectionInputSchema = z.object({
 }).strict()
 
 const emptyInputSchema = z.object({}).strict()
+
+const historyInputSchema = z.object({
+  sinceRevision: expectedRevisionSchema.optional(),
+  beforeRevision: expectedRevisionSchema.optional(),
+  limit: z.number().int().min(1).max(50).default(20)
+}).strict().refine(
+  input => input.sinceRevision === undefined || input.beforeRevision === undefined,
+  'Use sinceRevision or beforeRevision, not both.'
+)
 
 const creatableStarterIds = WIDGET_STARTERS
   .filter(starter => starter.action === 'create')
@@ -791,12 +803,445 @@ function readOnlyAnnotations() {
   }
 }
 
+function serializeValueSource(source: ValueSource): Record<string, unknown> {
+  if (source.kind === 'literal') {
+    return { kind: source.kind, value: source.value }
+  }
+
+  if (source.kind === 'binding') {
+    return {
+      kind: source.kind,
+      bindingId: source.bindingId,
+      fallback: source.fallback,
+      format: source.format
+    }
+  }
+
+  return {
+    kind: source.kind,
+    path: [...source.path],
+    fallback: source.fallback,
+    format: source.format
+  }
+}
+
+function serializeNumericSource(source: NumericSource): Record<string, unknown> {
+  if (source.kind === 'literal') {
+    return { kind: source.kind, value: source.value }
+  }
+
+  if (source.kind === 'binding') {
+    return {
+      kind: source.kind,
+      bindingId: source.bindingId,
+      fallback: source.fallback
+    }
+  }
+
+  return {
+    kind: source.kind,
+    path: [...source.path],
+    fallback: source.fallback
+  }
+}
+
+function serializeSeriesSource(source: SeriesSource): Record<string, unknown> {
+  if (source.kind === 'literal') {
+    return { kind: source.kind, value: [...source.value] }
+  }
+
+  if (source.kind === 'binding') {
+    return {
+      kind: source.kind,
+      bindingId: source.bindingId,
+      fallback: [...source.fallback]
+    }
+  }
+
+  return {
+    kind: source.kind,
+    path: [...source.path],
+    fallback: [...source.fallback]
+  }
+}
+
+function serializeBackground(background: WidgetBackground): Record<string, unknown> {
+  if (background.kind === 'solid') {
+    return {
+      kind: background.kind,
+      color: background.color,
+      opacity: background.opacity
+    }
+  }
+
+  if (background.kind === 'gradient') {
+    return {
+      kind: background.kind,
+      colors: [...background.colors],
+      direction: background.direction,
+      opacity: background.opacity
+    }
+  }
+
+  return {
+    kind: background.kind,
+    source: serializeValueSource(background.source),
+    fit: background.fit,
+    overlayColor: background.overlayColor,
+    overlayOpacity: background.overlayOpacity
+  }
+}
+
+function serializeElementStyle(style: WidgetElement['style']): Record<string, unknown> {
+  return {
+    opacity: style.opacity,
+    padding: { ...style.padding },
+    cornerRadius: style.cornerRadius,
+    border: style.border ? { ...style.border } : null,
+    background: style.background ? serializeBackground(style.background) : null,
+    width: style.width,
+    height: style.height,
+    alignSelf: style.alignSelf
+  }
+}
+
+function serializeWidgetElement(
+  element: WidgetElement,
+  parentId: string | null,
+  path: string[],
+  index: number
+): Record<string, unknown> {
+  const node: Record<string, unknown> = {
+    id: element.id,
+    label: widgetElementLabel(element),
+    type: element.type,
+    parentId,
+    index,
+    path,
+    visible: element.visible,
+    style: serializeElementStyle(element.style)
+  }
+
+  switch (element.type) {
+    case 'text':
+      node.value = serializeValueSource(element.value)
+      node.textStyle = { ...element.textStyle }
+      break
+    case 'date':
+      node.value = serializeValueSource(element.value)
+      node.format = element.format
+      node.textStyle = { ...element.textStyle }
+      break
+    case 'image':
+      node.source = serializeValueSource(element.source)
+      node.alt = element.alt
+      node.fit = element.fit
+      node.crop = { ...element.crop }
+      break
+    case 'symbol':
+      node.name = serializeValueSource(element.name)
+      node.color = element.color
+      node.size = element.size
+      break
+    case 'group':
+      node.direction = element.direction
+      node.spacing = element.spacing
+      node.horizontalAlignment = element.horizontalAlignment
+      node.verticalAlignment = element.verticalAlignment
+      node.distribution = element.distribution
+      node.children = element.children.map((child, childIndex) => (
+        serializeWidgetElement(child, element.id, [...path, child.id], childIndex)
+      ))
+      break
+    case 'spacer':
+      node.length = element.length
+      break
+    case 'repeat':
+      node.itemsBindingId = element.itemsBindingId
+      node.limit = element.limit
+      node.direction = element.direction
+      node.spacing = element.spacing
+      node.horizontalAlignment = element.horizontalAlignment
+      node.verticalAlignment = element.verticalAlignment
+      node.distribution = element.distribution
+      node.children = element.children.map((child, childIndex) => (
+        serializeWidgetElement(child, element.id, [...path, child.id], childIndex)
+      ))
+      break
+    case 'progress-ring':
+      node.rings = element.rings.map(ring => ({
+        id: ring.id,
+        value: serializeNumericSource(ring.value),
+        min: ring.min,
+        max: ring.max,
+        trackColor: ring.trackColor,
+        fillColor: ring.fillColor
+      }))
+      node.size = element.size
+      node.thickness = element.thickness
+      node.centerLabel = element.centerLabel
+        ? serializeValueSource(element.centerLabel)
+        : null
+      break
+    case 'progress-bar':
+      node.value = serializeNumericSource(element.value)
+      node.min = element.min
+      node.max = element.max
+      node.trackColor = element.trackColor
+      node.fillColor = element.fillColor
+      node.thickness = element.thickness
+      break
+    case 'sparkline':
+      node.values = serializeSeriesSource(element.values)
+      node.lineColor = element.lineColor
+      node.fillColor = element.fillColor
+      node.thickness = element.thickness
+      node.density = element.density
+      break
+    case 'bar-chart':
+      node.values = serializeSeriesSource(element.values)
+      node.barColor = element.barColor
+      node.gap = element.gap
+      node.density = element.density
+      break
+  }
+
+  return node
+}
+
+type WidgetElementLocation = {
+  element: WidgetElement
+  parentId: string | null
+  path: string[]
+  index: number
+}
+
+function findWidgetElementLocation(
+  root: WidgetElement,
+  elementId: string,
+  parentId: string | null = null,
+  path: string[] = [root.id],
+  index = 0
+): WidgetElementLocation | null {
+  if (root.id === elementId) {
+    return { element: root, parentId, path, index }
+  }
+
+  if (root.type !== 'group' && root.type !== 'repeat') {
+    return null
+  }
+
+  for (let childIndex = 0; childIndex < root.children.length; childIndex += 1) {
+    const child = root.children[childIndex]!
+    const match = findWidgetElementLocation(
+      child,
+      elementId,
+      root.id,
+      [...path, child.id],
+      childIndex
+    )
+    if (match) {
+      return match
+    }
+  }
+
+  return null
+}
+
+function selectionStatus(
+  project: WidgetProject,
+  selectedLocation: WidgetElementLocation | null
+): 'none' | 'selected' | 'stale' {
+  if (!project.selection) {
+    return 'none'
+  }
+  return selectedLocation ? 'selected' : 'stale'
+}
+
+function structureTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_get_structure',
+    title: 'Read the full Widgetr structure',
+    description: 'Read the current project structure for all widget sizes, including stable element IDs, hierarchy, content sources, bindings, and editable layout properties. Use this when no element is selected, the selection is stale, or the requested target is ambiguous. This tool is read-only and always available.',
+    inputSchema: objectJsonSchema({}),
+    annotations: readOnlyAnnotations(),
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(emptyInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      const project = runtime.getProject()
+      const selectedLocation = project.selection
+        ? findWidgetElementLocation(
+            project.layouts[project.selection.size].root,
+            project.selection.elementId
+          )
+        : null
+      const reference = project.localReference
+        ? {
+            fileName: project.localReference.fileName,
+            mimeType: project.localReference.mimeType,
+            width: project.localReference.width,
+            height: project.localReference.height,
+            storedLocally: true
+          }
+        : null
+
+      return {
+        ok: true,
+        projectId: project.id,
+        name: project.name,
+        startingIntent: project.startingIntent ?? null,
+        revision: project.revision,
+        selection: project.selection,
+        selectionStatus: selectionStatus(project, selectedLocation),
+        selectedElement: selectedLocation
+          ? {
+              id: selectedLocation.element.id,
+              type: selectedLocation.element.type,
+              label: widgetElementLabel(selectedLocation.element),
+              size: project.selection?.size,
+              parentId: selectedLocation.parentId,
+              path: selectedLocation.path,
+              index: selectedLocation.index
+            }
+          : null,
+        designScope: project.designScope,
+        data: {
+          sourceKind: project.dataSource.kind,
+          sourceUrl: project.dataSource.url,
+          adapter: project.dataSource.adapter ?? null,
+          state: project.data.kind,
+          label: project.data.label,
+          capturedAt: project.data.capturedAt,
+          bindingCount: project.bindings.length
+        },
+        bindings: project.bindings.map(binding => ({
+          id: binding.id,
+          label: binding.label,
+          path: [...binding.path],
+          valueType: binding.valueType
+        })),
+        layouts: Object.fromEntries(WIDGET_SIZES.map(size => [size, {
+          size,
+          width: WIDGET_DIMENSIONS[size].width,
+          height: WIDGET_DIMENSIONS[size].height,
+          padding: { ...project.layouts[size].padding },
+          cornerRadius: project.layouts[size].cornerRadius,
+          background: serializeBackground(project.layouts[size].background),
+          root: serializeWidgetElement(project.layouts[size].root, null, ['root'], 0)
+        }])),
+        reference,
+        diagnostics: project.diagnostics
+      }
+    }
+  })
+}
+
+function historyTool(): WebMcpToolDescriptor {
+  return descriptor({
+    name: 'widgetr_get_history',
+    title: 'Read Widgetr change history',
+    description: 'Read the current project change history without including it in every context response. Use sinceRevision to ask what changed after a revision, or beforeRevision to page backward through older changes.',
+    inputSchema: objectJsonSchema({
+      sinceRevision: {
+        type: 'integer',
+        minimum: 0,
+        description: 'Return changes after this revision.'
+      },
+      beforeRevision: {
+        type: 'integer',
+        minimum: 0,
+        description: 'Return older changes before this revision.'
+      },
+      limit: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 50,
+        description: 'Maximum number of history entries to return. Defaults to 20.'
+      }
+    }),
+    annotations: readOnlyAnnotations(),
+    execute: (_input, _context, runtime) => {
+      const parsed = parseOrError(historyInputSchema, _input, runtime)
+      if (!parsed.ok) {
+        return parsed.payload
+      }
+
+      const project = runtime.getProject()
+      const allEntries = runtime.getHistory()
+        .filter(entry => entry.projectId === project.id)
+        .sort((left, right) => left.revision - right.revision)
+      const { sinceRevision, beforeRevision, limit } = parsed.value
+
+      if (sinceRevision !== undefined) {
+        const available = allEntries.filter(entry => entry.revision > sinceRevision)
+        const entries = available.slice(0, limit)
+        return {
+          ok: true,
+          projectId: project.id,
+          currentRevision: project.revision,
+          sinceRevision,
+          beforeRevision: null,
+          history: entries,
+          returnedCount: entries.length,
+          hasMore: available.length > entries.length,
+          nextSinceRevision: entries.at(-1)?.revision ?? sinceRevision,
+          message: entries.length
+            ? `Found ${entries.length} change${entries.length === 1 ? '' : 's'} after revision ${sinceRevision}.`
+            : `No recorded changes found after revision ${sinceRevision}.`
+        }
+      }
+
+      if (beforeRevision !== undefined) {
+        const available = allEntries
+          .filter(entry => entry.revision < beforeRevision)
+          .sort((left, right) => right.revision - left.revision)
+        const entries = available
+          .slice(0, limit)
+          .sort((left, right) => left.revision - right.revision)
+        return {
+          ok: true,
+          projectId: project.id,
+          currentRevision: project.revision,
+          sinceRevision: null,
+          beforeRevision,
+          history: entries,
+          returnedCount: entries.length,
+          hasMore: available.length > entries.length,
+          nextBeforeRevision: entries[0]?.revision ?? beforeRevision,
+          message: entries.length
+            ? `Found ${entries.length} earlier change${entries.length === 1 ? '' : 's'} before revision ${beforeRevision}.`
+            : `No recorded changes found before revision ${beforeRevision}.`
+        }
+      }
+
+      const entries = allEntries.slice(-limit)
+      return {
+        ok: true,
+        projectId: project.id,
+        currentRevision: project.revision,
+        sinceRevision: null,
+        beforeRevision: null,
+        history: entries,
+        returnedCount: entries.length,
+        hasMore: allEntries.length > entries.length,
+        nextBeforeRevision: entries[0]?.revision ?? null,
+        message: entries.length
+          ? `Found the latest ${entries.length} change${entries.length === 1 ? '' : 's'}.`
+          : 'No recorded document changes yet.'
+      }
+    }
+  })
+}
+
 function sharedTools(): WebMcpToolDescriptor[] {
   return [
     descriptor({
       name: 'widgetr_get_context',
       title: 'Read Widgetr editor context',
-      description: 'Read the current Widgetr revision, selection, design scope, available contextual tools, and a bounded selected-element summary.',
+      description: 'Read the current Widgetr revision, exact selection state, design scope, available tools, and a bounded selected-element summary. Use widgetr_get_structure when no element is selected, the selection is stale, or the requested target is ambiguous. Use widgetr_get_history when you need to know what changed after an earlier revision.',
       inputSchema: objectJsonSchema({}),
       annotations: readOnlyAnnotations(),
       execute: (_input, _context, runtime) => {
@@ -806,10 +1251,17 @@ function sharedTools(): WebMcpToolDescriptor[] {
         }
 
         const project = runtime.getProject()
-        const element = project.selection
-          ? findWidgetElement(project.layouts[project.selection.size].root, project.selection.elementId)
+        const selectedLocation = project.selection
+          ? findWidgetElementLocation(
+              project.layouts[project.selection.size].root,
+              project.selection.elementId
+            )
           : null
+        const element = selectedLocation?.element ?? null
         const context = getWebMcpContext(project)
+        const history = runtime.getHistory()
+          .filter(entry => entry.projectId === project.id)
+          .sort((left, right) => left.revision - right.revision)
         const reference = project.localReference
           ? {
               fileName: project.localReference.fileName,
@@ -832,9 +1284,16 @@ function sharedTools(): WebMcpToolDescriptor[] {
             bindingCount: project.bindings.length
           },
           selection: project.selection,
+          selectionStatus: selectionStatus(project, selectedLocation),
           designScope: project.designScope,
           context,
           availableTools: getWebMcpToolNames(project),
+          history: {
+            available: true,
+            entryCount: history.length,
+            latestRevision: history.at(-1)?.revision ?? null,
+            tool: 'widgetr_get_history'
+          },
           reference,
           assistantNextStep: reference
             ? 'Ask one focused question at a time about the reference before changing the widget.'
@@ -844,6 +1303,10 @@ function sharedTools(): WebMcpToolDescriptor[] {
                 id: element.id,
                 type: element.type,
                 label: widgetElementLabel(element),
+                size: project.selection?.size,
+                parentId: selectedLocation?.parentId,
+                path: selectedLocation?.path,
+                index: selectedLocation?.index,
                 childCount: element.type === 'group' || element.type === 'repeat'
                   ? element.children.length
                   : undefined
@@ -852,6 +1315,8 @@ function sharedTools(): WebMcpToolDescriptor[] {
         }
       }
     }),
+    structureTool(),
+    historyTool(),
     descriptor({
       name: 'widgetr_export',
       title: 'Export Widgetr widget',
@@ -1984,6 +2449,8 @@ function groupContentOperation<T extends { expectedRevision: number, scope: Desi
 
 const sharedToolNames = [
   'widgetr_get_context',
+  'widgetr_get_structure',
+  'widgetr_get_history',
   'widgetr_export',
   'widgetr_select_element',
   'widgetr_clear_selection',

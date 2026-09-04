@@ -22,16 +22,16 @@ Update this section after every session that changes implementation, verificatio
 | Last updated | 4 September 2026 |
 | Active phase | Phase 4: close the deployed WebMCP and Scriptable vertical slice |
 | Phase state | In progress |
-| Phase 4 state | In progress; Phase 5 is complete locally, while the remaining deployed WebMCP, export, and iPhone checks are resumed here |
+| Phase 4 state | In progress; the generic structure/history follow-up is implemented locally, while the remaining deployed WebMCP, export, and iPhone checks are resumed here |
 | Local branch | `main` |
 | Local and remote commit | `main` and `origin/main` are synchronized at `127c731`; the homepage readiness-gating change is pushed |
 | Latest verified UI commit | `127c731` records the homepage readiness-gating change; the deployed version and external WebMCP path still need verification |
 | Production URL | [`widgetr.vercel.app`](https://widgetr.vercel.app/) |
-| Next action | Run the WebMCP audit against the revised metadata after deployment, then verify the deployed WebMCP, export, and iPhone gates |
+| Next action | Run the approved local checks, then verify the structure/history tools and the deployed WebMCP, export, and iPhone gates |
 | Next external checkpoint | Resolve the two local-image export warnings and run the generated file in Scriptable on an iPhone for all three widget families |
 | Next production checkpoint | Complete the mutating WebMCP flow and prove that a manual interleaved edit survives |
 | Reprioritized work | The first Phase 7 general public-data onboarding slice is implemented locally for the Weather starter. It supports bounded public HTTPS GET JSON sources, field bindings, browser fetch diagnostics, Scriptable refresh configuration, locale-aware day/time/whole-number display transforms, WMO weather-code labels, and columnar five-day forecast normalization for Open-Meteo-style responses. The Bitcoin starter now adds a fixed CoinGecko keyless public price-plus-history adapter, normalized seven-day history, live browser refresh, and matching Scriptable refresh behavior. The user-prioritized reference-image assistant-intake slice is also implemented locally: selecting an image immediately records it on a reference-led project, opens the existing assistant handoff, and exposes focused question guidance through a read-only WebMCP tool. User-selected locations and crypto assets remain project data/integration work rather than starter constants. Secrets and authenticated sources remain deferred. |
-| Latest local browser evidence | At `1280 x 900`, local and production dark-mode Studio checks show `Export` and the active size control using `#101012` on `#9b8cff` at a measured `6.87:1` contrast ratio, with zero horizontal overflow; the local browser had no errors or warnings beyond Vue's informational Suspense notice, and production logs were empty. The earlier manual inspector and temporary page-local WebMCP checks still show the correct `You` and `Assistant` attribution traces and receipts. The homepage readiness follow-up was smoke-checked through the local Nuxt SSR/HMR path at `http://127.0.0.1:3100/`, returned HTTP 200, and reported no Impeccable detector findings. The route was sent to the Codex in-app browser for handoff, but its browser control connector was unavailable for a rendered viewport, console, or overflow check. The local reference-selection interaction, real external WebMCP invocation, export, and iPhone execution remain unverified. |
+| Latest local browser evidence | At `1280 x 900`, local and production dark-mode Studio checks show `Export` and the active size control using `#101012` on `#9b8cff` at a measured `6.87:1` contrast ratio, with zero horizontal overflow; the local browser had no errors or warnings beyond Vue's informational Suspense notice, and production logs were empty. The earlier manual inspector and temporary page-local WebMCP checks still show the correct `You` and `Assistant` attribution traces and receipts. The homepage readiness follow-up was smoke-checked through the local Nuxt SSR/HMR path at `http://127.0.0.1:3100/`, returned HTTP 200, and reported no Impeccable detector findings. This session's local Brave tab loaded `/studio` and hydrated the existing Weather project at `1200 x 1329` with zero captured warning/error console entries; a 1280 x 900 viewport override was unavailable. The route remains available for handoff. The new structure/history paths, typecheck, tests, browser registration, real external WebMCP invocation, export, and iPhone execution remain unverified. |
 | Homepage follow-up | The homepage now passes through WebMCP status, registered tool names, and retry state; shows a compact `Page actions` disclosure; removes the provider chooser; gates new-visitor `Start in Studio` on registered or working page actions; shows setup guidance instead when page actions are unavailable or fail; keeps saved-project `Continue` available for review; and uses a short assistant prompt and onboarding result. `npm run repo:check`, `git diff --check`, the local Nuxt SSR/HMR smoke check, and the Impeccable detector pass. Implementation commit `127c731` is pushed to `origin/main`; tests, typecheck, production build, deployment, and one real external invocation remain separate checkpoints. |
 | Next phase | Phase 6: assistant handoff, truthful status, and fallback; the reference-image intake slice is implemented locally and still needs its verification gates |
 | Visual-data phase | Phase 9: constrained progress and chart elements is implemented locally; verification gates remain |
@@ -220,7 +220,7 @@ State: In progress
 
 ### Outcome
 
-On the deployed page, an external assistant can read the current project, make a visible revision-aware change, observe selection-driven tool changes, preserve a person's manual edit, and export the same Scriptable source as the UI.
+On the deployed page, an external assistant can read the current project, retrieve the full widget structure or persisted changes on demand, make a visible revision-aware change, observe selection-driven tool changes, preserve a person's manual edit, and export the same Scriptable source as the UI.
 
 ### Already delivered
 
@@ -231,6 +231,8 @@ On the deployed page, an external assistant can read the current project, make a
 - [x] Confirmation before image-source replacement
 - [x] Production discovery of seven contextual tools
 - [x] Production `widgetr_get_context` read
+- [x] Local `widgetr_get_structure` read for all widget sizes and canonical element types
+- [x] Local IndexedDB semantic history with `widgetr_get_history` revision paging
 - [x] Production `widgetr_export` read with ready source
 - [x] Preview-first workspace deployed without page-level overflow or browser console issues
 
@@ -241,6 +243,7 @@ On the deployed page, an external assistant can read the current project, make a
 - [ ] Resolve or deliberately document the two `LOCAL_IMAGE_SOURCE` warnings for `/sample-monsoon.svg`.
 - [ ] Run the real-iPhone checkpoint from Phase 2.
 - [ ] On production, create a project through WebMCP.
+- [ ] Verify the full-structure and persisted-history tools in a WebMCP-capable browser.
 - [ ] Select an element and prove that the contextual tool set changes.
 - [ ] Change the selected element and verify the same state changes on the page.
 - [ ] Make a manual change between assistant calls and prove that the next assistant call preserves it.

@@ -3,6 +3,7 @@ import { shallowRef } from 'vue'
 import { createNewWidgetProject } from '~/domain/widget/projects'
 import { createNeutralWidgetProject, createSampleWidgetProject } from '~/domain/widget/fixture'
 import { applyWidgetOperation } from '~/domain/widget/operations'
+import { createWidgetHistoryEntry } from '~/domain/widget/history'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
 import { createVisualDataElement } from '~/domain/widget/visual-data'
 import { registerWebMcpToolSet } from '~/composables/useWidgetWebMcp'
@@ -18,6 +19,7 @@ import {
 import { describeWebMcpStatus } from '~/domain/widget/webmcp-status'
 import type { WebMcpModelContext, WebMcpRuntime, WebMcpTool } from '~/types/webmcp'
 import type { WidgetOperation, WidgetProject } from '~/types/widget'
+import type { WidgetHistoryEntry } from '~/types/widget-history'
 
 const fixedClock = () => '2026-08-28T06:00:00.000Z'
 
@@ -53,13 +55,19 @@ function selectedVisualProject(type: 'progress-ring' | 'progress-bar' | 'sparkli
   return result.state
 }
 
-function createRuntime(initialProject: WidgetProject, confirmation = true) {
+function createRuntime(
+  initialProject: WidgetProject,
+  confirmation = true,
+  initialHistory: WidgetHistoryEntry[] = []
+) {
   const state = { project: initialProject }
   const operations: WidgetOperation[] = []
   const confirmations: string[] = []
+  const history = [...initialHistory]
 
   const runtime: WebMcpRuntime = {
     getProject: () => state.project,
+    getHistory: () => history,
     commitOperation: operation => {
       operations.push(operation)
       const result = applyWidgetOperation(state.project, operation, { now: fixedClock })
@@ -79,7 +87,7 @@ function createRuntime(initialProject: WidgetProject, confirmation = true) {
     }
   }
 
-  return { runtime, state, operations, confirmations }
+  return { runtime, state, operations, confirmations, history }
 }
 
 function toolFor(project: WidgetProject, name: string) {
@@ -240,6 +248,8 @@ describe('Widgetr WebMCP catalog', () => {
     expect(getWebMcpContext(project)).toBe('none')
     expect(getWebMcpToolNames(project)).toEqual([
       'widgetr_get_context',
+      'widgetr_get_structure',
+      'widgetr_get_history',
       'widgetr_export',
       'widgetr_select_element',
       'widgetr_clear_selection',
@@ -250,6 +260,85 @@ describe('Widgetr WebMCP catalog', () => {
       'widgetr_change_overall_style',
       'widgetr_insert_visual_data'
     ])
+  })
+
+  it('exposes the full structure without requiring a selection', async () => {
+    const project = createSampleWidgetProject()
+    project.selection = null
+    const { runtime } = createRuntime(project)
+
+    const result = await toolFor(project, 'widgetr_get_structure').execute({}, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      ok: true,
+      projectId: project.id,
+      revision: 0,
+      selection: null,
+      selectionStatus: 'none',
+      layouts: {
+        small: { size: 'small', root: { id: 'root', type: 'group' } },
+        medium: { size: 'medium', root: { id: 'root', type: 'group' } },
+        large: { size: 'large', root: { id: 'root', type: 'group' } }
+      }
+    })
+    expect(JSON.stringify(result)).toContain('"id":"location"')
+    expect(JSON.stringify(result)).toContain('"id":"temperature"')
+  })
+
+  it('returns the exact selected element path in context', async () => {
+    const project = selectedProject('medium', 'location')
+    const { runtime } = createRuntime(project)
+
+    const result = await toolFor(project, 'widgetr_get_context').execute({}, { signal: signal() }, runtime)
+
+    expect(result).toMatchObject({
+      selectionStatus: 'selected',
+      selectedElement: {
+        id: 'location',
+        type: 'text',
+        size: 'medium',
+        parentId: 'weather-summary',
+        path: ['root', 'weather-summary', 'location']
+      }
+    })
+  })
+
+  it('returns persisted semantic history by revision', async () => {
+    const project = createSampleWidgetProject()
+    const operation: WidgetOperation = {
+      type: 'update-element-content',
+      expectedRevision: 0,
+      elementId: 'location',
+      scope: { kind: 'all' },
+      patch: { value: { kind: 'literal', value: 'Ladakh' } }
+    }
+    const result = applyWidgetOperation(project, operation, { now: fixedClock })
+    const entry = createWidgetHistoryEntry(project, operation, result, 'assistant')
+
+    if (!result.ok || !entry) {
+      throw new Error('Could not create the history fixture.')
+    }
+
+    const { runtime } = createRuntime(result.state, true, [entry])
+    const historyResult = await toolFor(result.state, 'widgetr_get_history').execute({
+      sinceRevision: 0
+    }, { signal: signal() }, runtime)
+
+    expect(historyResult).toMatchObject({
+      ok: true,
+      projectId: project.id,
+      currentRevision: 1,
+      history: [{
+        revision: 1,
+        actor: 'assistant',
+        operation: 'update-element-content',
+        targetIds: ['location'],
+        changedFields: ['value'],
+        changedSizes: ['small', 'medium', 'large']
+      }],
+      hasMore: false,
+      nextSinceRevision: 1
+    })
   })
 
   it('changes the catalog for text, image, and group selections', () => {

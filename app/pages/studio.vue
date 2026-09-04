@@ -17,6 +17,7 @@ import {
 import { useWidgetProjects } from '~/composables/useWidgetProjects'
 import { useWidgetWebMcp } from '~/composables/useWidgetWebMcp'
 import { generateScriptableCode } from '~/domain/widget/scriptable'
+import { createWidgetHistoryEntry } from '~/domain/widget/history'
 import { WIDGET_SIZES } from '~/types/widget'
 import type {
   OperationResult,
@@ -33,6 +34,7 @@ import type { WebMcpConfirmationRequest } from '~/types/webmcp'
 const {
   project,
   projects,
+  historyEntries,
   isLoading,
   isHydrated,
   persistenceState,
@@ -315,10 +317,10 @@ const agentHistory = computed(() => [
     actor: entry.actor,
     direction: 'future' as const
   })),
-  ...historyPast.value.slice().reverse().map((entry, index) => ({
-    id: `past-${entry.snapshot.revision}-${index}`,
+  ...historyEntries.value.slice().reverse().map(entry => ({
+    id: entry.id,
     message: entry.message,
-    detail: 'Undo available',
+    detail: `Revision ${entry.revision}`,
     actor: entry.actor,
     direction: 'past' as const
   }))
@@ -363,6 +365,7 @@ const {
 } = useWidgetWebMcp({
   enabled: computed(() => true),
   project,
+  history: historyEntries,
   commitOperation: operation => commitOperation(operation, { actor: 'assistant' }),
   createProject: createAgentProject,
   getExport: () => exportResult.value,
@@ -451,6 +454,8 @@ function commitOperation(
     return result
   }
 
+  const historyEntry = createWidgetHistoryEntry(project.value, operation, result, actor)
+
   if (operation.type !== 'set-selection') {
     referenceIntakeOpen.value = false
   }
@@ -473,7 +478,7 @@ function commitOperation(
   }
 
   replaceProject(result.state)
-  void persistProject(result.state)
+  void persistProject(result.state, historyEntry ?? undefined)
   return result
 }
 

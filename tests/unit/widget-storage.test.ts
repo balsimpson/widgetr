@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createNewWidgetProject, duplicateWidgetProject } from '~/domain/widget/projects'
 import { createMemoryProjectRepository } from '~/domain/widget/storage'
+import type { WidgetHistoryEntry } from '~/types/widget-history'
 
 const firstTimestamp = '2026-08-28T06:00:00.000Z'
 const secondTimestamp = '2026-08-28T07:00:00.000Z'
@@ -40,6 +41,33 @@ describe('local widget project storage', () => {
 
     await repository.deleteReference('reference/newer')
     expect(await repository.getReference('reference/newer')).toBeNull()
+  })
+
+  it('stores project history with the project and removes it on delete', async () => {
+    const repository = createMemoryProjectRepository()
+    const project = createNewWidgetProject(firstTimestamp, 'Weather')
+    const historyEntry: WidgetHistoryEntry = {
+      id: `${project.id}:1`,
+      projectId: project.id,
+      revision: 1,
+      actor: 'assistant',
+      operation: 'update-element-content',
+      targetIds: ['welcome'],
+      changedFields: ['value'],
+      changedSizes: ['small'],
+      selection: { size: 'small', elementId: 'welcome' },
+      message: 'Updated Welcome content in the small layout.',
+      warnings: [],
+      createdAt: secondTimestamp
+    }
+
+    await repository.saveProject(project, historyEntry)
+
+    const storedHistory = await repository.listHistory(project.id)
+    expect(storedHistory).toEqual([historyEntry])
+
+    await repository.deleteProject(project.id)
+    expect(await repository.listHistory(project.id)).toEqual([])
   })
 
   it('creates a clean duplicate identity without copying session metadata', () => {

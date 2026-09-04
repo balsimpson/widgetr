@@ -1,12 +1,15 @@
 import { validateWidgetProject } from './schema'
 import { cloneWidgetProject } from './clone'
 import type { WidgetProject } from '~/types/widget'
+import { parseWidgetHistoryEntry } from './history'
+import type { WidgetHistoryEntry } from '~/types/widget-history'
 
 const DATABASE_NAME = 'widgetr-local'
-const DATABASE_VERSION = 1
+const DATABASE_VERSION = 2
 const PROJECTS_STORE = 'projects'
 const REFERENCES_STORE = 'references'
 const WORKSPACE_STORE = 'workspace'
+const HISTORY_STORE = 'history'
 const ACTIVE_PROJECT_KEY = 'active-project'
 
 interface StoredReference {
@@ -21,8 +24,9 @@ interface StoredWorkspace {
 
 export interface WidgetProjectRepository {
   listProjects(): Promise<WidgetProject[]>
-  saveProject(project: WidgetProject): Promise<void>
+  saveProject(project: WidgetProject, historyEntry?: WidgetHistoryEntry): Promise<void>
   deleteProject(projectId: string): Promise<void>
+  listHistory(projectId: string): Promise<WidgetHistoryEntry[]>
   getActiveProjectId(): Promise<string | null>
   setActiveProjectId(projectId: string | null): Promise<void>
   saveReference(storageKey: string, blob: Blob): Promise<void>
@@ -64,6 +68,9 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!database.objectStoreNames.contains(WORKSPACE_STORE)) {
         database.createObjectStore(WORKSPACE_STORE, { keyPath: 'key' })
       }
+      if (!database.objectStoreNames.contains(HISTORY_STORE)) {
+        database.createObjectStore(HISTORY_STORE, { keyPath: 'id' })
+      }
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error ?? new Error('Could not open IndexedDB.'))
@@ -72,6 +79,17 @@ function openDatabase(): Promise<IDBDatabase> {
 
 function sortProjects(projects: WidgetProject[]): WidgetProject[] {
   return projects.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+}
+
+function cloneHistoryEntry(entry: WidgetHistoryEntry): WidgetHistoryEntry {
+  return {
+    ...entry,
+    targetIds: [...entry.targetIds],
+    changedFields: [...entry.changedFields],
+    changedSizes: [...entry.changedSizes],
+    selection: entry.selection ? { ...entry.selection } : null,
+    warnings: [...entry.warnings]
+  }
 }
 
 export function createIndexedDbProjectRepository(): WidgetProjectRepository {
@@ -91,23 +109,56 @@ export function createIndexedDbProjectRepository(): WidgetProjectRepository {
       return sortProjects(projects)
     },
 
-    async saveProject(project) {
+    async saveProject(project, historyEntry) {
       const validation = validateWidgetProject(project)
       if (!validation.ok) {
         throw new Error('The project could not be saved because its state is invalid.')
       }
 
+      const normalizedHistory = historyEntry ? parseWidgetHistoryEntry(historyEntry) : null
+      if (historyEntry && !normalizedHistory) {
+        throw new Error('The project history entry is invalid.')
+      }
+
       const db = await database
-      const transaction = db.transaction(PROJECTS_STORE, 'readwrite')
+      const stores = normalizedHistory
+        ? [PROJECTS_STORE, HISTORY_STORE]
+        : [PROJECTS_STORE]
+      const transaction = db.transaction(stores, 'readwrite')
       transaction.objectStore(PROJECTS_STORE).put(validation.value)
+      if (normalizedHistory) {
+        transaction.objectStore(HISTORY_STORE).put(normalizedHistory)
+      }
       await transactionComplete(transaction)
     },
 
     async deleteProject(projectId) {
       const db = await database
-      const transaction = db.transaction(PROJECTS_STORE, 'readwrite')
+      const transaction = db.transaction([PROJECTS_STORE, HISTORY_STORE], 'readwrite')
       transaction.objectStore(PROJECTS_STORE).delete(projectId)
+      const historyStore = transaction.objectStore(HISTORY_STORE)
+      const records = await requestResult<unknown[]>(historyStore.getAll())
+      for (const record of records) {
+        const entry = parseWidgetHistoryEntry(record)
+        if (entry?.projectId === projectId) {
+          historyStore.delete(entry.id)
+        }
+      }
       await transactionComplete(transaction)
+    },
+
+    async listHistory(projectId) {
+      const db = await database
+      const transaction = db.transaction(HISTORY_STORE, 'readonly')
+      const records = await requestResult<unknown[]>(transaction.objectStore(HISTORY_STORE).getAll())
+      await transactionComplete(transaction)
+
+      return records
+        .flatMap(record => {
+          const entry = parseWidgetHistoryEntry(record)
+          return entry?.projectId === projectId ? [entry] : []
+        })
+        .sort((left, right) => left.revision - right.revision)
     },
 
     async getActiveProjectId() {
@@ -159,6 +210,7 @@ export function createIndexedDbProjectRepository(): WidgetProjectRepository {
 export function createMemoryProjectRepository(): WidgetProjectRepository {
   const projects = new Map<string, WidgetProject>()
   const references = new Map<string, Blob>()
+  const history = new Map<string, WidgetHistoryEntry>()
   let activeProjectId: string | null = null
 
   return {
@@ -166,19 +218,38 @@ export function createMemoryProjectRepository(): WidgetProjectRepository {
       return sortProjects([...projects.values()].map(project => cloneWidgetProject(project)))
     },
 
-    async saveProject(project) {
+    async saveProject(project, historyEntry) {
       const validation = validateWidgetProject(project)
       if (!validation.ok) {
         throw new Error('The project could not be saved because its state is invalid.')
       }
+      const normalizedHistory = historyEntry ? parseWidgetHistoryEntry(historyEntry) : null
+      if (historyEntry && !normalizedHistory) {
+        throw new Error('The project history entry is invalid.')
+      }
       projects.set(project.id, cloneWidgetProject(validation.value))
+      if (normalizedHistory) {
+        history.set(normalizedHistory.id, cloneHistoryEntry(normalizedHistory))
+      }
     },
 
     async deleteProject(projectId) {
       projects.delete(projectId)
+      for (const [entryId, entry] of history) {
+        if (entry.projectId === projectId) {
+          history.delete(entryId)
+        }
+      }
       if (activeProjectId === projectId) {
         activeProjectId = null
       }
+    },
+
+    async listHistory(projectId) {
+      return [...history.values()]
+        .filter(entry => entry.projectId === projectId)
+        .sort((left, right) => left.revision - right.revision)
+        .map(cloneHistoryEntry)
     },
 
     async getActiveProjectId() {
