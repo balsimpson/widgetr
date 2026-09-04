@@ -10,6 +10,7 @@
   --widgetr-muted: #6e6e73;
   --widgetr-border: rgb(29 29 31 / 12%);
   --widgetr-accent: #6d5bd0;
+  --widgetr-accent-foreground: #ffffff;
   --widgetr-accent-strong: #5745b7;
   --widgetr-assistant: #0b7275;
   --widgetr-success: #1f7a51;
@@ -40,6 +41,7 @@
   --widgetr-muted: #a1a1a6;
   --widgetr-border: rgb(255 255 255 / 14%);
   --widgetr-accent: #9b8cff;
+  --widgetr-accent-foreground: var(--widgetr-stage);
   --widgetr-accent-strong: #b3a7ff;
   --widgetr-assistant: #69d7d4;
   --widgetr-success: #5dd49e;

@@ -2190,12 +2190,8 @@ onBeforeUnmount(() => {
 
 .size-control-active {
   background: var(--widgetr-accent) !important;
-  color: white !important;
+  color: var(--widgetr-accent-foreground) !important;
   box-shadow: 0 1px 2px rgb(29 29 31 / 18%);
-}
-
-:global(.dark) .size-control-active {
-  color: var(--widgetr-stage) !important;
 }
 
 .scope-summary {
@@ -3501,7 +3497,7 @@ onBeforeUnmount(() => {
 
 .topbar-export {
   background: var(--widgetr-accent) !important;
-  color: white !important;
+  color: var(--widgetr-accent-foreground) !important;
 }
 
 .studio-workspace {
