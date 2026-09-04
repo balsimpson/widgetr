@@ -969,7 +969,7 @@ function getStartedTool(studioUrl: string): WebMcpToolDescriptor {
   return descriptor({
     name: 'widgetr_get_started',
     title: 'Get started with Widgetr',
-    description: 'Read Widgetr\'s starting paths and Studio URL before creating a widget.',
+    description: 'Returns Widgetr\'s starting paths, Studio URL, and next-step guidance for beginning a widget.',
     inputSchema: objectJsonSchema({}),
     annotations: readOnlyAnnotations(),
     execute: (_input, _context, runtime) => {
@@ -1053,7 +1053,7 @@ function createWidgetTool(): WebMcpToolDescriptor {
   return descriptor({
     name: 'widgetr_create_widget',
     title: 'Create a Widgetr widget',
-    description: 'Create a new local Widgetr project from a listed starting idea. This never edits the neutral unsaved project.',
+    description: 'Creates a new local Widgetr project with the supplied name and optional listed starting idea, then returns its id, starting intent, revision, and initial selection.',
     inputSchema: objectJsonSchema({
       name: { type: 'string', minLength: 1, maxLength: 120, description: 'The new widget name.' },
       starterId: {
