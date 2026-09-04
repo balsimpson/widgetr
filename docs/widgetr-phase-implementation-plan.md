@@ -24,7 +24,7 @@ Update this section after every session that changes implementation, verificatio
 | Phase state | In progress |
 | Phase 4 state | In progress; Phase 5 is complete locally, while the remaining WebMCP, export, README, and iPhone checks are resumed here |
 | Local branch | `main` |
-| Local and remote commit | `f5ac9d8 = origin/main` for the pushed reference-image assistant-intake feature; the preceding site favicon, route metadata and 1200x630 social preview pass, shared viewer-locale formatting, and generic single-line text fitting are also in the synchronized `main` history |
+| Local and remote commit | `main` is clean and synchronized with `origin/main`; the reference-image assistant-intake feature is in commit `f5ac9d8`, and the final docs handoff update follows it |
 | Latest verified UI commit | `d5bd7a6` (the pushed social preview metadata pass); `f5ac9d8` is now pushed, but its reference-selection interaction and external WebMCP invocation still need their own verification |
 | Production URL | [`widgetrmcp.vercel.app`](https://widgetrmcp.vercel.app/) |
 | Next action | Run the pending focused visual-data, Bitcoin adapter, and reference-intake tests and typecheck, then verify the browser, deployed WebMCP, export, and iPhone gates |
