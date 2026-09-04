@@ -82,7 +82,7 @@ Verified today:
 
 - The Devpost account is registered for The WebMCP Challenge, and the event is accepting submissions.
 - A Devpost project draft exists at `https://devpost.com/software/widgetr` and is attached to the challenge with status `Draft`.
-- The public deployment URL was previously checked for reachability and a deployed WebMCP catalog; the homepage follow-up in this working tree still needs a fresh production rollout and external invocation check.
+- The public deployment URL was previously checked for reachability and a deployed WebMCP catalog; homepage follow-up commit `9b37b26` is now pushed and still needs a fresh production rollout and external invocation check.
 - `https://github.com/balsimpson/widgetr` is public and shows a visible MIT license.
 - The local repository guard confirms the Widgetr checkout, origin, and package identity.
 

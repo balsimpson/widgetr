@@ -2,7 +2,7 @@
 
 ## Status
 
-**The current homepage follow-up is in the working tree.** The homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are in place. The homepage now shows its WebMCP status and registered tool names, routes new visitors to Studio, and uses a short assistant message. The provider chooser is no longer part of the rendered homepage. `npm test` passes 8 files and 74 tests, `npm run typecheck` passes, and a local Nuxt SSR/HMR smoke check confirms the changed homepage output; rendered browser inspection, production build, deployment, and real WebMCP invocation remain separate checkpoints for this follow-up.
+**The current homepage follow-up is committed in `9b37b26` and pushed to `origin/main`.** The homepage and `/studio` split, provider-neutral readiness surface, safe onboarding catalogs, dynamic assistant message, and official Scriptable asset are in place. The homepage now shows its WebMCP status and registered tool names, routes new visitors to Studio, and uses a short assistant message. The provider chooser is no longer part of the rendered homepage. `npm test` passes 8 files and 74 tests, `npm run typecheck` passes, and a local Nuxt SSR/HMR smoke check confirms the changed homepage output; rendered browser inspection, production build, deployment, and real WebMCP invocation remain separate checkpoints for this follow-up.
 
 The user has explicitly reprioritized this homepage and Studio split. Do not reopen whether it belongs to a later phase. When implementation begins, record the reprioritization and current evidence in the canonical [phase implementation plan](./widgetr-phase-implementation-plan.md).
 
